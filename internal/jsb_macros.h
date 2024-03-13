@@ -12,7 +12,7 @@
 #   define JSB_LOG(Severity, Format, ...) (void) 0
 #   define jsb_check(Condition) (void) 0
 #   define jsb_checkf(Condition, Message) (void) 0
-#   define jsb_ensure(Condition) (void) 0
+#   define jsb_ensure(Condition) CRASH_COND(!(Condition))
 #endif
 
 #define JSB_CONSOLE(Severity, Message) print_line(Severity, Message)

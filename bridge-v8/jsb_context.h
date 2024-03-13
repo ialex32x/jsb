@@ -79,6 +79,8 @@ namespace jsb
 
         v8::MaybeLocal<v8::Value> _compile_run(const char* p_source, int p_source_len, const CharString& p_filename);
 
+        bool _get_main_module(v8::Local<v8::Object>* r_main_module) const;
+
         // JS function (type_name: string): type
         static void _load_type(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void _require(const v8::FunctionCallbackInfo<v8::Value>& info);

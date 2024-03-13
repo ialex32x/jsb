@@ -94,7 +94,6 @@ namespace jsb
         }
     }
 
-    //TODO require chain (access parent_id in child module's require)
     void JavaScriptContext::_require(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
         v8::Isolate* isolate = info.GetIsolate();
@@ -132,7 +131,7 @@ namespace jsb
         // find loader with the module id
         if (IModuleLoader* loader = cruntime->find_module_loader(module_id))
         {
-            JavaScriptModule& module = ccontext->module_cache_.insert(module_id);
+            JavaScriptModule& module = ccontext->module_cache_.insert(module_id, false);
             v8::Local<v8::Object> module_obj = v8::Object::New(isolate);
             v8::Local<v8::String> propkey_loaded = v8::String::NewFromUtf8Literal(isolate, "loaded");
 
@@ -167,9 +166,12 @@ namespace jsb
         SourceModuleResolver& resolver = cruntime->source_module_resolver_;
         if (resolver.is_valid(normalized_id))
         {
-            JavaScriptModule& module = ccontext->module_cache_.insert(normalized_id);
+            // supported module properties: id, filename, cache, loaded, exports, children
+            JavaScriptModule& module = ccontext->module_cache_.insert(normalized_id, true);
+            const CharString cnormalized_id_utf8_ = normalized_id.utf8();
             v8::Local<v8::Object> module_obj = v8::Object::New(isolate);
             v8::Local<v8::String> propkey_loaded = v8::String::NewFromUtf8Literal(isolate, "loaded");
+            v8::Local<v8::String> propkey_children = v8::String::NewFromUtf8Literal(isolate, "children");
 
             // register the new module obj into module_cache obj
             v8::Local<v8::Object> jmodule_cache = ccontext->jmodule_cache_.Get(isolate);
@@ -177,13 +179,39 @@ namespace jsb
 
             // init the new module obj
             module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, false));
+            module_obj->Set(context, v8::String::NewFromUtf8Literal(isolate, "id"), v8::String::NewFromUtf8(isolate, cnormalized_id_utf8_.ptr(), v8::NewStringType::kNormal, cnormalized_id_utf8_.length()).ToLocalChecked());
+            module_obj->Set(context, v8::String::NewFromUtf8Literal(isolate, "cache"), jmodule_cache);
+            module_obj->Set(context, propkey_children, v8::Array::New(isolate));
             module.id = normalized_id;
             module.module.Reset(isolate, module_obj);
 
             //NOTE the resolver should throw error if failed
+            //NOTE module.filename should be set in `resolve.load`
             if (resolver.load(ccontext, module))
             {
-                //TODO
+                if (!parent_id.is_empty())
+                {
+                    if (JavaScriptModule* cparent_module = ccontext->module_cache_.find(parent_id))
+                    {
+                        v8::Local<v8::Object> jparent_module = cparent_module->module.Get(isolate);
+                        v8::Local<v8::Value> jparent_children_v;
+                        if (jparent_module->Get(context, propkey_children).ToLocal(&jparent_children_v) && jparent_children_v->IsArray())
+                        {
+                            v8::Local<v8::Array> jparent_children = jparent_children_v.As<v8::Array>();
+                            const uint32_t children_num = jparent_children->Length();
+                            jparent_children->Set(context, children_num, module_obj);
+                        }
+                        else
+                        {
+                            JSB_LOG(Error, "can not access children on '%s'", parent_id);
+                        }
+                        module_obj->Set(context, v8::String::NewFromUtf8Literal(isolate, "parent"), jparent_module);
+                    }
+                    else
+                    {
+                        JSB_LOG(Warning, "parent module not found with the name '%s'", parent_id);
+                    }
+                }
                 module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, true));
                 info.GetReturnValue().Set(module.exports.Get(isolate));
             }
@@ -464,6 +492,19 @@ namespace jsb
             ERR_FAIL_V_MSG(ERR_COMPILATION_FAILED, String::utf8(*message_utf8, message_utf8.length()));
         }
         return OK;
+    }
+
+    bool JavaScriptContext::_get_main_module(v8::Local<v8::Object>* r_main_module) const
+    {
+        if (JavaScriptModule* cmain_module = module_cache_.get_main())
+        {
+            if (r_main_module)
+            {
+                *r_main_module = cmain_module->module.Get(get_isolate());
+            }
+            return true;
+        }
+        return false;
     }
 
     v8::MaybeLocal<v8::Value> JavaScriptContext::_compile_run(const char* p_source, int p_source_len, const CharString& p_filename)
