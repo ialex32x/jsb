@@ -1,0 +1,62 @@
+#!/usr/bin/env python
+import importlib.util
+import sys
+import os
+
+Import("env")
+Import("env_modules")
+
+def is_v8_available():
+    # return env["platform"] != "web"
+    return env["platform"] == "windows" and env.msvc
+
+javascript_engine = "v8" if is_v8_available() else "quickjs"
+javascript_debug_link = False # it seems godot links MT_StaticRelease even if env["dev_build"]
+
+# env_jsb.Append(CPPDEFINES=["JSB_LOG_ENABLED=1"])
+
+print("javascript engine:", javascript_engine)
+
+# make these PreprocessorDefinitions publicly known for the convenience of IDE coding hints
+javascript_shared_defines = [
+    "JSB_WITH_V8="+         str(1 if javascript_engine == "v8" else 0), 
+    "JSB_WITH_QUICKJS="+    str(1 if javascript_engine == "quickjs" else 0),
+]
+
+env_jsb = env_modules.Clone()
+
+env.Append(CPPDEFINES=javascript_shared_defines)
+env_jsb.Append(CPPDEFINES=javascript_shared_defines) # due to env_modules inherited from env before adding jsb preprocessors
+module_obj = []
+
+if javascript_engine == "v8":
+    if javascript_debug_link:
+        # env.Append(LIBPATH=['v8/windows.x86_64.debug'])
+        env.Append(LIBS=[File("v8/windows.x86_64.debug/v8_monolith.lib")])
+    else:
+        # env.Append(LIBPATH=['v8/windows.x86_64.release'])
+        env.Append(LIBS=[File("v8/windows.x86_64.release/v8_monolith.lib")])
+    # env.Append(LIBS=["winmm", "Dbghelp"])
+    
+    env.Append(LINKFLAGS=["winmm.lib", "Dbghelp.lib"])
+
+    if env["platform"] != "ios" and env["platform"] != "macos":
+        env_jsb.AppendUnique(CPPDEFINES=["V8_COMPRESS_POINTERS"])
+    env_jsb.Append(CPPDEFINES=["_ITERATOR_DEBUG_LEVEL=0"])
+    env_jsb.add_source_files(module_obj, "bridge-v8/*.cpp")
+    
+    # env_jsb is enough for compiler, but IDE lookup paths from `env`
+    if env.msvc and env["vsproj"]:
+        env.Append(CPPPATH=["#modules/jsb/v8/include"])
+    env_jsb.Append(CPPPATH=["v8/include"])
+else:
+    env_jsb.add_source_files(module_obj, "quickjs/*.c")
+    env_jsb.add_source_files(module_obj, "bridge-quickjs/*.cpp")
+    env_jsb.add_source_files(module_obj, "bridge-quickjs/extra/*.cpp")
+
+# common parts
+env_jsb.add_source_files(module_obj, ["register_types.cpp"])
+env_jsb.add_source_files(module_obj, "internal/*.cpp")
+env_jsb.add_source_files(module_obj, "weaver/*.cpp")
+
+env.modules_sources += module_obj
