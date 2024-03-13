@@ -50,12 +50,32 @@ namespace jsb
     {
         v8::Isolate* isolate = info.GetIsolate();
         v8::HandleScope handle_scope(isolate);
-        StringBuilder sb;
+        v8::Local<v8::Context> context = isolate->GetCurrentContext();
 
-        sb.append("[jsb]");
-        for (int i = 0, n = info.Length(); i < n; i++)
+        v8::Local<v8::Int32> magic;
+        if (!info.Data()->ToInt32(context).ToLocal(&magic))
         {
-            v8::String::Utf8Value str(isolate, info[i]);
+            isolate->ThrowError("bad call");
+            return;
+        }
+
+        StringBuilder sb;
+        sb.append("[jsb]");
+        const internal::ELogSeverity::Type severity = (internal::ELogSeverity::Type) magic->Value();
+        int index = severity != internal::ELogSeverity::Assert ? 0 : 1;
+        if (index == 1)
+        {
+            // check assertion
+            if (info[0]->BooleanValue(isolate))
+            {
+                return;
+            }
+        }
+
+        // join all data
+        for (int n = info.Length(); index < n; index++)
+        {
+            v8::String::Utf8Value str(isolate, info[index]);
 
             if (str.length() > 0)
             {
@@ -63,7 +83,15 @@ namespace jsb
                 sb.append(*str);
             }
         }
-        print_line(sb.as_string());
+
+        switch (severity)
+        {
+        case internal::ELogSeverity::Assert: CRASH_NOW_MSG(sb.as_string()); return;
+        case internal::ELogSeverity::Error: ERR_FAIL_MSG(sb.as_string()); return;
+        case internal::ELogSeverity::Warning: WARN_PRINT(sb.as_string()); return;
+        case internal::ELogSeverity::Trace: //TODO append stacktrace
+        default: print_line(sb.as_string()); return;
+        }
     }
 
     //TODO require chain (access parent_id in child module's require)
@@ -169,8 +197,19 @@ namespace jsb
     {
         v8::Isolate* isolate = runtime_->isolate_;
 
-        // internal utility function 'print'
-        self->Set(context, v8::String::NewFromUtf8Literal(isolate, "print"), v8::Function::New(context, _print).ToLocalChecked()).Check();
+        // minimal console functions support
+        {
+            v8::Local<v8::Object> jconsole = v8::Object::New(isolate);
+
+            self->Set(context, v8::String::NewFromUtf8Literal(isolate, "console"), jconsole).Check();
+            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "log"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Verbose)).ToLocalChecked());
+            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "info"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Info)).ToLocalChecked());
+            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "debug"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Debug)).ToLocalChecked());
+            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "warn"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Warning)).ToLocalChecked());
+            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "error"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Error)).ToLocalChecked());
+            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "assert"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Assert)).ToLocalChecked());
+            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "trace"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Trace)).ToLocalChecked());
+        }
 
         // the root 'require' function
         {

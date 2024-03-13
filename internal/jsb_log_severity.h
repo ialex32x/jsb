@@ -8,4 +8,5 @@ DEF(Debug)   // not important
 DEF(Info)    // general level
 DEF(Warning) //
 DEF(Error)   // unexpected but not critical
-DEF(Assert)  // only used in 'console.assert'
+DEF(Assert)  // 'console.assert'
+DEF(Trace)   // 'console.trace'

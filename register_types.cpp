@@ -24,17 +24,17 @@ void initialize_jsb_module(ModuleInitializationLevel p_level)
 
             // not all classes available in the LEVEL_CORE phase
             static CharString source =
-                "print('hello, v8!');\n"
+                "console.log('hello, v8!');\n"
                 "let godot = require('godot');\n"
                 "let RefCounted = godot.RefCounted;\n"
-                "print(RefCounted);\n"
-                "print(new RefCounted());\n"
-                "{ let f = new Foo(); print(f.test(1122)); }\n"
+                "console.log(RefCounted);\n"
+                "console.log(new RefCounted());\n"
+                "{ let f = new Foo(); console.log(f.test(1122)); }\n"
                 "require('javascripts/main');\n"
                 "";
             ccontext->eval(source, "eval-1");
             ccontext->eval(
-                "print('right');\n"
+                "console.log('right');\n"
                 "something wrong\n", "eval-2");
             // rt->gc();
         }
