@@ -86,7 +86,7 @@ namespace jsb
 
         FunctionPointers function_pointers_;
         JavaScriptModuleCache module_cache_;
-        v8::Global<v8::Context> jmodule_cache_;
+        v8::Global<v8::Object> jmodule_cache_;
 
         // main context
         v8::Global<v8::Context> context_;
