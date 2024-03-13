@@ -230,7 +230,7 @@ namespace jsb
             v8::Local<v8::Object> jconsole = v8::Object::New(isolate);
 
             self->Set(context, v8::String::NewFromUtf8Literal(isolate, "console"), jconsole).Check();
-            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "log"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Verbose)).ToLocalChecked());
+            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "log"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Log)).ToLocalChecked());
             jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "info"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Info)).ToLocalChecked());
             jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "debug"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Debug)).ToLocalChecked());
             jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "warn"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Warning)).ToLocalChecked());
@@ -397,19 +397,43 @@ namespace jsb
         //TODO code for constructing type template
         {
             v8::Isolate* isolate = get_isolate();
+            v8::Local<v8::Context> context = isolate->GetCurrentContext();
 
+            jsb_check(context == context_.Get(isolate));
             jclass_info.name = p_class_info->name;
             jclass_info.constructor = &_godot_object_constructor;
             jclass_info.finalizer = &_godot_object_finalizer;
             v8::Local<v8::FunctionTemplate> function_template = v8::FunctionTemplate::New(isolate, jclass_info.constructor, v8::Uint32::NewFromUnsigned(isolate, class_id));
 
+            v8::Local<v8::ObjectTemplate> object_template = function_template->PrototypeTemplate();
             function_template->InstanceTemplate()->SetInternalFieldCount(kObjectFieldCount);
 #if DEV_ENABLED
             const CharString cname = String(p_class_info->name).utf8();
             function_template->SetClassName(v8::String:: NewFromUtf8(isolate, cname.ptr(), v8::NewStringType::kNormal, cname.length()).ToLocalChecked());
 #endif
 
-            //TODO expose all available fields/methods/functions etc.
+            // expose class methods
+            for (const KeyValue<StringName, MethodBind*>& pair : p_class_info->method_map)
+            {
+                const StringName& method_name = pair.key;
+                MethodBind* method_bind = pair.value;
+                const CharString cmethod_name = ((String) method_name).ascii();
+
+                v8::Local<v8::String> propkey_name = v8::String::NewFromUtf8(isolate, cmethod_name.ptr(), v8::NewStringType::kNormal, cmethod_name.length()).ToLocalChecked();
+                v8::Local<v8::FunctionTemplate> propval_func = v8::FunctionTemplate::New(isolate, _godot_object_method, v8::External::New(isolate, method_bind));
+
+                JSB_LOG(Verbose, "expose %s.%s", p_class_info->name, method_name);
+                if (method_bind->is_static())
+                {
+                    function_template->Set(propkey_name, propval_func);
+                }
+                else
+                {
+                    object_template->Set(propkey_name, propval_func);
+                }
+            }
+
+            //TODO expose all available fields/properties etc.
 
             jclass_info.template_.Reset(isolate, function_template);
         }
@@ -432,6 +456,130 @@ namespace jsb
             *r_class_id = class_id;
         }
         return &jclass_info;
+    }
+
+    jsb_force_inline bool js_to_gd_var(const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_jval, Variant& r_cvar)
+    {
+        if (p_jval->IsInt32())
+        {
+            r_cvar = p_jval->Int32Value(context).ToChecked();
+            return true;
+        }
+        if (p_jval->IsNumber())
+        {
+            r_cvar = p_jval->NumberValue(context).ToChecked();
+            return true;
+        }
+        v8::Isolate* isolate = context->GetIsolate();
+        if (p_jval->IsBoolean())
+        {
+            r_cvar = p_jval->BooleanValue(isolate);
+            return true;
+        }
+        if (p_jval->IsNullOrUndefined())
+        {
+            //NOTE untouched, r_cvar should be nil by default
+            return true;
+        }
+        if (p_jval->IsArray())
+        {
+            //TODO
+        }
+        if (p_jval->IsObject())
+        {
+            //TODO
+        }
+
+        v8::Local<v8::String> type_of = p_jval->TypeOf(isolate);
+        v8::String::Utf8Value type_of_utf8_value(isolate, type_of);
+        JSB_LOG(Warning, "not implemented conversion %s", String(*type_of_utf8_value, type_of_utf8_value.length()));
+        return true;
+    }
+
+    jsb_force_inline bool gd_var_to_js(v8::Isolate* isolate, const Variant& p_cvar, v8::Local<v8::Value>& r_jval)
+    {
+        switch (p_cvar.get_type())
+        {
+        case Variant::FLOAT:
+            r_jval = v8::Number::New(isolate, p_cvar);
+            return true;
+        case Variant::INT:
+            // precision loss
+            r_jval = v8::Int32::New(isolate, p_cvar);
+            return true;
+        case Variant::BOOL:
+            r_jval = v8::Boolean::New(isolate, p_cvar);
+            return true;
+        case Variant::OBJECT:
+            //TODO
+            JSB_LOG(Warning, "not implemented");
+            return true;
+        case Variant::NIL:
+            r_jval = v8::Undefined(isolate);
+            return true;
+        default:
+            JSB_LOG(Warning, "not implemented conversion %d", p_cvar.get_type());
+            return true;
+        }
+    }
+
+    void JavaScriptContext::_godot_object_method(const v8::FunctionCallbackInfo<v8::Value>& info)
+    {
+        v8::Isolate* isolate = info.GetIsolate();
+        if (!info.Data()->IsExternal())
+        {
+            isolate->ThrowError("bad call");
+            return;
+        }
+
+        v8::Local<v8::Context> context = isolate->GetCurrentContext();
+        v8::Local<v8::External> data = info.Data().As<v8::External>();
+        MethodBind* method_bind = (MethodBind*) data->Value();
+
+        jsb_check(method_bind && method_bind->is_static());
+        Callable::CallError error;
+
+        int argc = info.Length();
+        Object* gd_object = nullptr;
+        if (!method_bind->is_static())
+        {
+            v8::Local<v8::Object> self = info.This();
+            if (self->IsNullOrUndefined())
+            {
+                isolate->ThrowError("call method without a valid instance bound");
+                return;
+            }
+            void* pointer = self->GetAlignedPointerFromInternalField(kObjectFieldPointer);
+
+            jsb_check(JavaScriptRuntime::get(isolate)->check_object(pointer));
+            gd_object = (Object*) pointer;
+        }
+
+        JavaScriptArguments arguments(argc);
+        const Variant** argv = (const Variant**)alloca(argc * sizeof(Variant*));
+
+        for (int i = 0; i < argc; ++i)
+        {
+            if (!js_to_gd_var(context, info[i], arguments[i]))
+            {
+                isolate->ThrowError("failed to translate v8 value to godot variant");
+                return;
+            }
+            argv[i] = &arguments[i];
+        }
+        Variant crval = method_bind->call(gd_object, argv, argc, error);
+        if (error.error != Callable::CallError::CALL_OK)
+        {
+            isolate->ThrowError("failed to call");
+            return;
+        }
+        v8::Local<v8::Value> jrval;
+        if (gd_var_to_js(isolate, crval, jrval))
+        {
+            info.GetReturnValue().Set(jrval);
+            return;
+        }
+        isolate->ThrowError("failed to translate godot variant to v8 value");
     }
 
     // [JS] function load_type(type_name: string): Class;

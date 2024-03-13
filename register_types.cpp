@@ -10,7 +10,7 @@ static jsb::JavaScriptLanguage* script_language_js = nullptr;
 
 void initialize_jsb_module(ModuleInitializationLevel p_level)
 {
-    if (p_level == MODULE_INITIALIZATION_LEVEL_CORE)
+    if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE)
     {
         //TODO simple dirty temp code for testing
         {
@@ -24,22 +24,18 @@ void initialize_jsb_module(ModuleInitializationLevel p_level)
 
             // not all classes available in the LEVEL_CORE phase
             static CharString source =
-                "console.log('hello, v8!');\n"
-                "let godot = require('godot');\n"
-                "let RefCounted = godot.RefCounted;\n"
-                "console.log(RefCounted);\n"
-                "console.log(new RefCounted());\n"
                 "{ let f = new Foo(); console.log(f.test(1122)); }\n"
                 "require('javascripts/main');\n"
                 "";
             ccontext->eval(source, "eval-1");
-            ccontext->eval(
-                "console.log('right');\n"
-                "something wrong\n", "eval-2");
+            ccontext->eval("console.log('right'); something wrong prevents compilation\n", "eval-2");
             // rt->gc();
         }
         print_line("jsb temp code ok");
+    }
 
+    if (p_level == MODULE_INITIALIZATION_LEVEL_CORE)
+    {
         // register javascript language
 #if JSB_LANG_ENABLED
         script_language_js = memnew(jsb::JavaScriptLanguage());

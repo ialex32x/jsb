@@ -5,12 +5,36 @@
 
 namespace jsb
 {
-    class JavaScriptArguments
+    struct JavaScriptArguments
     {
-    public:
-
     private:
+        Variant *args;
 
+    public:
+        jsb_force_inline Variant& operator[](int p_index)
+        {
+            return args[p_index];
+        }
+
+        jsb_force_inline JavaScriptArguments(int p_argc)
+        {
+            if (p_argc == 0)
+            {
+                args = nullptr;
+            }
+            else
+            {
+                args = memnew_arr(Variant, p_argc);
+            }
+        }
+
+        jsb_force_inline ~JavaScriptArguments()
+        {
+            if (args)
+            {
+                memdelete_arr(args);
+            }
+        }
     };
 }
 

@@ -133,6 +133,15 @@ namespace jsb
             objects_.remove_at(first_index);
         }
 
+        // cleanup all class templates
+        while (!classes_.is_empty())
+        {
+            const internal::Index32 first_index = classes_.get_first_index();
+            JavaScriptClassInfo& class_info = classes_.get_value(first_index);
+            class_info.template_.Reset();
+            classes_.remove_at(first_index);
+        }
+
         isolate_->Dispose();
         isolate_ = nullptr;
     }

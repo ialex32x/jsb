@@ -91,6 +91,7 @@ namespace jsb
 
         static void _godot_object_constructor(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void _godot_object_finalizer(void* pointer);
+        static void _godot_object_method(const v8::FunctionCallbackInfo<v8::Value>& info);
 
         void _register_builtins(const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& self);
         JavaScriptClassInfo* _expose_godot_class(const ClassDB::ClassInfo* p_class_info, internal::Index32* r_class_id = nullptr);

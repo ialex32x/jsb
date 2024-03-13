@@ -24,6 +24,7 @@ namespace jsb
         ~JavaScriptRuntime();
 
         // return a JavaScriptRuntime pointer via `p_pointer` if it's still alive
+        // `p_pointer` should point to a JavaScriptRuntime instance
         static std::shared_ptr<JavaScriptRuntime> unwrap(void* p_pointer);
 
         jsb_force_inline bool check(v8::Isolate* p_isolate) const { return p_isolate == isolate_; }
@@ -35,6 +36,10 @@ namespace jsb
 
         void bind_object(internal::Index32 p_class_id, void *p_pointer, const v8::Local<v8::Object>& p_object);
         void unbind_object(void* p_pointer);
+        jsb_force_inline bool check_object(void* p_pointer) const
+        {
+            return objects_index_.has(p_pointer);
+        }
 
         // return true if can die
         bool reference_object(void* p_pointer, bool p_is_inc);
