@@ -8,7 +8,6 @@ namespace jsb
 
     struct JavaScriptModule
     {
-        // v8::CopyablePersistentTraits<v8::Object>::CopyablePersistent exports;
         String id;
 
         v8::Global<v8::Object> module;

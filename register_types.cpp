@@ -29,7 +29,9 @@ void initialize_jsb_module(ModuleInitializationLevel p_level)
                 "let RefCounted = godot.RefCounted;\n"
                 "print(RefCounted);\n"
                 "print(new RefCounted());\n"
-                "{ let f = new Foo(); print(f.test(1122)); }\n";
+                "{ let f = new Foo(); print(f.test(1122)); }\n"
+                "require('javascripts/main');\n"
+                "";
             ccontext->eval(source, "eval-1");
             ccontext->eval(
                 "print('right');\n"

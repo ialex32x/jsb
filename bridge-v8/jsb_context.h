@@ -50,6 +50,11 @@ namespace jsb
             return (JavaScriptContext*) p_context->GetAlignedPointerFromEmbedderData(kContextEmbedderData);
         }
 
+        jsb_force_inline bool check(const v8::Local<v8::Context>& p_context) const
+        {
+            return context_ == p_context;
+        }
+
         //TODO temp code
         void expose();
 
@@ -65,7 +70,14 @@ namespace jsb
         void load(const String& p_name);
 
         jsb_force_inline v8::Isolate* get_isolate() const { jsb_check(runtime_); return runtime_->isolate_; }
-        v8::MaybeLocal<v8::Value> compile_run(const CharString& p_source, const CharString& p_filename);
+
+        //NOTE handle scope is required to call this method
+        jsb_force_inline v8::MaybeLocal<v8::Value> _compile_run(const CharString& p_source, const CharString& p_filename)
+        {
+            return _compile_run(p_source.ptr(), p_source.length(), p_filename);
+        }
+
+        v8::MaybeLocal<v8::Value> _compile_run(const char* p_source, int p_source_len, const CharString& p_filename);
 
         // JS function (type_name: string): type
         static void _load_type(const v8::FunctionCallbackInfo<v8::Value>& info);

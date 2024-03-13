@@ -46,7 +46,8 @@ namespace jsb
         v8::Local<v8::Context> context = isolate->GetCurrentContext();
         v8::Context::Scope context_scope(context);
 
-        v8::MaybeLocal<v8::Value> func_maybe_local = p_ccontext->compile_run(on_demand_loader_source, "on_demand_loader_source");
+        jsb_check(p_ccontext->check(context));
+        v8::MaybeLocal<v8::Value> func_maybe_local = p_ccontext->_compile_run(on_demand_loader_source, "on_demand_loader_source");
 
         if (func_maybe_local.IsEmpty())
         {

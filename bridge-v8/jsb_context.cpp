@@ -129,7 +129,7 @@ namespace jsb
         // try resolve the module id
         String combined_id = internal::PathUtil::combine(internal::PathUtil::dirname(parent_id), module_id);
         String normalized_id;
-        if (internal::PathUtil::extract(combined_id, normalized_id) != OK && !normalized_id.is_empty())
+        if (internal::PathUtil::extract(combined_id, normalized_id) != OK || normalized_id.is_empty())
         {
             isolate->ThrowError("bad path");
             return;
@@ -149,7 +149,7 @@ namespace jsb
 
             // init the new module obj
             module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, false));
-            module.id = module_id;
+            module.id = normalized_id;
             module.module.Reset(isolate, module_obj);
 
             //NOTE the resolver should throw error if failed
@@ -294,8 +294,8 @@ namespace jsb
         cruntime->bind_object(class_id, gd_object, self);
         if (gd_object->is_ref_counted())
         {
-            //TODO IS IT A TRUTH that ref_count==1 after creation_func??
-            jsb_check(((RefCounted*) gd_object)->is_referenced());
+            //NOTE IS IT A TRUTH that ref_count==1 after creation_func??
+            jsb_check(!((RefCounted*) gd_object)->is_referenced());
         }
 
         gd_object->set_instance_binding(cruntime, gd_object, gd_instance_binding_callbacks);
@@ -406,7 +406,7 @@ namespace jsb
         v8::Context::Scope context_scope(context);
 
         v8::TryCatch try_catch_run(isolate);
-        /* return value discarded */ compile_run(p_source, p_filename);
+        /* return value discarded */ _compile_run(p_source, p_filename);
         if (try_catch_run.HasCaught())
         {
             v8::Local<v8::Message> message = try_catch_run.Message();
@@ -427,14 +427,13 @@ namespace jsb
         return OK;
     }
 
-    //NOTE handle scope is required to call this method
-    v8::MaybeLocal<v8::Value> JavaScriptContext::compile_run(const CharString& p_source, const CharString& p_filename)
+    v8::MaybeLocal<v8::Value> JavaScriptContext::_compile_run(const char* p_source, int p_source_len, const CharString& p_filename)
     {
         v8::Isolate* isolate = get_isolate();
         v8::Local<v8::Context> context = context_.Get(isolate);
 
         v8::ScriptOrigin origin(isolate, v8::String::NewFromUtf8(isolate, p_filename, v8::NewStringType::kNormal, p_filename.length()).ToLocalChecked());
-        v8::MaybeLocal<v8::String> source = v8::String::NewFromUtf8(isolate, p_source, v8::NewStringType::kNormal, p_source.length());
+        v8::MaybeLocal<v8::String> source = v8::String::NewFromUtf8(isolate, p_source, v8::NewStringType::kNormal, p_source_len);
         v8::MaybeLocal<v8::Script> script = v8::Script::Compile(context, source.ToLocalChecked(), &origin);
 
         if (script.IsEmpty())

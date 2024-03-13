@@ -26,6 +26,8 @@ namespace jsb
         // return a JavaScriptRuntime pointer via `p_pointer` if it's still alive
         static std::shared_ptr<JavaScriptRuntime> unwrap(void* p_pointer);
 
+        jsb_force_inline bool check(v8::Isolate* p_isolate) const { return p_isolate == isolate_; }
+
         jsb_force_inline static JavaScriptRuntime* get(v8::Isolate* p_isolate)
         {
             return (JavaScriptRuntime*) p_isolate->GetData(kIsolateEmbedderData);

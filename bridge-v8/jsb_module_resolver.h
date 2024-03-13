@@ -28,7 +28,7 @@ namespace jsb
 
     private:
         // read the source buffer (transformed into commonjs)
-        Vector<uint8_t> read_all_bytes(const String& p_path);
+        Vector<uint8_t> read_all_bytes(const String& p_path, String* r_filename);
     };
 }
 

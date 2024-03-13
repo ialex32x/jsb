@@ -12,10 +12,14 @@ namespace jsb::internal
 {
     String PathUtil::dirname(const String& p_name)
     {
-        const int index = p_name.rfind("/");
+        int index = p_name.rfind("/");
         if (index < 0)
         {
-            return p_name;
+            index = p_name.rfind("\\");
+            if (index < 0)
+            {
+                return p_name;
+            }
         }
         return p_name.substr(0, index);
     }

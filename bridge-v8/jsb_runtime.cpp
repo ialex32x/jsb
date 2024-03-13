@@ -111,6 +111,8 @@ namespace jsb
 
     JavaScriptRuntime::~JavaScriptRuntime()
     {
+        runtimes_.remove(this);
+
         for (KeyValue<String, IModuleLoader*>& pair : module_loaders_)
         {
             memdelete(pair.value);
@@ -126,13 +128,13 @@ namespace jsb
             JavaScriptClassInfo& class_info = classes_.get_value(handle.class_id);
             class_info.finalizer(handle.pointer);
             handle.callback.Reset();
+            handle.ref_.Reset();
             objects_index_.erase(handle.pointer);
             objects_.remove_at(first_index);
         }
 
         isolate_->Dispose();
         isolate_ = nullptr;
-        runtimes_.remove(this);
     }
 
     void JavaScriptRuntime::update()
@@ -229,6 +231,7 @@ namespace jsb
             class_info.finalizer(object_handle.pointer);
         }
         object_handle.callback.Reset();
+        object_handle.ref_.Reset();
         objects_index_.erase(object_handle.pointer);
         objects_.remove_at(object_id);
         return true;

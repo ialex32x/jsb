@@ -23,9 +23,10 @@ namespace jsb::internal
             {
                 return p_base + p_add;
             }
-            return p_base + '/' + p_add;
+            return p_base.is_empty() ? p_add : p_base + '/' + p_add;
         }
 
+        // return the upper directory path ('/' and '\' are both accepted)
         static String dirname(const String& p_name);
 
         // extract the relative path (eliminate all '.' and '..')
