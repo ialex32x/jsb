@@ -86,13 +86,12 @@ namespace jsb
         static void _require(const v8::FunctionCallbackInfo<v8::Value>& info);
 
     private:
-        struct ExceptionInfo
-        {
-            String message;
-            // String stack;
-        };
+        //TODO it's a debug function, will be removed in a future version
+        static void _list_classes(const v8::FunctionCallbackInfo<v8::Value>& info);
 
         static void _print(const v8::FunctionCallbackInfo<v8::Value>& info);
+        static void _set_timer(const v8::FunctionCallbackInfo<v8::Value>& info);
+        static void _clear_timer(const v8::FunctionCallbackInfo<v8::Value>& info);
 
         static void _godot_object_constructor(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void _godot_object_finalizer(void* pointer);
@@ -104,8 +103,6 @@ namespace jsb
         // return false if something wrong with an exception thrown
         // caller should handle the exception if it's not called from js
         bool _load_module(const String& p_parent_id, const String& p_module_id, JavaScriptModule*& r_module);
-
-        bool _read_exception(const v8::TryCatch& p_catch, ExceptionInfo& r_info);
 
         // hold a reference to JavaScriptRuntime which ensure runtime being destructed after context
         std::shared_ptr<class JavaScriptRuntime> runtime_;

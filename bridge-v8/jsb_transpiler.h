@@ -2,7 +2,6 @@
 #define JAVASCRIPT_TEMPLATE_H
 
 #include "jsb_pch.h"
-#include "jsb_arguments.h"
 #include "jsb_converter.h"
 #include "jsb_object_handle.h"
 

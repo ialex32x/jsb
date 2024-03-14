@@ -7,7 +7,9 @@
 #include "jsb_class_info.h"
 #include "jsb_module_loader.h"
 #include "jsb_module_resolver.h"
+#include "jsb_timer_action.h"
 #include "../internal/jsb_sarray.h"
+#include "../internal/jsb_timer_manager.h"
 
 namespace jsb
 {
@@ -25,17 +27,21 @@ namespace jsb
 
         // return a JavaScriptRuntime pointer via `p_pointer` if it's still alive
         // `p_pointer` should point to a JavaScriptRuntime instance
+        jsb_no_discard
         static std::shared_ptr<JavaScriptRuntime> unwrap(void* p_pointer);
 
-        jsb_force_inline bool check(v8::Isolate* p_isolate) const { return p_isolate == isolate_; }
+        jsb_force_inline jsb_no_discard
+        bool check(v8::Isolate* p_isolate) const { return p_isolate == isolate_; }
 
-        jsb_force_inline static JavaScriptRuntime* get(v8::Isolate* p_isolate)
+        jsb_force_inline jsb_no_discard
+        static JavaScriptRuntime* get(v8::Isolate* p_isolate)
         {
             return (JavaScriptRuntime*) p_isolate->GetData(kIsolateEmbedderData);
         }
 
         void bind_object(internal::Index32 p_class_id, void *p_pointer, const v8::Local<v8::Object>& p_object);
         void unbind_object(void* p_pointer);
+
         jsb_force_inline bool check_object(void* p_pointer) const
         {
             return objects_index_.has(p_pointer);
@@ -125,6 +131,9 @@ namespace jsb
         // module_id => loader
         HashMap<String, class IModuleLoader*> module_loaders_;
         Vector<IModuleResolver*> module_resolvers_;
+
+        uint64_t last_ticks_;
+        internal::TTimerManager<JavaScriptTimerAction> timer_manager_;
 
         friend class JavaScriptContext;
     };

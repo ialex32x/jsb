@@ -5,7 +5,6 @@
 
 namespace jsb
 {
-
     struct JavaScriptModule
     {
         String id;

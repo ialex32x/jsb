@@ -1,4 +1,6 @@
 #include "jsb_context.h"
+
+#include "jsb_exception_info.h"
 #include "core/string/string_builder.h"
 
 #include "jsb_module_loader.h"
@@ -7,6 +9,49 @@
 
 namespace jsb
 {
+    namespace InternalTimerType { enum Type : uint8_t { Interval, Timeout, Immediate, }; }
+
+    namespace
+    {
+#if DEV_ENABLED
+        jsb_force_inline constexpr bool is_debug_build() { return true; }
+#else
+        jsb_force_inline constexpr bool is_debug_build() { return false;}
+#endif
+    }
+
+    struct GodotArguments
+    {
+    private:
+        Variant *args;
+
+    public:
+        jsb_force_inline Variant& operator[](int p_index)
+        {
+            return args[p_index];
+        }
+
+        jsb_force_inline GodotArguments(int p_argc)
+        {
+            if (p_argc == 0)
+            {
+                args = nullptr;
+            }
+            else
+            {
+                args = memnew_arr(Variant, p_argc);
+            }
+        }
+
+        jsb_force_inline ~GodotArguments()
+        {
+            if (args)
+            {
+                memdelete_arr(args);
+            }
+        }
+    };
+
     struct InstanceBindingCallbacks
     {
         jsb_force_inline operator const GDExtensionInstanceBindingCallbacks* () const { return &callbacks_; }
@@ -45,6 +90,35 @@ namespace jsb
     };
 
     namespace { InstanceBindingCallbacks gd_instance_binding_callbacks = {}; }
+
+    void JavaScriptContext::_list_classes(const v8::FunctionCallbackInfo<v8::Value>& info)
+    {
+        for (const KeyValue<StringName, ClassDB::ClassInfo>& cclass_slot : ClassDB::classes)
+        {
+            const ClassDB::ClassInfo& cclass = cclass_slot.value;
+            if (!!cclass.inherits)
+            {
+                JSB_LOG(Debug, "Class: %s Super: %s", cclass.name, cclass.inherits);
+            }
+            else
+            {
+                JSB_LOG(Debug, "Class: %s", cclass.name);
+            }
+            for (const KeyValue<StringName, MethodBind*>& cmethod_slot : cclass.method_map)
+            {
+                const MethodBind& cmethod = *cmethod_slot.value;
+                JSB_LOG(Debug, "    Method: %s%s%s%s%s", cmethod.get_name(),
+                    cmethod.is_static() ? " static" : "",
+                    cmethod.is_const() ? " const" : "",
+                    cmethod.is_vararg() ? " vararg" : "",
+                    cmethod.has_return() ? " return" : "");
+            }
+            for (const PropertyInfo& cproperty : cclass.property_list)
+            {
+                JSB_LOG(Debug, "    Property: %s (Usage: %d)", cproperty.name, cproperty.usage);
+            }
+        }
+    }
 
     void JavaScriptContext::_print(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
@@ -243,6 +317,15 @@ namespace jsb
     {
         v8::Isolate* isolate = runtime_->isolate_;
 
+        // internal 'jsb'
+        {
+            v8::Local<v8::Object> jhost = v8::Object::New(isolate);
+
+            self->Set(context, v8::String::NewFromUtf8Literal(isolate, "jsb"), jhost).Check();
+            jhost->Set(context, v8::String::NewFromUtf8Literal(isolate, "list_classes"), v8::Function::New(context, _list_classes).ToLocalChecked());
+            jhost->Set(context, v8::String::NewFromUtf8Literal(isolate, "debug"), v8::Boolean::New(isolate, is_debug_build()));
+        }
+
         // minimal console functions support
         {
             v8::Local<v8::Object> jconsole = v8::Object::New(isolate);
@@ -272,10 +355,90 @@ namespace jsb
 
         }
 
-        //TODO essential timer support
+        // essential timer support
         {
-
+            self->Set(context, v8::String::NewFromUtf8Literal(isolate, "setInterval"), v8::Function::New(context, _set_timer, v8::Int32::New(isolate, InternalTimerType::Interval)).ToLocalChecked()).Check();
+            self->Set(context, v8::String::NewFromUtf8Literal(isolate, "setTimeout"), v8::Function::New(context, _set_timer, v8::Int32::New(isolate, InternalTimerType::Timeout)).ToLocalChecked()).Check();
+            self->Set(context, v8::String::NewFromUtf8Literal(isolate, "setImmediate"), v8::Function::New(context, _set_timer, v8::Int32::New(isolate, InternalTimerType::Immediate)).ToLocalChecked()).Check();
+            self->Set(context, v8::String::NewFromUtf8Literal(isolate, "clearInterval"), v8::Function::New(context, _clear_timer).ToLocalChecked()).Check();
         }
+    }
+
+    void JavaScriptContext::_set_timer(const v8::FunctionCallbackInfo<v8::Value>& info)
+    {
+        v8::Isolate* isolate = info.GetIsolate();
+        const int argc = info.Length();
+        if (argc < 1 || !info[0]->IsFunction())
+        {
+            isolate->ThrowError("bad argument");
+            return;
+        }
+
+        v8::Local<v8::Context> context = isolate->GetCurrentContext();
+        int32_t type;
+        if (!info.Data()->Int32Value(context).To(&type))
+        {
+            isolate->ThrowError("bad call");
+            return;
+        }
+        int32_t rate = 1;
+        int extra_arg_index = 1;
+        bool loop = false;
+        switch ((InternalTimerType::Type) type)
+        {
+        // interval & timeout have 2 arguments usually
+        case InternalTimerType::Interval: loop = true; // intentionally omit the break;
+        case InternalTimerType::Timeout:
+            if (!info[1]->IsUndefined() && !info[1]->Int32Value(context).To(&rate))
+            {
+                isolate->ThrowError("bad time");
+                return;
+            }
+            extra_arg_index = 2;
+            break;
+        // immediate has 1 argument usually
+        default: break;
+        }
+
+        JavaScriptRuntime* cruntime = JavaScriptRuntime::get(isolate);
+        v8::Local<v8::Function> func = info[0].As<v8::Function>();
+        internal::TimerHandle handle;
+
+        if (argc > extra_arg_index)
+        {
+            JavaScriptTimerAction action(v8::Global<v8::Function>(isolate, func), argc - extra_arg_index);
+            for (int index = extra_arg_index; index < argc; ++index)
+            {
+                action.store(index - extra_arg_index, v8::Global<v8::Value>(isolate, info[index]));
+            }
+            cruntime->timer_manager_.set_timer(handle, std::move(action), rate, loop);
+            info.GetReturnValue().Set(v8::Int32::New(isolate, (int32_t) handle));
+        }
+        else
+        {
+            cruntime->timer_manager_.set_timer(handle, JavaScriptTimerAction(v8::Global<v8::Function>(isolate, func), 0), rate, loop);
+            info.GetReturnValue().Set(v8::Int32::New(isolate, (int32_t) handle));
+        }
+    }
+
+    void JavaScriptContext::_clear_timer(const v8::FunctionCallbackInfo<v8::Value>& info)
+    {
+        v8::Isolate* isolate = info.GetIsolate();
+        if (info.Length() < 1 || !info[0]->IsInt32())
+        {
+            isolate->ThrowError("bad argument");
+            return;
+        }
+
+        v8::Local<v8::Context> context = isolate->GetCurrentContext();
+        int32_t handle = 0;
+        if (!info[0]->Int32Value(context).To(&handle))
+        {
+            isolate->ThrowError("bad time");
+            return;
+        }
+        JavaScriptRuntime* cruntime = JavaScriptRuntime::get(isolate);
+        cruntime->timer_manager_.clear_timer((internal::TimerHandle) (internal::Index32) handle);
     }
 
     JavaScriptContext::JavaScriptContext(const std::shared_ptr<JavaScriptRuntime>& runtime)
@@ -298,35 +461,14 @@ namespace jsb
 
     JavaScriptContext::~JavaScriptContext()
     {
+        {
+            v8::HandleScope handle_scope(get_isolate());
+            v8::Local<v8::Context> context = context_.Get(get_isolate());
+            context->SetAlignedPointerInEmbedderData(kContextEmbedderData, nullptr);
+        }
+
         jmodule_cache_.Reset();
         context_.Reset();
-    }
-
-    bool JavaScriptContext::_read_exception(const v8::TryCatch& p_catch, ExceptionInfo& r_info)
-    {
-        if (p_catch.HasCaught())
-        {
-            v8::Isolate* isolate = runtime_->isolate_;
-            v8::Local<v8::Context> context = isolate->GetCurrentContext();
-
-            v8::Local<v8::Message> message = p_catch.Message();
-            v8::Local<v8::Value> stack_trace;
-            if (p_catch.StackTrace(context).ToLocal(&stack_trace))
-            {
-                v8::String::Utf8Value stack_trace_utf8(isolate, stack_trace);
-                if (stack_trace_utf8.length() != 0)
-                {
-                    r_info.message = String(*stack_trace_utf8, stack_trace_utf8.length());
-                    return true;
-                }
-            }
-
-            // fallback to plain message
-            const v8::String::Utf8Value message_utf8(isolate, message->Get());
-            r_info.message = String::utf8(*message_utf8, message_utf8.length());
-            return true;
-        }
-        return false;
     }
 
     Error JavaScriptContext::load(const String& p_name)
@@ -346,8 +488,8 @@ namespace jsb
             return OK;
         }
 
-        ExceptionInfo exception_info;
-        if (_read_exception(try_catch_run, exception_info))
+        JavaScriptExceptionInfo exception_info;
+        if (JavaScriptExceptionInfo::_read_exception(isolate, try_catch_run, exception_info))
         {
             ERR_FAIL_V_MSG(ERR_COMPILATION_FAILED, exception_info.message);
         }
@@ -632,19 +774,23 @@ namespace jsb
             gd_object = (Object*) pointer;
         }
 
-        JavaScriptArguments arguments(argc);
-        const Variant** argv = (const Variant**)alloca(argc * sizeof(Variant*));
+        GodotArguments arguments(argc);
+        //NOTE (unsafe) DO NOT FORGET TO free argv (if it's not stack allocated)
+        const Variant** argv = (const Variant**)jsb_stackalloc(argc * sizeof(Variant*));
 
         for (int i = 0; i < argc; ++i)
         {
             if (!js_to_gd_var(context, info[i], arguments[i]))
             {
+                jsb_stackfree(argv);
                 isolate->ThrowError("failed to translate v8 value to godot variant");
                 return;
             }
             argv[i] = &arguments[i];
         }
         Variant crval = method_bind->call(gd_object, argv, argc, error);
+
+        jsb_stackfree(argv);
         if (error.error != Callable::CallError::CALL_OK)
         {
             isolate->ThrowError("failed to call");

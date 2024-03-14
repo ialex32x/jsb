@@ -3,6 +3,14 @@
 
 #include <cstdint>
 
+#include "core/object/object.h"
+#include "core/string/print_string.h"
+#include "core/templates/hash_map.h"
+#include "core/io/file_access.h"
+#include "core/io/dir_access.h"
+#include "core/os/thread.h"
+#include "core/os/os.h"
+
 #if DEV_ENABLED
 #   define JSB_LOG(Severity, Format, ...) print_line(vformat("[%s] " Format, ((void) sizeof(jsb::internal::ELogSeverity::Severity), #Severity), ##__VA_ARGS__))
 #   define jsb_check(Condition) CRASH_COND(!(Condition))
@@ -23,6 +31,16 @@
 #   define jsb_force_inline  __forceinline
 #else
 #   define jsb_force_inline
+#endif
+
+#define jsb_no_discard [[nodiscard]]
+
+#if !defined(JSB_DISABLE_STACKALLOC)
+#   define jsb_stackalloc(size) alloca(size)
+#   define jsb_stackfree(ptr)
+#else
+#   define jsb_stackalloc(size) memalloc(size)
+#   define jsb_stackfree(ptr) memfree(ptr)
 #endif
 
 namespace jsb::internal::ELogSeverity

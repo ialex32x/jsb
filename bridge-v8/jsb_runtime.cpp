@@ -2,6 +2,7 @@
 
 #include "jsb_module_loader.h"
 #include "core/string/string_builder.h"
+#include "jsb_pointer_store.h"
 
 namespace jsb
 {
@@ -19,43 +20,6 @@ namespace jsb
             v8::V8::Initialize();
         }
     };
-
-    struct Runtimes
-    {
-        std::shared_ptr<JavaScriptRuntime> access(void* p_runtime)
-        {
-            std::shared_ptr<JavaScriptRuntime> rval;
-            lock_.lock();
-            if (all_runtimes_.has(p_runtime))
-            {
-                rval = ((JavaScriptRuntime*) p_runtime)->shared_from_this();
-            }
-            lock_.unlock();
-            return rval;
-        }
-
-        void add(void* p_runtime)
-        {
-            lock_.lock();
-            jsb_check(!all_runtimes_.has(p_runtime));
-            all_runtimes_.insert(p_runtime);
-            lock_.unlock();
-        }
-
-        void remove(void* p_runtime)
-        {
-            lock_.lock();
-            jsb_check(all_runtimes_.has(p_runtime));
-            all_runtimes_.erase(p_runtime);
-            lock_.unlock();
-        }
-
-    private:
-        BinaryMutex lock_;
-        HashSet<void*> all_runtimes_;
-    };
-
-    static Runtimes runtimes_;
 
     namespace
     {
@@ -90,7 +54,7 @@ namespace jsb
 
     std::shared_ptr<JavaScriptRuntime> JavaScriptRuntime::unwrap(void* p_pointer)
     {
-        return runtimes_.access(p_pointer);
+        return PointerStore::get_shared().access<JavaScriptRuntime>(p_pointer);
     }
 
     JavaScriptRuntime::JavaScriptRuntime()
@@ -106,12 +70,14 @@ namespace jsb
         isolate_->SetPromiseRejectCallback(PromiseRejectCallback_);
 
         module_loaders_.insert("godot", memnew(GodotModuleLoader));
-        runtimes_.add(this);
+        PointerStore::get_shared().add(this);
     }
 
     JavaScriptRuntime::~JavaScriptRuntime()
     {
-        runtimes_.remove(this);
+        PointerStore::get_shared().remove(this);
+
+        timer_manager_.clear_all();
 
         for (IModuleResolver* resolver : module_resolvers_)
         {
@@ -154,8 +120,19 @@ namespace jsb
 
     void JavaScriptRuntime::update()
     {
-        // debug_server_->update();
+        const uint64_t base_ticks = Engine::get_singleton()->get_frame_ticks();
+        const uint64_t elapsed_milli = (base_ticks - last_ticks_) / 1000; // milliseconds
+
+        last_ticks_ = base_ticks;
+        if (timer_manager_.tick(elapsed_milli))
+        {
+            v8::Isolate::Scope isolate_scope(isolate_);
+            v8::HandleScope handle_scope(isolate_);
+
+            timer_manager_.invoke_timers(isolate_);
+        }
         isolate_->PerformMicrotaskCheckpoint();
+        // debug_server_->update();
     }
 
     void JavaScriptRuntime::gc()
