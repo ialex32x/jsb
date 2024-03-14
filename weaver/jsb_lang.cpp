@@ -1,5 +1,6 @@
 #include "jsb_lang.h"
 #include <iterator>
+#include "../internal/jsb_path_util.h"
 
 namespace jsb
 {
@@ -15,6 +16,20 @@ namespace jsb
 
     void JavaScriptBridgeLanguage::init()
     {
+        if (!once_inited_)
+        {
+            once_inited_ = true;
+            constexpr const char* xxx = __FILE__;
+            runtime_->add_module_resolver<jsb::DefaultModuleResolver>()
+                .add_search_path("res://")
+                .add_search_path(jsb::internal::PathUtil::combine(
+                    jsb::internal::PathUtil::dirname(::OS::get_singleton()->get_executable_path()),
+                    "../modules/jsb/scripts/out"));
+
+            // editor entry script
+            context_->load("main_entry");
+        }
+
     }
 
     void JavaScriptBridgeLanguage::finish()

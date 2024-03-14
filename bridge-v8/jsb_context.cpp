@@ -118,68 +118,82 @@ namespace jsb
         String module_id = JavaScriptModuleCache::get_name(isolate, arg0);
 
         JavaScriptContext* ccontext = JavaScriptContext::get(context);
-
-        // return directly if the module already cached
-        if (JavaScriptModule* module = ccontext->module_cache_.find(module_id))
+        JavaScriptModule* module;
+        if (ccontext->_load_module(parent_id, module_id, module))
         {
             info.GetReturnValue().Set(module->exports);
-            return;
+        }
+    }
+
+    bool JavaScriptContext::_load_module(const String& p_parent_id, const String& p_module_id, JavaScriptModule*& r_module)
+    {
+        if (JavaScriptModule* module = module_cache_.find(p_module_id))
+        {
+            r_module = module;
+            return true;
         }
 
-        JavaScriptRuntime* cruntime = JavaScriptRuntime::get(isolate);
+        v8::Isolate* isolate = runtime_->isolate_;
+        v8::Local<v8::Context> context = isolate->GetCurrentContext();
 
+        jsb_check(context == context_.Get(isolate));
         // find loader with the module id
-        if (IModuleLoader* loader = cruntime->find_module_loader(module_id))
+        if (IModuleLoader* loader = runtime_->find_module_loader(p_module_id))
         {
-            JavaScriptModule& module = ccontext->module_cache_.insert(module_id, false);
+            JavaScriptModule& module = module_cache_.insert(p_module_id, false);
             v8::Local<v8::Object> module_obj = v8::Object::New(isolate);
             v8::Local<v8::String> propkey_loaded = v8::String::NewFromUtf8Literal(isolate, "loaded");
 
             // register the new module obj into module_cache obj
-            v8::Local<v8::Object> jmodule_cache = ccontext->jmodule_cache_.Get(isolate);
-            jmodule_cache->Set(context, arg0, module_obj).Check();
+            v8::Local<v8::Object> jmodule_cache = jmodule_cache_.Get(isolate);
+            CharString cmodule_id = p_module_id.utf8();
+            v8::Local<v8::String> jmodule_id = v8::String::NewFromUtf8(isolate, cmodule_id.ptr(), v8::NewStringType::kNormal, cmodule_id.length()).ToLocalChecked();
+            jmodule_cache->Set(context, jmodule_id, module_obj).Check();
 
             // init the new module obj
             module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, false));
-            module.id = module_id;
+            module.id = p_module_id;
             module.module.Reset(isolate, module_obj);
 
             //NOTE the loader should throw error if failed
-            if (loader->load(ccontext, module))
+            if (!loader->load(this, module))
             {
-                module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, true));
-                info.GetReturnValue().Set(module.exports.Get(isolate));
+                return false;
             }
-            return;
+
+            module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, true));
+            r_module = &module;
+            return true;
         }
 
         // try resolve the module id
-        String combined_id = internal::PathUtil::combine(internal::PathUtil::dirname(parent_id), module_id);
+        String combined_id = internal::PathUtil::combine(internal::PathUtil::dirname(p_parent_id), p_module_id);
         String normalized_id;
         if (internal::PathUtil::extract(combined_id, normalized_id) != OK || normalized_id.is_empty())
         {
             isolate->ThrowError("bad path");
-            return;
+            return false;
         }
 
         // init source module
-        SourceModuleResolver& resolver = cruntime->source_module_resolver_;
-        if (resolver.is_valid(normalized_id))
+        String asset_path;
+        if (IModuleResolver* resolver = runtime_->find_module_resolver(normalized_id, asset_path))
         {
             // supported module properties: id, filename, cache, loaded, exports, children
-            JavaScriptModule& module = ccontext->module_cache_.insert(normalized_id, true);
-            const CharString cnormalized_id_utf8_ = normalized_id.utf8();
+            JavaScriptModule& module = module_cache_.insert(normalized_id, true);
+            CharString cmodule_id = normalized_id.utf8();
             v8::Local<v8::Object> module_obj = v8::Object::New(isolate);
             v8::Local<v8::String> propkey_loaded = v8::String::NewFromUtf8Literal(isolate, "loaded");
             v8::Local<v8::String> propkey_children = v8::String::NewFromUtf8Literal(isolate, "children");
 
             // register the new module obj into module_cache obj
-            v8::Local<v8::Object> jmodule_cache = ccontext->jmodule_cache_.Get(isolate);
-            jmodule_cache->Set(context, arg0, module_obj).Check();
+            v8::Local<v8::Object> jmodule_cache = jmodule_cache_.Get(isolate);
+            v8::Local<v8::String> jmodule_id = v8::String::NewFromUtf8(isolate, cmodule_id.ptr(), v8::NewStringType::kNormal, cmodule_id.length()).ToLocalChecked();
+            jmodule_cache->Set(context, jmodule_id, module_obj).Check();
 
             // init the new module obj
             module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, false));
-            module_obj->Set(context, v8::String::NewFromUtf8Literal(isolate, "id"), v8::String::NewFromUtf8(isolate, cnormalized_id_utf8_.ptr(), v8::NewStringType::kNormal, cnormalized_id_utf8_.length()).ToLocalChecked());
+            module_obj->Set(context, v8::String::NewFromUtf8Literal(isolate, "id"), jmodule_id);
             module_obj->Set(context, v8::String::NewFromUtf8Literal(isolate, "cache"), jmodule_cache);
             module_obj->Set(context, propkey_children, v8::Array::New(isolate));
             module.id = normalized_id;
@@ -187,38 +201,42 @@ namespace jsb
 
             //NOTE the resolver should throw error if failed
             //NOTE module.filename should be set in `resolve.load`
-            if (resolver.load(ccontext, module))
+            if (!resolver->load(this, asset_path, module))
             {
-                if (!parent_id.is_empty())
+                return false;
+            }
+
+            if (!p_parent_id.is_empty())
+            {
+                if (JavaScriptModule* cparent_module = module_cache_.find(p_parent_id))
                 {
-                    if (JavaScriptModule* cparent_module = ccontext->module_cache_.find(parent_id))
+                    v8::Local<v8::Object> jparent_module = cparent_module->module.Get(isolate);
+                    v8::Local<v8::Value> jparent_children_v;
+                    if (jparent_module->Get(context, propkey_children).ToLocal(&jparent_children_v) && jparent_children_v->IsArray())
                     {
-                        v8::Local<v8::Object> jparent_module = cparent_module->module.Get(isolate);
-                        v8::Local<v8::Value> jparent_children_v;
-                        if (jparent_module->Get(context, propkey_children).ToLocal(&jparent_children_v) && jparent_children_v->IsArray())
-                        {
-                            v8::Local<v8::Array> jparent_children = jparent_children_v.As<v8::Array>();
-                            const uint32_t children_num = jparent_children->Length();
-                            jparent_children->Set(context, children_num, module_obj);
-                        }
-                        else
-                        {
-                            JSB_LOG(Error, "can not access children on '%s'", parent_id);
-                        }
-                        module_obj->Set(context, v8::String::NewFromUtf8Literal(isolate, "parent"), jparent_module);
+                        v8::Local<v8::Array> jparent_children = jparent_children_v.As<v8::Array>();
+                        const uint32_t children_num = jparent_children->Length();
+                        jparent_children->Set(context, children_num, module_obj);
                     }
                     else
                     {
-                        JSB_LOG(Warning, "parent module not found with the name '%s'", parent_id);
+                        JSB_LOG(Error, "can not access children on '%s'", p_parent_id);
                     }
+                    module_obj->Set(context, v8::String::NewFromUtf8Literal(isolate, "parent"), jparent_module);
                 }
-                module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, true));
-                info.GetReturnValue().Set(module.exports.Get(isolate));
+                else
+                {
+                    JSB_LOG(Warning, "parent module not found with the name '%s'", p_parent_id);
+                }
             }
-            return;
+            module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, true));
+            r_module = &module;
+            return true;
         }
 
-        isolate->ThrowError("unknown module");
+        const CharString cerror_message = vformat("unknown module: %s", normalized_id).utf8();
+        isolate->ThrowError(v8::String::NewFromUtf8(isolate, cerror_message.ptr(), v8::NewStringType::kNormal, cerror_message.length()).ToLocalChecked());
+        return false;
     }
 
     void JavaScriptContext::_register_builtins(const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& self)
@@ -248,6 +266,16 @@ namespace jsb
             require_func->Set(context, v8::String::NewFromUtf8Literal(isolate, "moduleId"), v8::String::Empty(isolate));
             jmodule_cache_.Reset(isolate, jmodule_cache);
         }
+
+        //TODO the root 'import' function (async module loading?)
+        {
+
+        }
+
+        //TODO essential timer support
+        {
+
+        }
     }
 
     JavaScriptContext::JavaScriptContext(const std::shared_ptr<JavaScriptRuntime>& runtime)
@@ -274,8 +302,57 @@ namespace jsb
         context_.Reset();
     }
 
-    void JavaScriptContext::load(const String& p_name)
-    {}
+    bool JavaScriptContext::_read_exception(const v8::TryCatch& p_catch, ExceptionInfo& r_info)
+    {
+        if (p_catch.HasCaught())
+        {
+            v8::Isolate* isolate = runtime_->isolate_;
+            v8::Local<v8::Context> context = isolate->GetCurrentContext();
+
+            v8::Local<v8::Message> message = p_catch.Message();
+            v8::Local<v8::Value> stack_trace;
+            if (p_catch.StackTrace(context).ToLocal(&stack_trace))
+            {
+                v8::String::Utf8Value stack_trace_utf8(isolate, stack_trace);
+                if (stack_trace_utf8.length() != 0)
+                {
+                    r_info.message = String(*stack_trace_utf8, stack_trace_utf8.length());
+                    return true;
+                }
+            }
+
+            // fallback to plain message
+            const v8::String::Utf8Value message_utf8(isolate, message->Get());
+            r_info.message = String::utf8(*message_utf8, message_utf8.length());
+            return true;
+        }
+        return false;
+    }
+
+    Error JavaScriptContext::load(const String& p_name)
+    {
+        v8::Isolate* isolate = get_isolate();
+        v8::Isolate::Scope isolate_scope(isolate);
+        v8::HandleScope handle_scope(isolate);
+        v8::Local<v8::Context> context = context_.Get(isolate);
+        v8::Context::Scope context_scope(context);
+
+        JavaScriptModule* module;
+        v8::TryCatch try_catch_run(isolate);
+        if (_load_module("", p_name, module))
+        {
+            // no exception should thrown if module loaded successfully
+            jsb_check(!try_catch_run.HasCaught());
+            return OK;
+        }
+
+        ExceptionInfo exception_info;
+        if (_read_exception(try_catch_run, exception_info))
+        {
+            ERR_FAIL_V_MSG(ERR_COMPILATION_FAILED, exception_info.message);
+        }
+        ERR_FAIL_V_MSG(ERR_COMPILATION_FAILED, "something wrong");
+    }
 
     struct Foo
     {

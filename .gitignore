@@ -6,3 +6,4 @@ __pycache__
 !/v8/**/*.lib
 !/v8/**/*.a
 
+/scripts/node_modules

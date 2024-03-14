@@ -5,62 +5,66 @@
 
 namespace jsb
 {
-    namespace
-    {
-        String to_file_path(const String& p_module_id)
-        {
-            return "res://" + p_module_id + ".js";
-        }
-    }
-
-    Vector<uint8_t> SourceModuleResolver::read_all_bytes(const String& p_path, String* r_filename)
+    Vector<uint8_t> DefaultModuleResolver::read_all_bytes(const String& r_asset_path, String* r_filename)
     {
         Error r_error;
-        const Ref<FileAccess> f = FileAccess::open(p_path, FileAccess::READ, &r_error);
-        if (f.is_null())
-        {
-            if (r_filename)
-            {
-                *r_filename = "";
-            }
-            if (!r_error)
-            {
-                return Vector<uint8_t>();
-            }
-            ERR_FAIL_V_MSG(Vector<uint8_t>(), "Can't open file from path '" + String(p_path) + "'.");
-        }
-
-        static constexpr char header[] = "(function(exports,require,module,__filename,__dirname){";
-        static constexpr char footer[] = "\n})";
-
-        Vector<uint8_t> data;
-        const size_t file_len = f->get_length();
-        data.resize((int) (file_len + std::size(header) + std::size(footer) - 2));
-
+        const Ref<FileAccess> f = open_file(r_asset_path, FileAccess::READ, &r_error);
         if (r_filename)
         {
             *r_filename = f->get_path_absolute();
         }
-        memcpy(data.ptrw(), header, std::size(header) - 1);
-        f->get_buffer(data.ptrw() + std::size(header) - 1, file_len);
-        memcpy(data.ptrw() + file_len + std::size(header) - 1, footer, std::size(footer) - 1);
+        if (f.is_null())
+        {
+            if (!r_error)
+            {
+                return Vector<uint8_t>();
+            }
+            ERR_FAIL_V_MSG(Vector<uint8_t>(), "Can't open file from path '" + String(r_asset_path) + "'.");
+        }
+
+        constexpr static char header[] = "(function(exports,require,module,__filename,__dirname){";
+        constexpr static char footer[] = "\n})";
+
+        Vector<uint8_t> data;
+        const size_t file_len = f->get_length();
+        data.resize((int) (file_len + ::std::size(header) + ::std::size(footer) - 2));
+
+        memcpy(data.ptrw(), header, ::std::size(header) - 1);
+        f->get_buffer(data.ptrw() + ::std::size(header) - 1, file_len);
+        memcpy(data.ptrw() + file_len + ::std::size(header) - 1, footer, ::std::size(footer) - 1);
         return data;
     }
 
     // early and simple validation: check source file existence
-    bool SourceModuleResolver::is_valid(const String &p_module_id)
+    bool DefaultModuleResolver::get_source_info(const String &p_module_id, String& r_asset_path)
     {
-		Ref<FileAccess> file_check = FileAccess::create(FileAccess::ACCESS_RESOURCES);
-        return file_check->file_exists(to_file_path(p_module_id));
+        String extended = p_module_id + ".js";
+        for (const String& search_path : search_paths_)
+        {
+            String filename = internal::PathUtil::combine(search_path, extended);
+            if (get_file_access()->file_exists(filename))
+            {
+                r_asset_path = filename;
+                return true;
+            }
+        }
+        r_asset_path.clear();
+        return false;
     }
 
-    bool SourceModuleResolver::load(JavaScriptContext *p_ccontext, JavaScriptModule &p_module)
+    DefaultModuleResolver& DefaultModuleResolver::add_search_path(const String& p_path)
+    {
+        search_paths_.append(p_path);
+        return *this;
+    }
+
+    bool DefaultModuleResolver::load(JavaScriptContext *p_ccontext, const String& r_asset_path, JavaScriptModule &p_module)
     {
         v8::Isolate* isolate = p_ccontext->get_isolate();
 
         // load source buffer
-        String filename;
-        Vector<uint8_t> source = read_all_bytes(to_file_path(p_module.id), &filename);
+        String filename_abs;
+        const Vector<uint8_t> source = read_all_bytes(r_asset_path, &filename_abs);
         if (source.size() == 0)
         {
             isolate->ThrowError("failed to read module source");
@@ -89,8 +93,8 @@ namespace jsb
         }
 
         const CharString cmodule_id = p_module.id.utf8();
-        const CharString cfilename = filename.utf8();
-        const CharString cdirname = internal::PathUtil::dirname(filename).utf8();
+        const CharString cfilename = filename_abs.utf8();
+        const CharString cdirname = internal::PathUtil::dirname(filename_abs).utf8();
 
         v8::Local<v8::Object> jexports = v8::Object::New(isolate);
         v8::Local<v8::Object> jmodule = p_module.module.Get(isolate);
@@ -118,7 +122,7 @@ namespace jsb
             jrequire->Set(context, v8::String::NewFromUtf8Literal(isolate, "main"), v8::Null(isolate));
         }
         p_module.exports.Reset(isolate, jexports);
-        v8::MaybeLocal<v8::Value> type_maybe_local = elevator->Call(context, v8::Undefined(isolate), std::size(argv), argv);
+        v8::MaybeLocal<v8::Value> type_maybe_local = elevator->Call(context, v8::Undefined(isolate), ::std::size(argv), argv);
         if (type_maybe_local.IsEmpty())
         {
             return false;

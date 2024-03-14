@@ -113,6 +113,12 @@ namespace jsb
     {
         runtimes_.remove(this);
 
+        for (IModuleResolver* resolver : module_resolvers_)
+        {
+            memdelete(resolver);
+        }
+        module_resolvers_.clear();
+
         for (KeyValue<String, IModuleLoader*>& pair : module_loaders_)
         {
             memdelete(pair.value);

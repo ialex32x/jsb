@@ -12,6 +12,7 @@
 #include "core/io/file_access.h"
 #include "core/io/dir_access.h"
 #include "core/os/thread.h"
+#include "core/os/os.h"
 
 #include "../internal/jsb_macros.h"
 

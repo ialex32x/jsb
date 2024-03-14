@@ -38,7 +38,7 @@ namespace jsb::internal
 		int _last_index = -1;
 		AllocatorType allocator;
 
-		Slot* get_data() const
+		jsb_force_inline Slot* get_data() const
 		{
 			return (Slot*)allocator.get_data();
 		}
@@ -46,7 +46,7 @@ namespace jsb::internal
 	public:
 		struct LowLevelAccess
 		{
-			bool is_valid_slot(int p_slot_index) const
+			jsb_force_inline bool is_valid_slot(int p_slot_index) const
 			{
 				if (p_slot_index < 0 || p_slot_index >= container.capacity())
 				{
@@ -55,25 +55,25 @@ namespace jsb::internal
 				return container.get_data()[p_slot_index].has_value();
 			}
 
-			T& get_slot_value(int p_slot_index)
+			jsb_force_inline T& get_slot_value(int p_slot_index)
 			{
 				return container.get_data()[p_slot_index].value;
 			}
 
-			const T& get_slot_value(int p_slot_index) const
+			jsb_force_inline const T& get_slot_value(int p_slot_index) const
 			{
 				return container.get_data()[p_slot_index].value;
 			}
 
 		private:
-			LowLevelAccess(SArray& p_container) : container(p_container)
+			jsb_force_inline LowLevelAccess(SArray& p_container) : container(p_container)
 			{
 			}
 
 			SArray& container;
 		};
 
-		const LowLevelAccess& get_low_level_access() { return LowLevelAccess(*this); }
+		jsb_force_inline const LowLevelAccess& get_low_level_access() { return LowLevelAccess(*this); }
 
 		jsb_force_inline SArray() { reserve(8); }
 		jsb_force_inline SArray(int p_init_capacity) { reserve(p_init_capacity); }
@@ -426,7 +426,7 @@ namespace jsb::internal
 			return false;
 		}
 
-		bool contains(const T& p_item) const
+		jsb_force_inline bool contains(const T& p_item) const
 		{
 			return index_of(p_item) != IndexType::none();
 		}
@@ -461,7 +461,7 @@ namespace jsb::internal
 			return IndexType::none();
 		}
 
-		bool try_remove_at(const IndexType& p_index, T& o_item)
+		jsb_force_inline bool try_remove_at(const IndexType& p_index, T& o_item)
 		{
 			if (!is_valid_index(p_index))
 			{
@@ -522,7 +522,7 @@ namespace jsb::internal
 			grow_if_needed(p_size - capacity());
 		}
 
-	    // 至少预留 p_extra_count 个新元素位置
+	    // ensure the number of free slot is enough to add `p_extra_count` new elements
 		void grow_if_needed(int p_extra_count)
 		{
 			jsb_check(p_extra_count > 0);
@@ -560,13 +560,13 @@ namespace jsb::internal
 		public:
 			Iterator() = delete;
 
-			Iterator(ContainerType& p_container, IndexType p_index)
+			jsb_force_inline Iterator(ContainerType& p_container, IndexType p_index)
 				: container(p_container), index(p_index)
 			{
 				container.try_get_linked_index(p_index, previous, next);
 			}
 
-			Iterator(const Iterator& other):
+			jsb_force_inline Iterator(const Iterator& other):
 				container(other.container),
 				index(other.index),
 				previous(other.previous),
@@ -574,14 +574,14 @@ namespace jsb::internal
 			{
 			}
 
-			Iterator& operator++()
+			jsb_force_inline Iterator& operator++()
 			{
 				index = next;
 				container.try_get_linked_index(index, previous, next);
 				return *this;
 			}
 
-			Iterator& operator++(int)
+			jsb_force_inline Iterator& operator++(int)
 			{
 				Iterator temp(*this);
 				index = next;
@@ -589,14 +589,14 @@ namespace jsb::internal
 				return temp;
 			}
 
-			Iterator& operator--()
+			jsb_force_inline Iterator& operator--()
 			{
 				index = previous;
 				container.try_get_linked_index(index, previous, next);
 				return *this;
 			}
 
-			Iterator& operator--(int)
+			jsb_force_inline Iterator& operator--(int)
 			{
 				Iterator temp(*this);
 				index = previous;
@@ -604,12 +604,12 @@ namespace jsb::internal
 				return temp;
 			}
 
-			ElementType& operator*() const
+			jsb_force_inline ElementType& operator*() const
 			{
 				return container.get_value(index);
 			}
 
-			ElementType* operator->() const
+			jsb_force_inline ElementType* operator->() const
 			{
 				return &container.get_value(index);
 			}
@@ -617,7 +617,7 @@ namespace jsb::internal
 			jsb_force_inline bool is_valid() const { return container.is_valid_index(index); }
 			jsb_force_inline explicit operator bool() const { return is_valid(); }
 
-			Iterator& operator=(const Iterator& other)
+			jsb_force_inline Iterator& operator=(const Iterator& other)
 			{
 				container = other.container;
 				index = other.index;
@@ -626,7 +626,7 @@ namespace jsb::internal
 				return *this;
 			}
 
-			friend bool operator==(const Iterator& lhs, const Iterator& rhs)
+			jsb_force_inline friend bool operator==(const Iterator& lhs, const Iterator& rhs)
 			{
 				return &lhs.container == &rhs.container
 					&& lhs.index == rhs.index
@@ -634,7 +634,7 @@ namespace jsb::internal
 					&& lhs.next == rhs.next;
 			}
 
-			friend bool operator!=(const Iterator& lhs, const Iterator& rhs)
+			jsb_force_inline friend bool operator!=(const Iterator& lhs, const Iterator& rhs)
 			{
 				return &lhs.container != &rhs.container
 					|| lhs.index != rhs.index
@@ -642,12 +642,12 @@ namespace jsb::internal
 					|| lhs.next != rhs.next;
 			}
 
-			void remove()
+			jsb_force_inline void remove()
 			{
 				container.remove_at(index);
 			}
 
-			IndexType get_index() const
+			jsb_force_inline IndexType get_index() const
 			{
 				return index;
 			}
@@ -774,12 +774,12 @@ namespace jsb::internal
 			return _first_index == INDEX_NONE && _last_index == INDEX_NONE;
 		}
 
-		static void increase_revision(int& p_value)
+		jsb_force_inline static void increase_revision(int& p_value)
 		{
 			p_value = p_value == -1 ? 1 : p_value + 1;
 		}
 
-	    static void construct_element(Slot& p_slot)
+	    jsb_force_inline static void construct_element(Slot& p_slot)
 		{
 		    if constexpr (!std::is_trivially_constructible_v<T>)
 		    {
@@ -787,7 +787,7 @@ namespace jsb::internal
 		    }
 		}
 
-		static void destruct_element(Slot& p_slot)
+		jsb_force_inline static void destruct_element(Slot& p_slot)
 		{
 			if constexpr (!std::is_trivially_destructible_v<T>)
 			{

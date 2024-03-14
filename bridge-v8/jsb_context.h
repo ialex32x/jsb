@@ -67,7 +67,7 @@ namespace jsb
         Error eval(const CharString& p_source, const CharString& p_filename);
 
         // load a script (as module)
-        void load(const String& p_name);
+        Error load(const String& p_name);
 
         jsb_force_inline v8::Isolate* get_isolate() const { jsb_check(runtime_); return runtime_->isolate_; }
 
@@ -86,6 +86,11 @@ namespace jsb
         static void _require(const v8::FunctionCallbackInfo<v8::Value>& info);
 
     private:
+        struct ExceptionInfo
+        {
+            String message;
+            // String stack;
+        };
 
         static void _print(const v8::FunctionCallbackInfo<v8::Value>& info);
 
@@ -95,6 +100,12 @@ namespace jsb
 
         void _register_builtins(const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& self);
         JavaScriptClassInfo* _expose_godot_class(const ClassDB::ClassInfo* p_class_info, internal::Index32* r_class_id = nullptr);
+
+        // return false if something wrong with an exception thrown
+        // caller should handle the exception if it's not called from js
+        bool _load_module(const String& p_parent_id, const String& p_module_id, JavaScriptModule*& r_module);
+
+        bool _read_exception(const v8::TryCatch& p_catch, ExceptionInfo& r_info);
 
         // hold a reference to JavaScriptRuntime which ensure runtime being destructed after context
         std::shared_ptr<class JavaScriptRuntime> runtime_;

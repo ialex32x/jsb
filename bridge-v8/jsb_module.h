@@ -37,6 +37,8 @@ namespace jsb
         jsb_force_inline JavaScriptModule& insert(const String& p_name, bool p_main_candidate)
         {
             jsb_check(!find(p_name));
+
+            JSB_LOG(Verbose, "loading new module %s", p_name);
             if (p_main_candidate && main_.is_empty())
             {
                 main_ = p_name;

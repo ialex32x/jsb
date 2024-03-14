@@ -59,6 +59,27 @@ namespace jsb
             return nullptr;
         }
 
+        class IModuleResolver* find_module_resolver(const String& p_module_id, String& r_asset_path) const
+        {
+            for (IModuleResolver* resolver : module_resolvers_)
+            {
+                if (resolver->get_source_info(p_module_id, r_asset_path))
+                {
+                    return resolver;
+                }
+            }
+
+            return nullptr;
+        }
+
+        template<typename T, typename... ArgumentTypes>
+        T& add_module_resolver(ArgumentTypes... p_args)
+        {
+            T* resolver = memnew(T(p_args...));
+            module_resolvers_.append(resolver);
+            return *resolver;
+        }
+
         JavaScriptClassInfo& add_class(internal::Index32* o_class_id = nullptr)
         {
             const internal::Index32 class_id = classes_.append(JavaScriptClassInfo());
@@ -103,7 +124,7 @@ namespace jsb
 
         // module_id => loader
         HashMap<String, class IModuleLoader*> module_loaders_;
-        SourceModuleResolver source_module_resolver_;
+        Vector<IModuleResolver*> module_resolvers_;
 
         friend class JavaScriptContext;
     };

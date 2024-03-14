@@ -82,6 +82,7 @@ namespace jsb
     private:
         void reload_script(const Ref<Script> &p_script, bool p_soft_reload);
 
+        bool once_inited_ = false;
         std::shared_ptr<class JavaScriptRuntime> runtime_;
         std::shared_ptr<class JavaScriptContext> context_;
     };

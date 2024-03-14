@@ -10,6 +10,9 @@ def is_v8_available():
     # return env["platform"] != "web"
     return env["platform"] == "windows" and env.msvc
 
+# def is_platform(expected_value):
+#     return "1" if env["platform"] == expected_value else "0"
+
 javascript_engine = "v8" if is_v8_available() else "quickjs"
 javascript_debug_link = False # it seems godot links MT_StaticRelease even if env["dev_build"]
 
@@ -19,7 +22,7 @@ print("javascript engine:", javascript_engine)
 
 # make these PreprocessorDefinitions publicly known for the convenience of IDE coding hints
 javascript_shared_defines = [
-    "JSB_WITH_V8="+         str(1 if javascript_engine == "v8" else 0), 
+    "JSB_WITH_V8="+         str(1 if javascript_engine == "v8" else 0),
     "JSB_WITH_QUICKJS="+    str(1 if javascript_engine == "quickjs" else 0),
 ]
 
@@ -37,14 +40,14 @@ if javascript_engine == "v8":
         # env.Append(LIBPATH=['v8/windows.x86_64.release'])
         env.Append(LIBS=[File("v8/windows.x86_64.release/v8_monolith.lib")])
     # env.Append(LIBS=["winmm", "Dbghelp"])
-    
+
     env.Append(LINKFLAGS=["winmm.lib", "Dbghelp.lib"])
 
     if env["platform"] != "ios" and env["platform"] != "macos":
         env_jsb.AppendUnique(CPPDEFINES=["V8_COMPRESS_POINTERS"])
     env_jsb.Append(CPPDEFINES=["_ITERATOR_DEBUG_LEVEL=0"])
     env_jsb.add_source_files(module_obj, "bridge-v8/*.cpp")
-    
+
     # env_jsb is enough for compiler, but IDE lookup paths from `env`
     if env.msvc and env["vsproj"]:
         env.Append(CPPPATH=["#modules/jsb/v8/include"])
