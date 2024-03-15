@@ -30,7 +30,7 @@ namespace jsb
             Callee* ptr = new Callee;
             self->SetAlignedPointerInInternalField(kObjectFieldPointer, ptr);
 
-            JavaScriptRuntime* runtime = JavaScriptRuntime::get(isolate);
+            JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
             runtime->bind_object(class_id, ptr, self);
         }
 
@@ -53,7 +53,7 @@ namespace jsb
             Callee* ptr = new Callee(p1);
             self->SetAlignedPointerInInternalField(kObjectFieldPointer, ptr);
 
-            JavaScriptRuntime* runtime = JavaScriptRuntime::get(isolate);
+            JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
             runtime->bind_object(class_id, ptr, self);
         }
 

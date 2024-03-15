@@ -45,9 +45,14 @@ namespace jsb
         JavaScriptContext(const std::shared_ptr<class JavaScriptRuntime>& runtime);
         ~JavaScriptContext();
 
-        jsb_force_inline static JavaScriptContext* get(const v8::Local<v8::Context>& p_context)
+        jsb_force_inline static JavaScriptContext* wrap(const v8::Local<v8::Context>& p_context)
         {
             return (JavaScriptContext*) p_context->GetAlignedPointerFromEmbedderData(kContextEmbedderData);
+        }
+
+        jsb_force_inline v8::Local<v8::Context> unwrap() const
+        {
+            return context_.Get(runtime_->isolate_);
         }
 
         jsb_force_inline bool check(const v8::Local<v8::Context>& p_context) const
@@ -61,7 +66,7 @@ namespace jsb
         // jsb_force_inline uint8_t* get_function_pointer(uint32_t p_offset) { return function_pointers_[p_offset]; }
         jsb_force_inline static uint8_t* get_function(const v8::Local<v8::Context>& p_context, uint32_t p_offset)
         {
-            return get(p_context)->function_pointers_[p_offset];
+            return wrap(p_context)->function_pointers_[p_offset];
         }
 
         Error eval(const CharString& p_source, const CharString& p_filename);

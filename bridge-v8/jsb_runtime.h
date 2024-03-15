@@ -28,16 +28,19 @@ namespace jsb
         // return a JavaScriptRuntime pointer via `p_pointer` if it's still alive
         // `p_pointer` should point to a JavaScriptRuntime instance
         jsb_no_discard
-        static std::shared_ptr<JavaScriptRuntime> unwrap(void* p_pointer);
+        static std::shared_ptr<JavaScriptRuntime> safe_wrap(void* p_pointer);
 
         jsb_force_inline jsb_no_discard
-        bool check(v8::Isolate* p_isolate) const { return p_isolate == isolate_; }
-
-        jsb_force_inline jsb_no_discard
-        static JavaScriptRuntime* get(v8::Isolate* p_isolate)
+        static JavaScriptRuntime* wrap(v8::Isolate* p_isolate)
         {
             return (JavaScriptRuntime*) p_isolate->GetData(kIsolateEmbedderData);
         }
+
+        jsb_force_inline jsb_no_discard
+        v8::Isolate* unwrap() const { return isolate_; }
+
+        jsb_force_inline jsb_no_discard
+        bool check(v8::Isolate* p_isolate) const { return p_isolate == isolate_; }
 
         void bind_object(internal::Index32 p_class_id, void *p_pointer, const v8::Local<v8::Object>& p_object);
         void unbind_object(void* p_pointer);
@@ -99,7 +102,15 @@ namespace jsb
         }
 
     private:
-        static void object_gc_callback(const v8::WeakCallbackInfo<void>& info);
+        void on_context_created(const v8::Local<v8::Context>& p_context);
+        void on_context_destroyed(const v8::Local<v8::Context>& p_context);
+
+        static void object_gc_callback(const v8::WeakCallbackInfo<void>& info)
+        {
+            JavaScriptRuntime* cruntime = wrap(info.GetIsolate());
+            cruntime->free_object(info.GetParameter(), true);
+        }
+
         bool free_object(void* p_pointer, bool p_free);
 
         /*volatile*/
@@ -134,6 +145,10 @@ namespace jsb
 
         uint64_t last_ticks_;
         internal::TTimerManager<JavaScriptTimerAction> timer_manager_;
+
+#if JSB_WITH_DEBUGGER
+        std::unique_ptr<class JavaScriptDebugger> debugger_;
+#endif
 
         friend class JavaScriptContext;
     };

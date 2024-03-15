@@ -70,7 +70,7 @@ namespace jsb
 
         static void free_callback(void* p_token, void* p_instance, void* p_binding)
         {
-            if (std::shared_ptr<JavaScriptRuntime> cruntime = JavaScriptRuntime::unwrap(p_token))
+            if (std::shared_ptr<JavaScriptRuntime> cruntime = JavaScriptRuntime::safe_wrap(p_token))
             {
                 jsb_check(p_instance == p_binding);
                 cruntime->unbind_object(p_binding);
@@ -79,7 +79,7 @@ namespace jsb
 
         static GDExtensionBool reference_callback(void* p_token, void* p_binding, GDExtensionBool p_reference)
         {
-            if (std::shared_ptr<JavaScriptRuntime> cruntime = JavaScriptRuntime::unwrap(p_token))
+            if (std::shared_ptr<JavaScriptRuntime> cruntime = JavaScriptRuntime::safe_wrap(p_token))
             {
                 return cruntime->reference_object(p_binding, !!p_reference);
             }
@@ -191,7 +191,7 @@ namespace jsb
         String parent_id = JavaScriptModuleCache::get_name(isolate, info.Data());
         String module_id = JavaScriptModuleCache::get_name(isolate, arg0);
 
-        JavaScriptContext* ccontext = JavaScriptContext::get(context);
+        JavaScriptContext* ccontext = JavaScriptContext::wrap(context);
         JavaScriptModule* module;
         if (ccontext->_load_module(parent_id, module_id, module))
         {
@@ -400,7 +400,7 @@ namespace jsb
         default: break;
         }
 
-        JavaScriptRuntime* cruntime = JavaScriptRuntime::get(isolate);
+        JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
         v8::Local<v8::Function> func = info[0].As<v8::Function>();
         internal::TimerHandle handle;
 
@@ -437,7 +437,7 @@ namespace jsb
             isolate->ThrowError("bad time");
             return;
         }
-        JavaScriptRuntime* cruntime = JavaScriptRuntime::get(isolate);
+        JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
         cruntime->timer_manager_.clear_timer((internal::TimerHandle) (internal::Index32) handle);
     }
 
@@ -457,10 +457,12 @@ namespace jsb
 
             _register_builtins(context, global);
         }
+        runtime_->on_context_created(context);
     }
 
     JavaScriptContext::~JavaScriptContext()
     {
+        runtime_->on_context_destroyed(context_.Get(runtime_->isolate_));
         {
             v8::HandleScope handle_scope(get_isolate());
             v8::Local<v8::Context> context = context_.Get(get_isolate());
@@ -488,10 +490,9 @@ namespace jsb
             return OK;
         }
 
-        JavaScriptExceptionInfo exception_info;
-        if (JavaScriptExceptionInfo::_read_exception(isolate, try_catch_run, exception_info))
+        if (JavaScriptExceptionInfo exception_info = JavaScriptExceptionInfo(isolate, try_catch_run))
         {
-            ERR_FAIL_V_MSG(ERR_COMPILATION_FAILED, exception_info.message);
+            ERR_FAIL_V_MSG(ERR_COMPILATION_FAILED, (String) exception_info);
         }
         ERR_FAIL_V_MSG(ERR_COMPILATION_FAILED, "something wrong");
     }
@@ -569,7 +570,7 @@ namespace jsb
         v8::Local<v8::Uint32> data = v8::Local<v8::Uint32>::Cast(info.Data());
         internal::Index32 class_id(data->Value());
 
-        JavaScriptRuntime* cruntime = JavaScriptRuntime::get(isolate);
+        JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
         JavaScriptClassInfo& jclass_info = cruntime->classes_.get_value(class_id);
         HashMap<StringName, ClassDB::ClassInfo>::Iterator it = ClassDB::classes.find(jclass_info.name);
         jsb_check(it != ClassDB::classes.end());
@@ -770,7 +771,7 @@ namespace jsb
             }
             void* pointer = self->GetAlignedPointerFromInternalField(kObjectFieldPointer);
 
-            jsb_check(JavaScriptRuntime::get(isolate)->check_object(pointer));
+            jsb_check(JavaScriptRuntime::wrap(isolate)->check_object(pointer));
             gd_object = (Object*) pointer;
         }
 
@@ -819,7 +820,7 @@ namespace jsb
         v8::String::Utf8Value str_utf8(isolate, arg0);
         StringName type_name(*str_utf8);
         v8::Local<v8::Context> context = isolate->GetCurrentContext();
-        JavaScriptContext* ccontext = JavaScriptContext::get(context);
+        JavaScriptContext* ccontext = JavaScriptContext::wrap(context);
 
         HashMap<StringName, ClassDB::ClassInfo>::Iterator it = ClassDB::classes.find(type_name);
         if (it != ClassDB::classes.end())

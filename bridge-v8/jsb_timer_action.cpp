@@ -8,7 +8,7 @@ namespace jsb
     {
         v8::Local<v8::Function> func = function_.Get(isolate);
         v8::Local<v8::Context> context = func->GetCreationContextChecked();
-        JavaScriptContext* ccontext = JavaScriptContext::get(context);
+        JavaScriptContext* ccontext = JavaScriptContext::wrap(context);
 
         if (!ccontext)
         {
@@ -39,10 +39,10 @@ namespace jsb
         {
             func->Call(context, v8::Undefined(isolate), 0, nullptr);
         }
-        JavaScriptExceptionInfo exception_info;
-        if (JavaScriptExceptionInfo::_read_exception(isolate, try_catch, exception_info))
+
+        if (JavaScriptExceptionInfo exception_info = JavaScriptExceptionInfo(isolate, try_catch))
         {
-            JSB_LOG(Error, "timer error %s", exception_info.message);
+            JSB_LOG(Error, "timer error %s", (String) exception_info);
         }
     }
 }

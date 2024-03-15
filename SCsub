@@ -24,6 +24,7 @@ print("javascript engine:", javascript_engine)
 javascript_shared_defines = [
     "JSB_WITH_V8="+         str(1 if javascript_engine == "v8" else 0),
     "JSB_WITH_QUICKJS="+    str(1 if javascript_engine == "quickjs" else 0),
+    "JSB_WITH_DEBUGGER=0",
 ]
 
 env_jsb = env_modules.Clone()

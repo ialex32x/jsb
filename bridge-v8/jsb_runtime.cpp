@@ -1,8 +1,11 @@
 #include "jsb_runtime.h"
 
+#if JSB_WITH_DEBUGGER
+#include "jsb_debugger.h"
+#endif
+
 #include "jsb_module_loader.h"
 #include "core/string/string_builder.h"
-#include "jsb_pointer_store.h"
 
 namespace jsb
 {
@@ -19,6 +22,47 @@ namespace jsb
             v8::V8::InitializePlatform(platform.get());
             v8::V8::Initialize();
         }
+    };
+
+    struct JavaScriptRuntimeStore
+    {
+        std::shared_ptr<JavaScriptRuntime> access(void* p_runtime)
+        {
+            std::shared_ptr<JavaScriptRuntime> rval;
+            lock_.lock();
+            if (all_runtimes_.has(p_runtime))
+            {
+                rval = ((JavaScriptRuntime*) p_runtime)->shared_from_this();
+            }
+            lock_.unlock();
+            return rval;
+        }
+
+        void add(void* p_runtime)
+        {
+            lock_.lock();
+            jsb_check(!all_runtimes_.has(p_runtime));
+            all_runtimes_.insert(p_runtime);
+            lock_.unlock();
+        }
+
+        void remove(void* p_runtime)
+        {
+            lock_.lock();
+            jsb_check(all_runtimes_.has(p_runtime));
+            all_runtimes_.erase(p_runtime);
+            lock_.unlock();
+        }
+
+        jsb_force_inline static JavaScriptRuntimeStore& get_shared()
+        {
+            static JavaScriptRuntimeStore global_store;
+            return global_store;
+        }
+
+    private:
+        BinaryMutex lock_;
+        HashSet<void*> all_runtimes_;
     };
 
     namespace
@@ -52,9 +96,23 @@ namespace jsb
         }
     }
 
-    std::shared_ptr<JavaScriptRuntime> JavaScriptRuntime::unwrap(void* p_pointer)
+    std::shared_ptr<JavaScriptRuntime> JavaScriptRuntime::safe_wrap(void* p_pointer)
     {
-        return PointerStore::get_shared().access<JavaScriptRuntime>(p_pointer);
+        return JavaScriptRuntimeStore::get_shared().access(p_pointer);
+    }
+
+    void JavaScriptRuntime::on_context_created(const v8::Local<v8::Context>& p_context)
+    {
+#if JSB_WITH_DEBUGGER
+        debugger_->on_context_created(p_context);
+#endif
+    }
+
+    void JavaScriptRuntime::on_context_destroyed(const v8::Local<v8::Context>& p_context)
+    {
+#if JSB_WITH_DEBUGGER
+        debugger_->on_context_destroyed(p_context);
+#endif
     }
 
     JavaScriptRuntime::JavaScriptRuntime()
@@ -70,12 +128,19 @@ namespace jsb
         isolate_->SetPromiseRejectCallback(PromiseRejectCallback_);
 
         module_loaders_.insert("godot", memnew(GodotModuleLoader));
-        PointerStore::get_shared().add(this);
+        JavaScriptRuntimeStore::get_shared().add(this);
+#if JSB_WITH_DEBUGGER
+        debugger_ = JavaScriptDebugger::create(isolate_);
+        debugger_->open();
+#endif
     }
 
     JavaScriptRuntime::~JavaScriptRuntime()
     {
-        PointerStore::get_shared().remove(this);
+#if JSB_WITH_DEBUGGER
+        debugger_.reset();
+#endif
+        JavaScriptRuntimeStore::get_shared().remove(this);
 
         timer_manager_.clear_all();
 
@@ -132,7 +197,9 @@ namespace jsb
             timer_manager_.invoke_timers(isolate_);
         }
         isolate_->PerformMicrotaskCheckpoint();
-        // debug_server_->update();
+#if JSB_WITH_DEBUGGER
+        debugger_->update(true);
+#endif
     }
 
     void JavaScriptRuntime::gc()
@@ -142,12 +209,6 @@ namespace jsb
 #else
         isolate_->LowMemoryNotification();
 #endif
-    }
-
-    void JavaScriptRuntime::object_gc_callback(const v8::WeakCallbackInfo<void>& info)
-    {
-        JavaScriptRuntime* cruntime = get(info.GetIsolate());
-        cruntime->free_object(info.GetParameter(), true);
     }
 
     void JavaScriptRuntime::bind_object(internal::Index32 p_class_id, void *p_pointer, const v8::Local<v8::Object>& p_object)
