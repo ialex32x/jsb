@@ -7,14 +7,13 @@ Import("env")
 Import("env_modules")
 
 def is_v8_available():
-    # return env["platform"] != "web"
-    return env["platform"] == "windows" and env.msvc
+    return env["platform"] != "web"
+    # return env["platform"] == "windows" and env.msvc
 
 # def is_platform(expected_value):
 #     return "1" if env["platform"] == expected_value else "0"
 
 javascript_engine = "v8" if is_v8_available() else "quickjs"
-javascript_debug_link = False # it seems godot links MT_StaticRelease even if env["dev_build"]
 
 # env_jsb.Append(CPPDEFINES=["JSB_LOG_ENABLED=1"])
 
@@ -34,18 +33,17 @@ env_jsb.Append(CPPDEFINES=javascript_shared_defines) # due to env_modules inheri
 module_obj = []
 
 if javascript_engine == "v8":
-    if javascript_debug_link:
-        # env.Append(LIBPATH=['v8/windows.x86_64.debug'])
-        env.Append(LIBS=[File("v8/windows.x86_64.debug/v8_monolith.lib")])
+    # it seems godot always links MT_StaticRelease even if env["dev_build"]
+    # env.Append(LIBPATH=['v8/windows.x86_64.release'])
+    if env["platform"] == "macos":
+        env.Append(LIBS=[File("v8/macos.x64.release/libv8_monolith.a")])
     else:
-        # env.Append(LIBPATH=['v8/windows.x86_64.release'])
         env.Append(LIBS=[File("v8/windows.x86_64.release/v8_monolith.lib")])
-    # env.Append(LIBS=["winmm", "Dbghelp"])
+        env.Append(LINKFLAGS=["winmm.lib", "Dbghelp.lib"])
 
-    env.Append(LINKFLAGS=["winmm.lib", "Dbghelp.lib"])
-
-    if env["platform"] != "ios" and env["platform"] != "macos":
+    if env["platform"] != "ios":
         env_jsb.AppendUnique(CPPDEFINES=["V8_COMPRESS_POINTERS"])
+
     env_jsb.Append(CPPDEFINES=["_ITERATOR_DEBUG_LEVEL=0"])
     env_jsb.add_source_files(module_obj, "bridge-v8/*.cpp")
 
