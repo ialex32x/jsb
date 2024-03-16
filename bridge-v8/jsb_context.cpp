@@ -462,7 +462,10 @@ namespace jsb
 
     JavaScriptContext::~JavaScriptContext()
     {
-        runtime_->on_context_destroyed(context_.Get(runtime_->isolate_));
+        v8::Isolate* isolate = runtime_->isolate_;
+        v8::Isolate::Scope isolate_scope(isolate);
+        v8::HandleScope handle_scope(isolate);
+        runtime_->on_context_destroyed(context_.Get(isolate));
         {
             v8::HandleScope handle_scope(get_isolate());
             v8::Local<v8::Context> context = context_.Get(get_isolate());

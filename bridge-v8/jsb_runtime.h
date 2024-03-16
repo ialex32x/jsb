@@ -30,16 +30,20 @@ namespace jsb
         jsb_no_discard
         static std::shared_ptr<JavaScriptRuntime> safe_wrap(void* p_pointer);
 
-        jsb_force_inline jsb_no_discard
-        static JavaScriptRuntime* wrap(v8::Isolate* p_isolate)
+        jsb_no_discard
+        static 
+        jsb_force_inline 
+        JavaScriptRuntime* wrap(v8::Isolate* p_isolate)
         {
             return (JavaScriptRuntime*) p_isolate->GetData(kIsolateEmbedderData);
         }
 
-        jsb_force_inline jsb_no_discard
+        jsb_no_discard
+        jsb_force_inline 
         v8::Isolate* unwrap() const { return isolate_; }
 
-        jsb_force_inline jsb_no_discard
+        jsb_no_discard
+        jsb_force_inline 
         bool check(v8::Isolate* p_isolate) const { return p_isolate == isolate_; }
 
         void bind_object(internal::Index32 p_class_id, void *p_pointer, const v8::Local<v8::Object>& p_object);

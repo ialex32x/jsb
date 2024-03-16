@@ -34,9 +34,12 @@ module_obj = []
 
 if javascript_engine == "v8":
     # it seems godot always links MT_StaticRelease even if env["dev_build"]
-    # env.Append(LIBPATH=['v8/windows.x86_64.release'])
+    
     if env["platform"] == "macos":
-        env.Append(LIBS=[File("v8/macos.x64.release/libv8_monolith.a")])
+        env.Append(LIBPATH=['#modules/jsb/v8/macos.arm64.release'])
+
+        # it seems v8_monolith must be compiled with `use_rtti=true` explicitly, or the linker will failed on `v8::ArrayBuffer::Allocator` 
+        env.Append(LINKFLAGS=["-lv8_monolith"])
     else:
         env.Append(LIBS=[File("v8/windows.x86_64.release/v8_monolith.lib")])
         env.Append(LINKFLAGS=["winmm.lib", "Dbghelp.lib"])

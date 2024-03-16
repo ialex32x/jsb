@@ -114,12 +114,12 @@ namespace jsb
         v8::Local<v8::Object> jmain_module;
         if (p_ccontext->_get_main_module(&jmain_module))
         {
-            jrequire->Set(context, v8::String::NewFromUtf8Literal(isolate, "main"), jmain_module);
+            jrequire->Set(context, v8::String::NewFromUtf8Literal(isolate, "main"), jmain_module).Check();
         }
         else
         {
             JSB_LOG(Warning, "invalid main module");
-            jrequire->Set(context, v8::String::NewFromUtf8Literal(isolate, "main"), v8::Null(isolate));
+            jrequire->Set(context, v8::String::NewFromUtf8Literal(isolate, "main"), v8::Null(isolate)).Check();
         }
         p_module.exports.Reset(isolate, jexports);
         v8::MaybeLocal<v8::Value> type_maybe_local = elevator->Call(context, v8::Undefined(isolate), ::std::size(argv), argv);
