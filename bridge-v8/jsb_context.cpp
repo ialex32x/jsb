@@ -154,7 +154,7 @@ namespace jsb
             if (str.length() > 0)
             {
                 sb.append(" ");
-                sb.append(*str);
+                sb.append(String::utf8(*str, str.length()));
             }
         }
 
