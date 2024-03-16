@@ -225,7 +225,7 @@ namespace jsb
             jmodule_cache->Set(context, jmodule_id, module_obj).Check();
 
             // init the new module obj
-            module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, false));
+            module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, false)).Check();
             module.id = p_module_id;
             module.module.Reset(isolate, module_obj);
 
@@ -235,7 +235,7 @@ namespace jsb
                 return false;
             }
 
-            module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, true));
+            module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, true)).Check();
             r_module = &module;
             return true;
         }
@@ -266,10 +266,10 @@ namespace jsb
             jmodule_cache->Set(context, jmodule_id, module_obj).Check();
 
             // init the new module obj
-            module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, false));
-            module_obj->Set(context, v8::String::NewFromUtf8Literal(isolate, "id"), jmodule_id);
-            module_obj->Set(context, v8::String::NewFromUtf8Literal(isolate, "cache"), jmodule_cache);
-            module_obj->Set(context, propkey_children, v8::Array::New(isolate));
+            module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, false)).Check();
+            module_obj->Set(context, v8::String::NewFromUtf8Literal(isolate, "id"), jmodule_id).Check();
+            module_obj->Set(context, v8::String::NewFromUtf8Literal(isolate, "cache"), jmodule_cache).Check();
+            module_obj->Set(context, propkey_children, v8::Array::New(isolate)).Check();
             module.id = normalized_id;
             module.module.Reset(isolate, module_obj);
 
@@ -290,20 +290,20 @@ namespace jsb
                     {
                         v8::Local<v8::Array> jparent_children = jparent_children_v.As<v8::Array>();
                         const uint32_t children_num = jparent_children->Length();
-                        jparent_children->Set(context, children_num, module_obj);
+                        jparent_children->Set(context, children_num, module_obj).Check();
                     }
                     else
                     {
                         JSB_LOG(Error, "can not access children on '%s'", p_parent_id);
                     }
-                    module_obj->Set(context, v8::String::NewFromUtf8Literal(isolate, "parent"), jparent_module);
+                    module_obj->Set(context, v8::String::NewFromUtf8Literal(isolate, "parent"), jparent_module).Check();
                 }
                 else
                 {
                     JSB_LOG(Warning, "parent module not found with the name '%s'", p_parent_id);
                 }
             }
-            module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, true));
+            module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, true)).Check();
             r_module = &module;
             return true;
         }
@@ -322,8 +322,8 @@ namespace jsb
             v8::Local<v8::Object> jhost = v8::Object::New(isolate);
 
             self->Set(context, v8::String::NewFromUtf8Literal(isolate, "jsb"), jhost).Check();
-            jhost->Set(context, v8::String::NewFromUtf8Literal(isolate, "list_classes"), v8::Function::New(context, _list_classes).ToLocalChecked());
-            jhost->Set(context, v8::String::NewFromUtf8Literal(isolate, "debug"), v8::Boolean::New(isolate, is_debug_build()));
+            jhost->Set(context, v8::String::NewFromUtf8Literal(isolate, "list_classes"), v8::Function::New(context, _list_classes).ToLocalChecked()).Check();
+            jhost->Set(context, v8::String::NewFromUtf8Literal(isolate, "debug"), v8::Boolean::New(isolate, is_debug_build())).Check();
         }
 
         // minimal console functions support
@@ -331,13 +331,13 @@ namespace jsb
             v8::Local<v8::Object> jconsole = v8::Object::New(isolate);
 
             self->Set(context, v8::String::NewFromUtf8Literal(isolate, "console"), jconsole).Check();
-            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "log"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Log)).ToLocalChecked());
-            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "info"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Info)).ToLocalChecked());
-            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "debug"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Debug)).ToLocalChecked());
-            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "warn"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Warning)).ToLocalChecked());
-            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "error"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Error)).ToLocalChecked());
-            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "assert"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Assert)).ToLocalChecked());
-            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "trace"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Trace)).ToLocalChecked());
+            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "log"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Log)).ToLocalChecked()).Check();
+            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "info"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Info)).ToLocalChecked()).Check();
+            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "debug"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Debug)).ToLocalChecked()).Check();
+            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "warn"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Warning)).ToLocalChecked()).Check();
+            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "error"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Error)).ToLocalChecked()).Check();
+            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "assert"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Assert)).ToLocalChecked()).Check();
+            jconsole->Set(context, v8::String::NewFromUtf8Literal(isolate, "trace"), v8::Function::New(context, _print, v8::Int32::New(isolate, internal::ELogSeverity::Trace)).ToLocalChecked()).Check();
         }
 
         // the root 'require' function
@@ -345,8 +345,8 @@ namespace jsb
             v8::Local<v8::Object> jmodule_cache = v8::Object::New(isolate);
             v8::Local<v8::Function> require_func = v8::Function::New(context, _require).ToLocalChecked();
             self->Set(context, v8::String::NewFromUtf8Literal(isolate, "require"), require_func).Check();
-            require_func->Set(context, v8::String::NewFromUtf8Literal(isolate, "cache"), jmodule_cache);
-            require_func->Set(context, v8::String::NewFromUtf8Literal(isolate, "moduleId"), v8::String::Empty(isolate));
+            require_func->Set(context, v8::String::NewFromUtf8Literal(isolate, "cache"), jmodule_cache).Check();
+            require_func->Set(context, v8::String::NewFromUtf8Literal(isolate, "moduleId"), v8::String::Empty(isolate)).Check();
             jmodule_cache_.Reset(isolate, jmodule_cache);
         }
 
@@ -549,7 +549,7 @@ namespace jsb
         // type
         global->Set(context,
             v8::String::NewFromUtf8Literal(isolate, "Foo"),
-            function_template->GetFunction(context).ToLocalChecked());
+            function_template->GetFunction(context).ToLocalChecked()).Check();
     }
 
     void JavaScriptContext::_godot_object_finalizer(void* pointer)
