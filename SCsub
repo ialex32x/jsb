@@ -58,6 +58,7 @@ if javascript_engine == "v8":
     env_jsb.Append(CPPDEFINES=["_ITERATOR_DEBUG_LEVEL=0"])
     env_jsb.add_source_files(module_obj, "bridge-v8/*.cpp")
 
+    # headers
     # env_jsb is enough for compiler, but IDE lookup paths from `env`
     if env.msvc and env["vsproj"]:
         env.Append(CPPPATH=["#modules/jsb/v8/include"])
@@ -70,11 +71,17 @@ else:
 
 # lws
 if "JSB_WITH_LWS=1" in javascript_shared_defines:
-    if env.msvc and env["vsproj"]:
-        env.Append(CPPPATH=["#modules/jsb/lws/include"])
-    env_jsb.Append(CPPPATH=["lws/include"])
-    if env["platform"] == "windows":
-        env.Append(LIBS=[File("lws/lib/websockets.windows.x64.lib")])
+    if env["platform"] == "macos":
+        env_jsb.Append(CPPPATH=["lws/macos.arm64.release/include"])
+
+        env.Append(LIBPATH=['#modules/jsb/lws/macos.arm64.release'])
+        env.Append(LINKFLAGS=["-lwebsockets"])
+    elif env["platform"] == "windows":
+        if env.msvc and env["vsproj"]:
+            env.Append(CPPPATH=["#modules/jsb/lws/windows.x86_64.release/include"])
+        env_jsb.Append(CPPPATH=["lws/windows.x86_64.release/include"])
+
+        env.Append(LIBS=[File("lws/windows.x86_64.release/websockets.lib")])
     #TODO lws builds on other platforms
 
 # common parts
