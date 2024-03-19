@@ -131,7 +131,6 @@ namespace jsb
         JavaScriptRuntimeStore::get_shared().add(this);
 #if JSB_WITH_DEBUGGER
         debugger_ = JavaScriptDebugger::create(isolate_);
-        debugger_->open();
 #endif
     }
 
@@ -198,7 +197,7 @@ namespace jsb
         }
         isolate_->PerformMicrotaskCheckpoint();
 #if JSB_WITH_DEBUGGER
-        debugger_->update(true);
+        debugger_->update();
 #endif
     }
 

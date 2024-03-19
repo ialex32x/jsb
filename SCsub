@@ -23,7 +23,14 @@ print("javascript engine:", javascript_engine)
 javascript_shared_defines = [
     "JSB_WITH_V8="+         str(1 if javascript_engine == "v8" else 0),
     "JSB_WITH_QUICKJS="+    str(1 if javascript_engine == "quickjs" else 0),
-    "JSB_WITH_DEBUGGER=0",
+    "JSB_WITH_DEBUGGER=1",
+
+    # NOTE
+    # JSB_WITH_LWS must be enabled if JSB_WITH_DEBUGGER is used.
+    # currently use `libwebsockets` to handle v8 debugger connection since `modules/websocket` fail to handshake with `devtools`
+    # `devtools` do not response the upgrade request with a `sec-websocket-protocol` header which does not apply the handshake requirements of `WSLPeer`
+    # and the connection will break immediately by `devtools` if `selected_protocol` is assigned manually in `WSLPeer`
+    "JSB_WITH_LWS=1",
 ]
 
 env_jsb = env_modules.Clone()
@@ -34,15 +41,16 @@ module_obj = []
 
 if javascript_engine == "v8":
     # it seems godot always links MT_StaticRelease even if env["dev_build"]
-    
+
     if env["platform"] == "macos":
         env.Append(LIBPATH=['#modules/jsb/v8/macos.arm64.release'])
 
-        # it seems v8_monolith must be compiled with `use_rtti=true` explicitly, or the linker will failed on `v8::ArrayBuffer::Allocator` 
+        # it seems v8_monolith must be compiled with `use_rtti=true` explicitly, or the linker will failed on `v8::ArrayBuffer::Allocator`
         env.Append(LINKFLAGS=["-lv8_monolith"])
     else:
         env.Append(LIBS=[File("v8/windows.x86_64.release/v8_monolith.lib")])
         env.Append(LINKFLAGS=["winmm.lib", "Dbghelp.lib"])
+    #TODO v8 builds on other platforms
 
     if env["platform"] != "ios":
         env_jsb.AppendUnique(CPPDEFINES=["V8_COMPRESS_POINTERS"])
@@ -55,9 +63,19 @@ if javascript_engine == "v8":
         env.Append(CPPPATH=["#modules/jsb/v8/include"])
     env_jsb.Append(CPPPATH=["v8/include"])
 else:
+    # quickjs is directly build from source
     env_jsb.add_source_files(module_obj, "quickjs/*.c")
     env_jsb.add_source_files(module_obj, "bridge-quickjs/*.cpp")
     env_jsb.add_source_files(module_obj, "bridge-quickjs/extra/*.cpp")
+
+# lws
+if "JSB_WITH_LWS=1" in javascript_shared_defines:
+    if env.msvc and env["vsproj"]:
+        env.Append(CPPPATH=["#modules/jsb/lws/include"])
+    env_jsb.Append(CPPPATH=["lws/include"])
+    if env["platform"] == "windows":
+        env.Append(LIBS=[File("lws/lib/websockets.windows.x64.lib")])
+    #TODO lws builds on other platforms
 
 # common parts
 env_jsb.add_source_files(module_obj, ["register_types.cpp"])

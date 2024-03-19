@@ -54,7 +54,11 @@ namespace jsb
 
     DefaultModuleResolver& DefaultModuleResolver::add_search_path(const String& p_path)
     {
-        search_paths_.append(p_path);
+        String normalized;
+        const Error err = internal::PathUtil::extract(p_path, normalized);
+
+        ERR_FAIL_COND_V(err != OK, *this);
+        search_paths_.append(normalized);
         return *this;
     }
 
@@ -79,7 +83,7 @@ namespace jsb
         jsb_check(p_ccontext->check(context));
 
         // failed to compile or run, immediately return since an exception should already be thrown
-        v8::MaybeLocal<v8::Value> func_maybe_local = p_ccontext->_compile_run((const char*) source.ptr(), source.size(), "module_elevator");
+        v8::MaybeLocal<v8::Value> func_maybe_local = p_ccontext->_compile_run((const char*) source.ptr(), source.size(), filename_abs);
         if (func_maybe_local.IsEmpty())
         {
             return false;

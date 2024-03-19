@@ -30,6 +30,11 @@ timer_id = setInterval(function () {
 setImmediate(function () {
     console.log("immediate");
 });
+let infinite_loops = 0;
+setInterval(function () {
+    ++infinite_loops;
+    console.log("a test interval timer never stop 1", infinite_loops);
+}, 5000);
 setTimeout(function (...args) {
     console.log("timeout", ...args);
     if (jsb.debug) {

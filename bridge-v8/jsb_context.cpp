@@ -465,10 +465,10 @@ namespace jsb
         v8::Isolate* isolate = runtime_->isolate_;
         v8::Isolate::Scope isolate_scope(isolate);
         v8::HandleScope handle_scope(isolate);
-        runtime_->on_context_destroyed(context_.Get(isolate));
+        v8::Local<v8::Context> context = context_.Get(get_isolate());
+
+        runtime_->on_context_destroyed(context);
         {
-            v8::HandleScope handle_scope(get_isolate());
-            v8::Local<v8::Context> context = context_.Get(get_isolate());
             context->SetAlignedPointerInEmbedderData(kContextEmbedderData, nullptr);
         }
 
@@ -839,7 +839,7 @@ namespace jsb
         isolate->ThrowError(v8::String::NewFromUtf8(isolate, message.ptr(), v8::NewStringType::kNormal, message.length()).ToLocalChecked());
     }
 
-    Error JavaScriptContext::eval(const CharString& p_source, const CharString& p_filename)
+    Error JavaScriptContext::eval(const CharString& p_source, const String& p_filename)
     {
         v8::Isolate* isolate = get_isolate();
         v8::Isolate::Scope isolate_scope(isolate);
@@ -882,12 +882,17 @@ namespace jsb
         return false;
     }
 
-    v8::MaybeLocal<v8::Value> JavaScriptContext::_compile_run(const char* p_source, int p_source_len, const CharString& p_filename)
+    v8::MaybeLocal<v8::Value> JavaScriptContext::_compile_run(const char* p_source, int p_source_len, const String& p_filename)
     {
         v8::Isolate* isolate = get_isolate();
         v8::Local<v8::Context> context = context_.Get(isolate);
 
-        v8::ScriptOrigin origin(isolate, v8::String::NewFromUtf8(isolate, p_filename, v8::NewStringType::kNormal, p_filename.length()).ToLocalChecked());
+#if WINDOWS_ENABLED
+        const CharString filename = p_filename.replace("/", "\\").utf8();
+#else
+        const CharString filename = p_filename.utf8();
+#endif
+        v8::ScriptOrigin origin(isolate, v8::String::NewFromUtf8(isolate, filename, v8::NewStringType::kNormal, filename.length()).ToLocalChecked());
         v8::MaybeLocal<v8::String> source = v8::String::NewFromUtf8(isolate, p_source, v8::NewStringType::kNormal, p_source_len);
         v8::MaybeLocal<v8::Script> script = v8::Script::Compile(context, source.ToLocalChecked(), &origin);
 
@@ -902,6 +907,7 @@ namespace jsb
             return {};
         }
 
+        JSB_LOG(Verbose, "script compiled %s", p_filename);
         return maybe_value;
     }
 

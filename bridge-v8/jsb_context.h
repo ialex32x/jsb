@@ -69,7 +69,7 @@ namespace jsb
             return wrap(p_context)->function_pointers_[p_offset];
         }
 
-        Error eval(const CharString& p_source, const CharString& p_filename);
+        Error eval(const CharString& p_source, const String& p_filename);
 
         // load a script (as module)
         Error load(const String& p_name);
@@ -77,12 +77,12 @@ namespace jsb
         jsb_force_inline v8::Isolate* get_isolate() const { jsb_check(runtime_); return runtime_->isolate_; }
 
         //NOTE handle scope is required to call this method
-        jsb_force_inline v8::MaybeLocal<v8::Value> _compile_run(const CharString& p_source, const CharString& p_filename)
+        jsb_force_inline v8::MaybeLocal<v8::Value> _compile_run(const CharString& p_source, const String& p_filename)
         {
             return _compile_run(p_source.ptr(), p_source.length(), p_filename);
         }
 
-        v8::MaybeLocal<v8::Value> _compile_run(const char* p_source, int p_source_len, const CharString& p_filename);
+        v8::MaybeLocal<v8::Value> _compile_run(const char* p_source, int p_source_len, const String& p_filename);
 
         bool _get_main_module(v8::Local<v8::Object>* r_main_module) const;
 

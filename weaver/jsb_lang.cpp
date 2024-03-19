@@ -108,7 +108,7 @@ namespace jsb
             return err;
         }
         const CharString& cs_source = (const char*) source.ptr();
-        const CharString& cs_path = p_path.utf8();
+        const String& cs_path = p_path;
 
         return context_->eval(cs_source, cs_path);
     }

@@ -13,7 +13,7 @@ JavaScript for Godot with V8
 * [ ] Worker threads implementation
 * [ ] C++ binding (very basically)
 * [ ] Seamlessly switch to QuickJS when targeting web platform
-* [ ] Debug with Chrome devtools when using V8
+* [x] Debug with Chrome devtools when using V8
 
 ## Current State
 
@@ -25,7 +25,7 @@ JavaScript for Godot with V8
 | Windows ARM64 | TODO | TODO |
 | Linux x86_64 | TODO | TODO |
 | MacOS x86_64 | TODO | TODO |
-| MacOS ARM64 | TODO | TODO |
+| MacOS ARM64 | INTEGRATING | TODO |
 | WebAssembly | X | TODO |
 
 
@@ -93,3 +93,7 @@ async function test_async() {
 
 test_async();
 ```
+
+## Debugger
+
+![20240319122550.png](./docs/assets/20240319122550.png)
