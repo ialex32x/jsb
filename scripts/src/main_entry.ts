@@ -42,6 +42,10 @@ setTimeout(function(...args){
         console.log("it's a release build");
     }
 
+    const node = new Node();
+    node.set_name("test_node");
+    console.log(node.get_name());
+
 }, 1500, 123, 456.789, "abc");
 
 async function delay(seconds: number) {

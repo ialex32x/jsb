@@ -20,38 +20,6 @@ namespace jsb
 #endif
     }
 
-    struct GodotArguments
-    {
-    private:
-        Variant *args;
-
-    public:
-        jsb_force_inline Variant& operator[](int p_index)
-        {
-            return args[p_index];
-        }
-
-        jsb_force_inline GodotArguments(int p_argc)
-        {
-            if (p_argc == 0)
-            {
-                args = nullptr;
-            }
-            else
-            {
-                args = memnew_arr(Variant, p_argc);
-            }
-        }
-
-        jsb_force_inline ~GodotArguments()
-        {
-            if (args)
-            {
-                memdelete_arr(args);
-            }
-        }
-    };
-
     struct InstanceBindingCallbacks
     {
         jsb_force_inline operator const GDExtensionInstanceBindingCallbacks* () const { return &callbacks_; }
@@ -681,70 +649,216 @@ namespace jsb
         return &jclass_info;
     }
 
-    jsb_force_inline bool js_to_gd_var(const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_jval, Variant& r_cvar)
+    jsb_force_inline bool js_to_gd_var(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_jval, Variant::Type p_type, Variant& r_cvar)
     {
-        if (p_jval->IsInt32())
+        switch (p_type)
         {
-            r_cvar = p_jval->Int32Value(context).ToChecked();
-            return true;
-        }
-        if (p_jval->IsNumber())
-        {
-            r_cvar = p_jval->NumberValue(context).ToChecked();
-            return true;
-        }
-        v8::Isolate* isolate = context->GetIsolate();
-        if (p_jval->IsBoolean())
-        {
-            r_cvar = p_jval->BooleanValue(isolate);
-            return true;
-        }
-        if (p_jval->IsNullOrUndefined())
-        {
-            //NOTE untouched, r_cvar should be nil by default
-            return true;
-        }
-        if (p_jval->IsArray())
-        {
-            //TODO
-        }
-        if (p_jval->IsObject())
-        {
-            //TODO
-        }
+        case Variant::NIL: return p_jval->IsNullOrUndefined();
+        case Variant::BOOL:
+            // strict?
+            if (p_jval->IsBoolean()) { r_cvar = p_jval->BooleanValue(isolate); return true; }
+            return false;
+        case Variant::INT:
+            // strict?
+            if (p_jval->IsInt32()) { r_cvar = p_jval->Int32Value(context).ToChecked(); return true; }
+            if (p_jval->IsNumber()) { r_cvar = (int64_t) p_jval->NumberValue(context).ToChecked(); return true; }
+            return false;
+        case Variant::FLOAT:
+            if (p_jval->IsNumber()) { r_cvar = p_jval->NumberValue(context).ToChecked(); return true; }
+            return false;
+        case Variant::STRING:
+            if (p_jval->IsString())
+            {
+                //TODO optimize with cache?
+                v8::String::Utf8Value str(isolate, p_jval);
+                r_cvar = String(*str, str.length());
+                return true;
+            }
+            return false;
 
-        v8::Local<v8::String> type_of = p_jval->TypeOf(isolate);
-        v8::String::Utf8Value type_of_utf8_value(isolate, type_of);
-        JSB_LOG(Warning, "not implemented conversion %s", String(*type_of_utf8_value, type_of_utf8_value.length()));
-        return true;
+        // math types
+        case Variant::VECTOR2:
+        case Variant::VECTOR2I:
+        case Variant::RECT2:
+        case Variant::RECT2I:
+        case Variant::VECTOR3:
+        case Variant::VECTOR3I:
+        case Variant::TRANSFORM2D:
+        case Variant::VECTOR4:
+        case Variant::VECTOR4I:
+        case Variant::PLANE:
+        case Variant::QUATERNION:
+        case Variant::AABB:
+        case Variant::BASIS:
+        case Variant::TRANSFORM3D:
+        case Variant::PROJECTION:
+
+        // misc types
+        case Variant::COLOR:
+        case Variant::STRING_NAME:
+        case Variant::NODE_PATH:
+        case Variant::RID:
+        case Variant::OBJECT:
+        case Variant::CALLABLE:
+        case Variant::SIGNAL:
+        case Variant::DICTIONARY:
+        case Variant::ARRAY:
+
+        // typed arrays
+        case Variant::PACKED_BYTE_ARRAY:
+        case Variant::PACKED_INT32_ARRAY:
+        case Variant::PACKED_INT64_ARRAY:
+        case Variant::PACKED_FLOAT32_ARRAY:
+        case Variant::PACKED_FLOAT64_ARRAY:
+        case Variant::PACKED_STRING_ARRAY:
+        case Variant::PACKED_VECTOR2_ARRAY:
+        case Variant::PACKED_VECTOR3_ARRAY:
+        case Variant::PACKED_COLOR_ARRAY:
+            //TODO unimplemented
+        default: return false;
+        }
     }
 
     jsb_force_inline bool gd_var_to_js(v8::Isolate* isolate, const Variant& p_cvar, v8::Local<v8::Value>& r_jval)
     {
         switch (p_cvar.get_type())
         {
-        case Variant::FLOAT:
-            r_jval = v8::Number::New(isolate, p_cvar);
-            return true;
-        case Variant::INT:
-            // precision loss
-            r_jval = v8::Int32::New(isolate, p_cvar);
-            return true;
+        case Variant::NIL: r_jval = v8::Null(isolate); return true;
         case Variant::BOOL:
             r_jval = v8::Boolean::New(isolate, p_cvar);
             return true;
+        case Variant::INT:
+            {
+                const int64_t raw_val = p_cvar;
+                const int32_t trunc_val = (int32_t) raw_val;
+#if DEV_ENABLED
+                if (raw_val != (int64_t) trunc_val)
+                {
+                    JSB_LOG(Warning, "conversion lose precision");
+                }
+#endif
+                r_jval = v8::Int32::New(isolate, trunc_val);
+                return true;
+            }
+        case Variant::FLOAT:
+            {
+                r_jval = v8::Number::New(isolate, p_cvar);
+                return true;
+            }
+        case Variant::STRING:
+            {
+                //TODO optimize with cache?
+                const String raw_val = p_cvar;
+                const CharString repr_val = raw_val.utf8();
+                r_jval = v8::String::NewFromUtf8(isolate, repr_val.get_data(), v8::NewStringType::kNormal, repr_val.length()).ToLocalChecked();
+                return true;
+            }
+        // math types
+        case Variant::VECTOR2:
+        case Variant::VECTOR2I:
+        case Variant::RECT2:
+        case Variant::RECT2I:
+        case Variant::VECTOR3:
+        case Variant::VECTOR3I:
+        case Variant::TRANSFORM2D:
+        case Variant::VECTOR4:
+        case Variant::VECTOR4I:
+        case Variant::PLANE:
+        case Variant::QUATERNION:
+        case Variant::AABB:
+        case Variant::BASIS:
+        case Variant::TRANSFORM3D:
+        case Variant::PROJECTION:
+
+        // misc types
+        case Variant::COLOR:
+        case Variant::STRING_NAME:
+            {
+                //TODO losing type
+                const String raw_val2 = p_cvar;
+                const CharString repr_val = raw_val2.utf8();
+                r_jval = v8::String::NewFromUtf8(isolate, repr_val.get_data(), v8::NewStringType::kNormal, repr_val.length()).ToLocalChecked();
+                return true;
+            }
+        case Variant::NODE_PATH:
+        case Variant::RID:
         case Variant::OBJECT:
-            //TODO
-            JSB_LOG(Warning, "not implemented");
-            return true;
-        case Variant::NIL:
-            r_jval = v8::Undefined(isolate);
-            return true;
-        default:
-            JSB_LOG(Warning, "not implemented conversion %d", p_cvar.get_type());
-            return true;
+        case Variant::CALLABLE:
+        case Variant::SIGNAL:
+        case Variant::DICTIONARY:
+        case Variant::ARRAY:
+
+        // typed arrays
+        case Variant::PACKED_BYTE_ARRAY:
+        case Variant::PACKED_INT32_ARRAY:
+        case Variant::PACKED_INT64_ARRAY:
+        case Variant::PACKED_FLOAT32_ARRAY:
+        case Variant::PACKED_FLOAT64_ARRAY:
+        case Variant::PACKED_STRING_ARRAY:
+        case Variant::PACKED_VECTOR2_ARRAY:
+        case Variant::PACKED_VECTOR3_ARRAY:
+        case Variant::PACKED_COLOR_ARRAY:
+            //TODO unimplemented
+        default: return false;
         }
     }
+
+    struct GodotArguments
+    {
+    private:
+        int argc_;
+        Variant *args_;
+
+    public:
+        jsb_force_inline GodotArguments() : argc_(0), args_(nullptr) {}
+
+        jsb_force_inline bool translate(const MethodBind& p_method_bind, v8::Isolate* p_isolate, const v8::Local<v8::Context>& p_context, const v8::FunctionCallbackInfo<v8::Value>& p_info, int& r_failed_arg_index)
+        {
+            argc_ = p_info.Length();
+            args_ = argc_ == 0 ? nullptr : memnew_arr(Variant, argc_);
+
+            //TODO handle vararg call
+            if (p_method_bind.is_vararg())
+            {
+
+            }
+
+            for (int index = 0; index < argc_; ++index)
+            {
+                Variant::Type type = p_method_bind.get_argument_type(index);
+                if (!js_to_gd_var(p_isolate, p_context, p_info[index], type, args_[index]))
+                {
+                    r_failed_arg_index = index;
+                    return false;
+                }
+            }
+
+            //TODO use default argument var if not given in js call info
+            // p_method_bind.get_default_argument(index);
+            return true;
+        }
+
+        jsb_force_inline ~GodotArguments()
+        {
+            if (args_)
+            {
+                memdelete_arr(args_);
+            }
+        }
+
+        jsb_force_inline int argc() const { return argc_; }
+
+        jsb_force_inline Variant& operator[](int p_index) { return args_[p_index]; }
+
+        jsb_force_inline void fill(const Variant** p_argv) const
+        {
+            for (int i = 0; i < argc_; ++i)
+            {
+                p_argv[i] = &args_[i];
+            }
+        }
+
+    };
 
     void JavaScriptContext::_godot_object_method(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
@@ -759,10 +873,9 @@ namespace jsb
         v8::Local<v8::External> data = info.Data().As<v8::External>();
         MethodBind* method_bind = (MethodBind*) data->Value();
 
-        jsb_check(method_bind && method_bind->is_static());
+        jsb_check(method_bind);
         Callable::CallError error;
 
-        int argc = info.Length();
         Object* gd_object = nullptr;
         if (!method_bind->is_static())
         {
@@ -772,29 +885,31 @@ namespace jsb
                 isolate->ThrowError("call method without a valid instance bound");
                 return;
             }
-            void* pointer = self->GetAlignedPointerFromInternalField(kObjectFieldPointer);
 
+            // `this` must be a gd object which already bound to javascript
+            void* pointer = self->GetAlignedPointerFromInternalField(kObjectFieldPointer);
             jsb_check(JavaScriptRuntime::wrap(isolate)->check_object(pointer));
             gd_object = (Object*) pointer;
         }
 
-        GodotArguments arguments(argc);
+        GodotArguments arguments;
+        int failed_arg_index;
+        if (!arguments.translate(*method_bind, isolate, context, info, failed_arg_index))
+        {
+            const CharString raw_string = vformat("bad argument: %d", failed_arg_index).ascii();
+            v8::Local<v8::String> error_message = v8::String::NewFromOneByte(isolate, (const uint8_t*) raw_string.ptr(), v8::NewStringType::kNormal, raw_string.length()).ToLocalChecked();
+            isolate->ThrowError(error_message);
+            return;
+        }
+
         //NOTE (unsafe) DO NOT FORGET TO free argv (if it's not stack allocated)
+        const int argc = arguments.argc();
         const Variant** argv = (const Variant**)jsb_stackalloc(argc * sizeof(Variant*));
 
-        for (int i = 0; i < argc; ++i)
-        {
-            if (!js_to_gd_var(context, info[i], arguments[i]))
-            {
-                jsb_stackfree(argv);
-                isolate->ThrowError("failed to translate v8 value to godot variant");
-                return;
-            }
-            argv[i] = &arguments[i];
-        }
+        arguments.fill(argv);
         Variant crval = method_bind->call(gd_object, argv, argc, error);
-
         jsb_stackfree(argv);
+
         if (error.error != Callable::CallError::CALL_OK)
         {
             isolate->ThrowError("failed to call");
@@ -834,6 +949,8 @@ namespace jsb
                 return;
             }
         }
+
+        //TODO singletons? put singletons into another module?
 
         const CharString message = vformat("godot class not found '%s'", type_name).utf8();
         isolate->ThrowError(v8::String::NewFromUtf8(isolate, message.ptr(), v8::NewStringType::kNormal, message.length()).ToLocalChecked());
