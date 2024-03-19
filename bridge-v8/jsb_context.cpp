@@ -530,6 +530,11 @@ namespace jsb
                 memdelete(gd_object);
             }
         }
+        else
+        {
+            //TODO only delete when the object's lifecycle is fully managed by javascript
+            memdelete(gd_object);
+        }
     }
 
     void JavaScriptContext::_godot_object_constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
