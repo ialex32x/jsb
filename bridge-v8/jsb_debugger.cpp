@@ -3,15 +3,12 @@
 #include "jsb_exception_info.h"
 #include "jsb_runtime.h"
 
-#define JSB_NAME "godot-jsb"
-#define JSB_MAJOR_VERSION 0
-#define JSB_MINOR_VERSION 1
-
 #include "core/io/tcp_server.h"
 
 #if JSB_WITH_DEBUGGER
 #if JSB_WITH_LWS
 #include "libwebsockets.h"
+#include "../internal/jsb_version.h"
 #define JSB_DEBUGGER_LOG(Severity, Format, ...) print_line(vformat("[JSDebugger][%s] " Format, ((void) sizeof(jsb::internal::ELogSeverity::Severity), #Severity), ##__VA_ARGS__))
 
 namespace jsb
