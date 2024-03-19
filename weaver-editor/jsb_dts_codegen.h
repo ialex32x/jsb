@@ -5,7 +5,11 @@
 
 namespace jsb::editor
 {
-
+    class TypeDeclarationCodeGen
+    {
+    public:
+        void emit();
+    };
 }
 
 #endif

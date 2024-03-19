@@ -17,7 +17,10 @@ void initialize_jsb_module(ModuleInitializationLevel p_level)
 {
     if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE)
     {
-
+// #ifdef TOOLS_ENABLED
+//         jsb::editor::TypeDeclarationCodeGen codegen;
+//         codegen.emit();
+// #endif
     }
 
     if (p_level == MODULE_INITIALIZATION_LEVEL_CORE)

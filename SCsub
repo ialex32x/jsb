@@ -89,4 +89,8 @@ env_jsb.add_source_files(module_obj, ["register_types.cpp"])
 env_jsb.add_source_files(module_obj, "internal/*.cpp")
 env_jsb.add_source_files(module_obj, "weaver/*.cpp")
 
+# editor functionalities
+if env.editor_build:
+    env_jsb.add_source_files(module_obj, "weaver-editor/*.cpp")
+
 env.modules_sources += module_obj
