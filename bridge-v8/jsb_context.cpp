@@ -472,12 +472,11 @@ namespace jsb
         v8::Local<v8::Object> global = context->Global();
 
         internal::Index32 class_id;
-        JavaScriptClassInfo& class_info = runtime_->add_class(&class_id);
-        class_info.constructor = &Transpiler<Foo>::constructor;
+        JavaScriptClassInfo& class_info = runtime_->add_class(JavaScriptClassType::None, &class_id);
         class_info.finalizer = &Transpiler<Foo>::finalizer;
 
         v8::Local<v8::FunctionTemplate> function_template = v8::FunctionTemplate::New(isolate,
-            class_info.constructor, v8::Uint32::NewFromUnsigned(isolate, class_id));
+            &Transpiler<Foo>::constructor, v8::Uint32::NewFromUnsigned(isolate, class_id));
         function_template->InstanceTemplate()->SetInternalFieldCount(kObjectFieldCount);
         //class_info.template_.Reset(isolate, function_template);
 
@@ -528,16 +527,16 @@ namespace jsb
         v8::Isolate::Scope isolate_scope(isolate);
         v8::Local<v8::Object> self = info.This();
         v8::Local<v8::Uint32> data = v8::Local<v8::Uint32>::Cast(info.Data());
-        internal::Index32 class_id(data->Value());
+        const internal::Index32 class_id(data->Value());
 
         JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
-        JavaScriptClassInfo& jclass_info = cruntime->classes_.get_value(class_id);
-        HashMap<StringName, ClassDB::ClassInfo>::Iterator it = ClassDB::classes.find(jclass_info.name);
+        const JavaScriptClassInfo& jclass_info = cruntime->classes_.get_value(class_id);
+        jsb_check(jclass_info.type == JavaScriptClassType::GodotObject);
+        const HashMap<StringName, ClassDB::ClassInfo>::Iterator it = ClassDB::classes.find(jclass_info.name);
         jsb_check(it != ClassDB::classes.end());
-        ClassDB::ClassInfo& gd_class_info = it->value;
+        const ClassDB::ClassInfo& gd_class_info = it->value;
 
         Object* gd_object = gd_class_info.creation_func();
-        // self->SetAlignedPointerInInternalField(kObjectFieldPointer, gd_object);
         cruntime->bind_object(class_id, gd_object, self, false);
         if (gd_object->is_ref_counted())
         {
@@ -546,6 +545,14 @@ namespace jsb
         }
 
         gd_object->set_instance_binding(cruntime, gd_object, gd_instance_binding_callbacks);
+    }
+
+    JavaScriptClassInfo* JavaScriptContext::_expose_godot_variant(internal::Index32* r_class_id)
+    {
+        //TODO uncertain
+        // add_class(None);
+        // register(Transpiler<Vector2>::xxx);
+        return nullptr;
     }
 
     JavaScriptClassInfo* JavaScriptContext::_expose_godot_class(const ClassDB::ClassInfo* p_class_info, internal::Index32* r_class_id)
@@ -559,7 +566,7 @@ namespace jsb
             return nullptr;
         }
 
-        HashMap<StringName, internal::Index32>::Iterator found = runtime_->godot_classes_index_.find(p_class_info->name);
+        const HashMap<StringName, internal::Index32>::Iterator found = runtime_->godot_classes_index_.find(p_class_info->name);
         if (found != runtime_->godot_classes_index_.end())
         {
             if (r_class_id)
@@ -570,20 +577,19 @@ namespace jsb
         }
 
         internal::Index32 class_id;
-        JavaScriptClassInfo& jclass_info = runtime_->add_class(&class_id);
+        JavaScriptClassInfo& jclass_info = runtime_->add_class(JavaScriptClassType::GodotObject, &class_id);
         runtime_->godot_classes_index_.insert(p_class_info->name, class_id);
         JSB_LOG(Verbose, "load godot type %s (%d)", p_class_info->name, (uint32_t) class_id);
 
-        //TODO code for constructing type template
+        // construct type template
         {
             v8::Isolate* isolate = get_isolate();
             v8::Local<v8::Context> context = isolate->GetCurrentContext();
 
             jsb_check(context == context_.Get(isolate));
             jclass_info.name = p_class_info->name;
-            jclass_info.constructor = &_godot_object_constructor;
             jclass_info.finalizer = &_godot_object_finalizer;
-            v8::Local<v8::FunctionTemplate> function_template = v8::FunctionTemplate::New(isolate, jclass_info.constructor, v8::Uint32::NewFromUnsigned(isolate, class_id));
+            v8::Local<v8::FunctionTemplate> function_template = v8::FunctionTemplate::New(isolate, &_godot_object_constructor, v8::Uint32::NewFromUnsigned(isolate, class_id));
 
             v8::Local<v8::ObjectTemplate> object_template = function_template->PrototypeTemplate();
             function_template->InstanceTemplate()->SetInternalFieldCount(kObjectFieldCount);
@@ -615,15 +621,10 @@ namespace jsb
             for (const KeyValue<StringName, int64_t>& pair : p_class_info->constant_map)
             {
                 const int64_t constant_value = pair.value;
-                const int32_t scaled_value = (int32_t) constant_value;
                 const CharString constant_name = ((String) pair.key).utf8(); // utf-8 for better compatibilities
                 v8::Local<v8::String> prop_key = v8::String::NewFromUtf8(isolate, constant_name.ptr(), v8::NewStringType::kNormal, constant_name.length()).ToLocalChecked();
 
-                if ((int64_t) scaled_value != constant_value)
-                {
-                    JSB_LOG(Warning, "inconsistent binding %s %d", pair.key, constant_value);
-                }
-                function_template->Set(prop_key, v8::Int32::New(isolate, scaled_value));
+                function_template->Set(prop_key, v8::Int32::New(isolate, jsb_downscalef(constant_value, pair.key)));
             }
 
             //TODO expose all available fields/properties etc.
@@ -633,7 +634,7 @@ namespace jsb
 
             // setup the prototype chain (inherit)
             internal::Index32 super_id;
-            if (JavaScriptClassInfo* jsuper_class = _expose_godot_class(p_class_info->inherits_ptr, &super_id))
+            if (const JavaScriptClassInfo* jsuper_class = _expose_godot_class(p_class_info->inherits_ptr, &super_id))
             {
                 jclass_info.super_ = super_id;
                 v8::Local<v8::FunctionTemplate> base_template = jsuper_class->template_.Get(isolate);
@@ -720,7 +721,7 @@ namespace jsb
         }
     }
 
-    jsb_force_inline bool gd_var_to_js(v8::Isolate* isolate, const v8::Local<v8::Context>& context, Object* p_cvar, v8::Local<v8::Value>& r_jval, bool is_persistent)
+    jsb_force_inline bool gd_obj_to_js(v8::Isolate* isolate, const v8::Local<v8::Context>& context, Object* p_cvar, v8::Local<v8::Value>& r_jval, bool is_persistent)
     {
         if (unlikely(!p_cvar))
         {
@@ -767,20 +768,11 @@ namespace jsb
         switch (p_cvar.get_type())
         {
         case Variant::NIL: r_jval = v8::Null(isolate); return true;
-        case Variant::BOOL:
-            r_jval = v8::Boolean::New(isolate, p_cvar);
-            return true;
+        case Variant::BOOL: r_jval = v8::Boolean::New(isolate, p_cvar); return true;
         case Variant::INT:
             {
                 const int64_t raw_val = p_cvar;
-                const int32_t trunc_val = (int32_t) raw_val;
-#if DEV_ENABLED
-                if (raw_val != (int64_t) trunc_val)
-                {
-                    JSB_LOG(Warning, "conversion lose precision");
-                }
-#endif
-                r_jval = v8::Int32::New(isolate, trunc_val);
+                r_jval = v8::Int32::New(isolate, jsb_downscale(raw_val));
                 return true;
             }
         case Variant::FLOAT:
@@ -829,7 +821,7 @@ namespace jsb
             return false;
         case Variant::OBJECT:
             {
-                return gd_var_to_js(isolate, context, (Object*) p_cvar, r_jval, false);
+                return gd_obj_to_js(isolate, context, (Object*) p_cvar, r_jval, false);
             }
         case Variant::CALLABLE:
         case Variant::SIGNAL:
@@ -996,7 +988,7 @@ namespace jsb
         {
             v8::Local<v8::Value> rval;
             JSB_LOG(Verbose, "exposing singleton object %d", (uint64_t) gd_singleton);
-            if (gd_var_to_js(isolate, context, gd_singleton, rval, true))
+            if (gd_obj_to_js(isolate, context, gd_singleton, rval, true))
             {
                 jsb_check(!rval.IsEmpty());
                 info.GetReturnValue().Set(rval);

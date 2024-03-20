@@ -27,7 +27,7 @@ namespace jsb
             v8::Local<v8::Uint32> data = v8::Local<v8::Uint32>::Cast(info.Data());
             internal::Index32 class_id(data->Value());
 
-            Callee* ptr = new Callee;
+            Callee* ptr = memnew(Callee);
             JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
             runtime->bind_object(class_id, ptr, self, false);
         }
@@ -48,7 +48,7 @@ namespace jsb
                 return;
             }
             P1 p1 = Converter<P1>::get(isolate, context, info[0]);
-            Callee* ptr = new Callee(p1);
+            Callee* ptr = memnew(Callee(p1));
             JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
             runtime->bind_object(class_id, ptr, self, false);
         }
@@ -56,7 +56,7 @@ namespace jsb
         static void finalizer(void* pointer, bool p_persistent)
         {
             Callee* callee = (Callee*) pointer;
-            delete callee;
+            memdelete(callee);
         }
 
         template<typename ReturnType, typename P1>

@@ -95,6 +95,7 @@ namespace jsb
             const HashMap<StringName, ClassDB::ClassInfo>::ConstIterator& it = ClassDB::classes.find(p_class_name);
             return it != ClassDB::classes.end() ? _expose_godot_class(&it->value, r_class_id) : nullptr;
         }
+        JavaScriptClassInfo* _expose_godot_variant(internal::Index32* r_class_id);
 
     private:
         static void _print(const v8::FunctionCallbackInfo<v8::Value>& info);

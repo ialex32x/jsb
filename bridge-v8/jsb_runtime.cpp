@@ -212,10 +212,10 @@ namespace jsb
 #endif
     }
 
-    void JavaScriptRuntime::bind_object(internal::Index32 p_class_id, void *p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
+    void JavaScriptRuntime::bind_object(internal::Index32 p_class_id, void* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
     {
         jsb_check(classes_.is_valid_index(p_class_id));
-        internal::Index64 object_id = objects_.add({});
+        const internal::Index64 object_id = objects_.add({});
         ObjectHandle& handle = objects_.get_value(object_id);
 
         handle.class_id = p_class_id;
@@ -248,7 +248,7 @@ namespace jsb
         //TODO thread-safety issues on objects_* access
         jsb_check(Thread::get_caller_id() == thread_id_);
 
-        HashMap<void*, internal::Index64>::Iterator it = objects_index_.find(p_pointer);
+        const HashMap<void*, internal::Index64>::Iterator it = objects_index_.find(p_pointer);
         ERR_FAIL_COND_V_MSG(it == objects_index_.end(), true, "bad pointer");
         const internal::Index64 object_id = it->value;
 
@@ -259,7 +259,7 @@ namespace jsb
             if (object_handle.ref_count_ == 0)
             {
                 //TODO scope issues
-                v8::Local<v8::Value> temp = object_handle.callback.Get(isolate_);
+                const v8::Local<v8::Value> temp = object_handle.callback.Get(isolate_);
                 jsb_check(!temp.IsEmpty());
                 object_handle.ref_.Reset(isolate_, temp);
             }
@@ -291,7 +291,7 @@ namespace jsb
         const bool is_persistent = persistent_objects_.has(p_pointer);
         if (p_free)
         {
-            JavaScriptClassInfo& class_info = classes_.get_value(object_handle.class_id);
+            const JavaScriptClassInfo& class_info = classes_.get_value(object_handle.class_id);
             jsb_check(object_handle.pointer == p_pointer);
             class_info.finalizer(p_pointer, is_persistent);
         }

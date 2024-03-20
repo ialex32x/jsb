@@ -23,6 +23,9 @@
 #   define jsb_ensure(Condition) CRASH_COND(!(Condition))
 #endif
 
+#define jsb_downscale(v64) ::jsb::internal::downscale(v64)
+#define jsb_downscalef(v64, v_msg) ::jsb::internal::downscale(v64, v_msg)
+
 #define JSB_CONSOLE(Severity, Message) print_line(Severity, Message)
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -43,16 +46,36 @@
 #   define jsb_stackfree(ptr) memfree(ptr)
 #endif
 
-namespace jsb::internal::ELogSeverity
+namespace jsb::internal
 {
-    enum Type
+    namespace ELogSeverity
     {
+        enum Type
+        {
 #pragma push_macro("DEF")
 #   undef   DEF
 #   define  DEF(FieldName) FieldName,
 #   include "jsb_log_severity.h"
 #pragma pop_macro("DEF")
-    };
+        };
+    }
+
+    template<typename T>
+    jsb_force_inline int32_t downscale(int64_t p_val, const T& p_msg)
+    {
+#if DEV_ENABLED
+        if (p_val != (int64_t) (int32_t) p_val) JSB_LOG(Warning, "inconsistent int64_t conversion: %s", p_msg);
+#endif
+        return (int32_t) p_val;
+    }
+
+    jsb_force_inline int32_t downscale(int64_t p_val)
+    {
+#if DEV_ENABLED
+        if (p_val != (int64_t) (int32_t) p_val) JSB_LOG(Warning, "inconsistent int64_t conversion");
+#endif
+        return (int32_t) p_val;
+    }
 }
 
 #endif
