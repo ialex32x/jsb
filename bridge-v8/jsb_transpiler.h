@@ -29,7 +29,7 @@ namespace jsb
 
             Callee* ptr = new Callee;
             JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
-            runtime->bind_object(class_id, ptr, self);
+            runtime->bind_object(class_id, ptr, self, false);
         }
 
         template<typename P1>
@@ -50,10 +50,10 @@ namespace jsb
             P1 p1 = Converter<P1>::get(isolate, context, info[0]);
             Callee* ptr = new Callee(p1);
             JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
-            runtime->bind_object(class_id, ptr, self);
+            runtime->bind_object(class_id, ptr, self, false);
         }
 
-        static void finalizer(void* pointer)
+        static void finalizer(void* pointer, bool p_persistent)
         {
             Callee* callee = (Callee*) pointer;
             delete callee;

@@ -59,6 +59,7 @@ function delay(seconds) {
 }
 function test_async() {
     return __awaiter(this, void 0, void 0, function* () {
+        console.log(godot_1.Engine.get_time_scale());
         console.log("async test begin");
         yield delay(3);
         console.log("async test end");

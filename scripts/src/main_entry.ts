@@ -1,6 +1,6 @@
 
 // godot types will be exposed to JS runtime until they are actually used
-import { Node } from "godot";
+import { Node, Engine } from "godot";
 import { TSDCodeGen } from "./tsd_codegen";
 
 // entry point (editor only)
@@ -57,6 +57,7 @@ async function delay(seconds: number) {
 }
 
 async function test_async() {
+    console.log(Engine.get_time_scale());
     console.log("async test begin");
     await delay(3);
     console.log("async test end");

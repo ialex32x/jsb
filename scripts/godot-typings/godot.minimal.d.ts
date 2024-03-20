@@ -210,10 +210,26 @@ declare namespace jsb {
             signals: Array<SignalInfo>;
         }
 
+        interface SingletonInfo {
+            name: string;
+            class_name: string;
+            user_created: boolean;
+            editor_only: boolean;
+        }
+
+        interface GlobalConstantInfo {
+            name: string;
+            value: number; /** int64_t */
+        }
+
         /**
          * get a list of all classes registered in ClassDB
          */
-        function get_classes() : Array<ClassInfo>;
+        function get_classes(): Array<ClassInfo>;
+
+        function get_singletons(): Array<SingletonInfo>;
+
+        function get_global_constants(): Array<GlobalConstantInfo>;
     }
 }
 

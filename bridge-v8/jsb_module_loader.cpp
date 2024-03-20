@@ -7,8 +7,7 @@ namespace jsb
     {
         static const CharString on_demand_loader_source = ""
             "(function (type_loader_func) {"
-            "    let to_proxied;"
-            "    to_proxied = function (type_obj, type_name) {"
+            "    return (function (type_obj, type_name) {"
             "        if (typeof type_obj === 'undefined') {"
             "            throw new Error(`type '${type_name}' does not exist`);"
             "        }"
@@ -31,13 +30,12 @@ namespace jsb
             "                let o = target[prop_name];"
             "                if (typeof o === 'undefined' && typeof prop_name === 'string') {"
             "                    let type_path = typeof type_name === 'string' ? type_name + '.' + prop_name : prop_name;"
-            "                    o = target[prop_name] = to_proxied(type_loader_func(type_path), type_path);"
+            "                    o = target[prop_name] = type_loader_func(type_path);"
             "                }"
             "                return o;"
             "            }"
             "        });"
-            "    };"
-            "    return to_proxied({});"
+            "    })({});"
             "})"
             "";
         v8::Isolate* isolate = p_ccontext->get_isolate();

@@ -46,7 +46,12 @@ namespace jsb
         jsb_force_inline
         bool check(v8::Isolate* p_isolate) const { return p_isolate == isolate_; }
 
-        void bind_object(internal::Index32 p_class_id, void *p_pointer, const v8::Local<v8::Object>& p_object);
+        /**
+         * \brief bind a C++ `p_pointer` with a JS `p_object`
+         * \param p_class_id
+         * \param p_persistent keep a strong reference on pointer, usually used on binding singleton objects which are manually managed by native codes.
+         */
+        void bind_object(internal::Index32 p_class_id, void *p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent);
         void unbind_object(void* p_pointer);
 
         jsb_force_inline bool check_object(void* p_pointer) const
@@ -154,6 +159,7 @@ namespace jsb
 
         // (unsafe) mapping object pointer to object_id
         HashMap<void*, internal::Index64> objects_index_;
+        HashSet<void*> persistent_objects_;
 
         // module_id => loader
         HashMap<String, class IModuleLoader*> module_loaders_;

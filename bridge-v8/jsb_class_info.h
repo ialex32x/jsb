@@ -5,7 +5,7 @@
 namespace jsb
 {
     typedef void (*ConstructorFunc)(const v8::FunctionCallbackInfo<v8::Value>&);
-    typedef void (*FinalizerFunc)(void*);
+    typedef void (*FinalizerFunc)(void*, bool /* p_persistent */);
 
     struct JavaScriptClassInfo
     {

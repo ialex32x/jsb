@@ -160,13 +160,15 @@ namespace jsb
         {
             const internal::Index64 first_index = objects_.get_first_index();
             ObjectHandle& handle = objects_.get_value(first_index);
+            const bool is_persistent = persistent_objects_.has(handle.pointer);
 
             JavaScriptClassInfo& class_info = classes_.get_value(handle.class_id);
-            class_info.finalizer(handle.pointer);
+            class_info.finalizer(handle.pointer, is_persistent);
             handle.callback.Reset();
             handle.ref_.Reset();
             objects_index_.erase(handle.pointer);
             objects_.remove_at(first_index);
+            if (is_persistent) persistent_objects_.erase(handle.pointer);
         }
 
         // cleanup all class templates
@@ -210,7 +212,7 @@ namespace jsb
 #endif
     }
 
-    void JavaScriptRuntime::bind_object(internal::Index32 p_class_id, void *p_pointer, const v8::Local<v8::Object>& p_object)
+    void JavaScriptRuntime::bind_object(internal::Index32 p_class_id, void *p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
     {
         jsb_check(classes_.is_valid_index(p_class_id));
         internal::Index64 object_id = objects_.add({});
@@ -222,6 +224,13 @@ namespace jsb
         handle.callback.SetWeak(p_pointer, &object_gc_callback, v8::WeakCallbackType::kInternalFields);
         objects_index_.insert(p_pointer, object_id);
         p_object->SetAlignedPointerInInternalField(kObjectFieldPointer, p_pointer);
+        if (p_persistent)
+        {
+            persistent_objects_.insert(p_pointer);
+            handle.ref_count_ = 1;
+            handle.ref_.Reset(isolate_, p_object);
+        }
+        JSB_LOG(Verbose, "bind object %d class_id %d", (uintptr_t) p_pointer, (int32_t) p_class_id);
     }
 
     void JavaScriptRuntime::unbind_object(void* p_pointer)
@@ -244,6 +253,7 @@ namespace jsb
         const internal::Index64 object_id = it->value;
 
         ObjectHandle& object_handle = objects_.get_value(object_id);
+
         if (p_is_inc)
         {
             if (object_handle.ref_count_ == 0)
@@ -256,6 +266,7 @@ namespace jsb
             ++object_handle.ref_count_;
             return false;
         }
+
         if (object_handle.ref_count_ == 0)
         {
             jsb_check(object_handle.ref_.IsEmpty());
@@ -277,15 +288,17 @@ namespace jsb
         const internal::Index64 object_id = it->value;
 
         ObjectHandle& object_handle = objects_.get_value(object_id);
+        const bool is_persistent = persistent_objects_.has(p_pointer);
         if (p_free)
         {
             JavaScriptClassInfo& class_info = classes_.get_value(object_handle.class_id);
             jsb_check(object_handle.pointer == p_pointer);
-            class_info.finalizer(object_handle.pointer);
+            class_info.finalizer(p_pointer, is_persistent);
         }
         object_handle.callback.Reset();
         object_handle.ref_.Reset();
-        objects_index_.erase(object_handle.pointer);
+        objects_index_.erase(p_pointer);
+        if (is_persistent) persistent_objects_.erase(p_pointer);
         objects_.remove_at(object_id);
         return true;
     }

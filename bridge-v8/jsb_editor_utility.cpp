@@ -1,4 +1,6 @@
 #include "jsb_editor_utility.h"
+
+#include "core/core_constants.h"
 #if TOOLS_ENABLED
 
 #define JSB_STRINGIFY_2(a) #a
@@ -22,10 +24,20 @@ namespace jsb
 {
     namespace
     {
+        v8::MaybeLocal<v8::String> S(v8::Isolate* isolate, const String& name)
+        {
+            const CharString char_string = name.utf8();
+            return v8::String::NewFromUtf8(isolate, char_string.ptr(), v8::NewStringType::kNormal, char_string.length());
+        }
+
+        v8::MaybeLocal<v8::String> S(v8::Isolate* isolate, const char* name)
+        {
+            return v8::String::NewFromUtf8(isolate, name, v8::NewStringType::kNormal);
+        }
+
         v8::MaybeLocal<v8::String> S(v8::Isolate* isolate, const StringName& name)
         {
-            const CharString char_string = ((String) name).utf8();
-            return v8::String::NewFromUtf8(isolate, char_string.ptr(), v8::NewStringType::kNormal, char_string.length());
+            return S(isolate, (String) name);
         }
 
         template<int N>
@@ -50,6 +62,18 @@ namespace jsb
         void set_field(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& obj, const char (&field_name)[N], const uint32_t& field_value)
         {
             set_field(isolate, context, obj, field_name, v8::Int32::NewFromUnsigned(isolate, field_value));
+        }
+
+        template<int N>
+        void set_field(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& obj, const char (&field_name)[N], const String& field_value)
+        {
+            set_field(isolate, context, obj, field_name, S(isolate, field_value).ToLocalChecked());
+        }
+
+        template<int N>
+        void set_field(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& obj, const char (&field_name)[N], const char*& field_value)
+        {
+            set_field(isolate, context, obj, field_name, S(isolate, field_value).ToLocalChecked());
         }
 
         template<int N>
@@ -236,8 +260,50 @@ namespace jsb
             build_class_info(isolate, context, list[index], class_info);
             array->Set(context, index, class_info);
         }
-
         info.GetReturnValue().Set(array);
     }
+
+    void JavaScriptEditorUtility::_get_global_constants(const v8::FunctionCallbackInfo<v8::Value>& info)
+    {
+        v8::Isolate* isolate = info.GetIsolate();
+        v8::HandleScope handle_scope(isolate);
+        v8::Local<v8::Context> context = isolate->GetCurrentContext();
+
+        const int num = CoreConstants::get_global_constant_count();
+        v8::Local<v8::Array> array = v8::Array::New(isolate, num);
+        for (int index = 0; index < num; ++index)
+        {
+            const char* name = CoreConstants::get_global_constant_name(index);
+            const int64_t value = CoreConstants::get_global_constant_value(index);
+            v8::Local<v8::Object> constant_obj = v8::Object::New(isolate);
+            set_field(isolate, context, constant_obj, "name", name);
+            set_field(isolate, context, constant_obj, "value", value);
+            array->Set(context, index, constant_obj);
+        }
+        info.GetReturnValue().Set(array);
+    }
+
+    void JavaScriptEditorUtility::_get_singletons(const v8::FunctionCallbackInfo<v8::Value>& info)
+    {
+        v8::Isolate* isolate = info.GetIsolate();
+        v8::HandleScope handle_scope(isolate);
+        v8::Local<v8::Context> context = isolate->GetCurrentContext();
+
+        List<Engine::Singleton> singletons;
+        Engine::get_singleton()->get_singletons(&singletons);
+        v8::Local<v8::Array> array = v8::Array::New(isolate, singletons.size());
+        for (int index = 0, num = singletons.size(); index < num; ++index)
+        {
+            const Engine::Singleton& singleton = singletons[index];
+            v8::Local<v8::Object> constant_obj = v8::Object::New(isolate);
+            set_field(isolate, context, constant_obj, "name", singleton.name);
+            set_field(isolate, context, constant_obj, "class_name", singleton.class_name);
+            set_field(isolate, context, constant_obj, "user_created", singleton.user_created);
+            set_field(isolate, context, constant_obj, "editor_only", singleton.editor_only);
+            array->Set(context, index, constant_obj);
+        }
+        info.GetReturnValue().Set(array);
+    }
+
 }
 #endif

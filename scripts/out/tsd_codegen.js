@@ -22,7 +22,7 @@ class TSDCodeGen {
         return this;
     }
     emit() {
-        let classes = jsb.editor.get_classes();
+        const classes = jsb.editor.get_classes();
         for (let cls of classes) {
             this.line(`[Class] ${cls.name} < ${cls.super}`);
             let class_scope = new IndentWriter(this);
@@ -46,6 +46,17 @@ class TSDCodeGen {
                 class_scope.line(`[Signal] ${signal_info.name}: ${signal_info.name_} ${signal_info.flags}`);
             }
         }
+        const singletons = jsb.editor.get_singletons();
+        for (let singleton of singletons) {
+            const user_created = singleton.user_created ? "(USER)" : "";
+            const editor_only = singleton.editor_only ? "(EDITOR)" : "";
+            this.line(`[Singleton] ${singleton.name}: ${singleton.class_name} ${user_created}${editor_only}`);
+        }
+        const global_constants = jsb.editor.get_global_constants();
+        for (let global_constant of global_constants) {
+            this.line(`[GlobalConstant] ${global_constant.name} = ${global_constant.value}`);
+        }
+        this._file.flush();
     }
 }
 exports.TSDCodeGen = TSDCodeGen;

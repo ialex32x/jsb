@@ -7,6 +7,7 @@
 #include "jsb_module_loader.h"
 #include "jsb_transpiler.h"
 #include "../internal/jsb_path_util.h"
+#include "core/core_constants.h"
 
 namespace jsb
 {
@@ -263,6 +264,8 @@ namespace jsb
 
                 jhost->Set(context, v8::String::NewFromUtf8Literal(isolate, "editor"), editor).Check();
                 editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "get_classes"), v8::Function::New(context, JavaScriptEditorUtility::_get_classes).ToLocalChecked()).Check();
+                editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "get_global_constants"), v8::Function::New(context, JavaScriptEditorUtility::_get_global_constants).ToLocalChecked()).Check();
+                editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "get_singletons"), v8::Function::New(context, JavaScriptEditorUtility::_get_singletons).ToLocalChecked()).Check();
             }
 #endif
         }
@@ -493,20 +496,28 @@ namespace jsb
             function_template->GetFunction(context).ToLocalChecked()).Check();
     }
 
-    void JavaScriptContext::_godot_object_finalizer(void* pointer)
+    void JavaScriptContext::_godot_object_finalizer(void* pointer, bool p_persistent)
     {
         Object* gd_object = (Object*) pointer;
         if (gd_object->is_ref_counted())
         {
             if (((RefCounted*) gd_object)->unreference())
             {
-                memdelete(gd_object);
+                if (!p_persistent)
+                {
+                    JSB_LOG(Verbose, "deleting gd ref_counted object %d", (uintptr_t) gd_object);
+                    memdelete(gd_object);
+                }
             }
         }
         else
         {
             //TODO only delete when the object's lifecycle is fully managed by javascript
-            memdelete(gd_object);
+            if (!p_persistent)
+            {
+                JSB_LOG(Verbose, "deleting gd object %d", (uintptr_t) gd_object);
+                memdelete(gd_object);
+            }
         }
     }
 
@@ -527,7 +538,7 @@ namespace jsb
 
         Object* gd_object = gd_class_info.creation_func();
         // self->SetAlignedPointerInInternalField(kObjectFieldPointer, gd_object);
-        cruntime->bind_object(class_id, gd_object, self);
+        cruntime->bind_object(class_id, gd_object, self, false);
         if (gd_object->is_ref_counted())
         {
             //NOTE IS IT A TRUTH that ref_count==1 after creation_func??
@@ -587,11 +598,9 @@ namespace jsb
                 const StringName& method_name = pair.key;
                 MethodBind* method_bind = pair.value;
                 const CharString cmethod_name = ((String) method_name).ascii();
-
                 v8::Local<v8::String> propkey_name = v8::String::NewFromUtf8(isolate, cmethod_name.ptr(), v8::NewStringType::kNormal, cmethod_name.length()).ToLocalChecked();
                 v8::Local<v8::FunctionTemplate> propval_func = v8::FunctionTemplate::New(isolate, _godot_object_method, v8::External::New(isolate, method_bind));
 
-                JSB_LOG(Verbose, "expose %s.%s", p_class_info->name, method_name);
                 if (method_bind->is_static())
                 {
                     function_template->Set(propkey_name, propval_func);
@@ -608,7 +617,6 @@ namespace jsb
                 const int64_t constant_value = pair.value;
                 const int32_t scaled_value = (int32_t) constant_value;
                 const CharString constant_name = ((String) pair.key).utf8(); // utf-8 for better compatibilities
-
                 v8::Local<v8::String> prop_key = v8::String::NewFromUtf8(isolate, constant_name.ptr(), v8::NewStringType::kNormal, constant_name.length()).ToLocalChecked();
 
                 if ((int64_t) scaled_value != constant_value)
@@ -620,20 +628,19 @@ namespace jsb
 
             //TODO expose all available fields/properties etc.
 
+            // store `template` before setting `inherit`
             jclass_info.template_.Reset(isolate, function_template);
-        }
 
-        // setup the prototype chain
-        internal::Index32 super_id;
-        if (JavaScriptClassInfo* jsuper_class = _expose_godot_class(p_class_info->inherits_ptr, &super_id))
-        {
-            v8::Isolate* isolate = get_isolate();
-
-            jclass_info.super_ = super_id;
-            v8::Local<v8::FunctionTemplate> this_template = jclass_info.template_.Get(isolate);
-            v8::Local<v8::FunctionTemplate> base_template = jsuper_class->template_.Get(isolate);
-            this_template->Inherit(base_template);
-            JSB_LOG(Debug, "%s (%d) extends %s (%d)", p_class_info->name, (uint32_t) class_id, p_class_info->inherits_ptr->name, (uint32_t) super_id);
+            // setup the prototype chain (inherit)
+            internal::Index32 super_id;
+            if (JavaScriptClassInfo* jsuper_class = _expose_godot_class(p_class_info->inherits_ptr, &super_id))
+            {
+                jclass_info.super_ = super_id;
+                v8::Local<v8::FunctionTemplate> base_template = jsuper_class->template_.Get(isolate);
+                jsb_check(!base_template.IsEmpty());
+                function_template->Inherit(base_template);
+                JSB_LOG(Debug, "%s (%d) extends %s (%d)", p_class_info->name, (uint32_t) class_id, p_class_info->inherits_ptr->name, (uint32_t) super_id);
+            }
         }
 
         if (r_class_id)
@@ -713,6 +720,48 @@ namespace jsb
         }
     }
 
+    jsb_force_inline bool gd_var_to_js(v8::Isolate* isolate, const v8::Local<v8::Context>& context, Object* p_cvar, v8::Local<v8::Value>& r_jval, bool is_persistent)
+    {
+        if (unlikely(!p_cvar))
+        {
+            r_jval = v8::Null(isolate);
+            return true;
+        }
+        JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
+        if (cruntime->check_object(p_cvar, r_jval))
+        {
+            return true;
+        }
+
+        // freshly bind existing gd object (not constructed in javascript)
+        const StringName& class_name = p_cvar->get_class_name();
+        JavaScriptContext* ccontext = JavaScriptContext::wrap(context);
+        internal::Index32 jclass_id;
+        if (JavaScriptClassInfo* jclass = ccontext->_expose_godot_class(class_name, &jclass_id))
+        {
+            v8::Local<v8::FunctionTemplate> jtemplate = jclass->template_.Get(isolate);
+            r_jval = jtemplate->InstanceTemplate()->NewInstance(context).ToLocalChecked();
+            jsb_check(r_jval.As<v8::Object>()->InternalFieldCount() == kObjectFieldCount);
+
+            if (p_cvar->is_ref_counted())
+            {
+                //NOTE in the case this godot object created by a godot method which returns a Ref<T>,
+                //     it's `refcount_init` will be zero after the object pointer assigned to a Variant.
+                //     we need to resurrect the object from this special state, or it will be a dangling pointer.
+                if (((RefCounted*) p_cvar)->init_ref())
+                {
+                    // great, it's resurrected.
+                }
+            }
+
+            // the lifecycle will be managed by javascript runtime, DO NOT DELETE it externally
+            cruntime->bind_object(jclass_id, p_cvar, r_jval.As<v8::Object>(), is_persistent);
+            return true;
+        }
+        JSB_LOG(Error, "failed to expose godot class '%s'", class_name);
+        return false;
+    }
+
     jsb_force_inline bool gd_var_to_js(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const Variant& p_cvar, v8::Local<v8::Value>& r_jval)
     {
         switch (p_cvar.get_type())
@@ -780,44 +829,7 @@ namespace jsb
             return false;
         case Variant::OBJECT:
             {
-                Object* raw_val = p_cvar;
-                if (unlikely(!raw_val))
-                {
-                    r_jval = v8::Null(isolate);
-                    return true;
-                }
-                JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
-                if (cruntime->check_object(raw_val, r_jval))
-                {
-                    return true;
-                }
-
-                // freshly bind existing gd object (not constructed in javascript)
-                const StringName& class_name = raw_val->get_class_name();
-                JavaScriptContext* ccontext = JavaScriptContext::wrap(context);
-                internal::Index32 jclass_id;
-                if (JavaScriptClassInfo* jclass = ccontext->_expose_godot_class(class_name, &jclass_id))
-                {
-                    v8::Local<v8::FunctionTemplate> jtemplate = jclass->template_.Get(isolate);
-                    v8::Local<v8::Object> jinst = jtemplate->InstanceTemplate()->NewInstance(context).ToLocalChecked();
-
-                    if (raw_val->is_ref_counted())
-                    {
-                        //NOTE in the case this godot object created by a godot method which returns a Ref<T>,
-                        //     it's `refcount_init` will be zero after the object pointer assigned to a Variant.
-                        //     we need to resurrect the object from this special state, or it will be a dangling pointer.
-                        if (((RefCounted*) raw_val)->init_ref())
-                        {
-                            // great, it's resurrected.
-                        }
-                    }
-                    // the lifecycle will be managed by javascript runtime, DO NOT DELETE it externally
-                    cruntime->bind_object(jclass_id, raw_val, jinst);
-                    r_jval = jinst;
-                    return true;
-                }
-                JSB_LOG(Error, "failed to expose godot class '%s'", class_name);
-                return false;
+                return gd_var_to_js(isolate, context, (Object*) p_cvar, r_jval, false);
             }
         case Variant::CALLABLE:
         case Variant::SIGNAL:
@@ -916,7 +928,7 @@ namespace jsb
         if (!method_bind->is_static())
         {
             v8::Local<v8::Object> self = info.This();
-            if (self->IsNullOrUndefined())
+            if (!self->IsObject() || self->InternalFieldCount() != kObjectFieldCount)
             {
                 isolate->ThrowError("call method without a valid instance bound");
                 return;
@@ -976,6 +988,46 @@ namespace jsb
         v8::Local<v8::Context> context = isolate->GetCurrentContext();
         JavaScriptContext* ccontext = JavaScriptContext::wrap(context);
 
+        //NOTE keep the same order with `GDScriptLanguage::init()`
+        // firstly, singletons have the top priority (in GDScriptLanguage::init, singletons will overwrite the globals slot even if a type/const has the same name)
+        // checking before getting to avoid error prints
+        if (Engine::get_singleton()->has_singleton(type_name))
+        if (Object* gd_singleton = Engine::get_singleton()->get_singleton_object(type_name))
+        {
+            v8::Local<v8::Value> rval;
+            JSB_LOG(Verbose, "exposing singleton object %d", (uint64_t) gd_singleton);
+            if (gd_var_to_js(isolate, context, gd_singleton, rval, true))
+            {
+                jsb_check(!rval.IsEmpty());
+                info.GetReturnValue().Set(rval);
+                return;
+            }
+            isolate->ThrowError("failed to bind a singleton object");
+            return;
+        }
+
+        // then, math_defs. but `PI`, `INF`, `NAN`, `TAU` could be easily accessed in javascript.
+        // so we just happily omit these defines here.
+
+        // thirdly, global_constants
+        if (CoreConstants::is_global_constant(type_name))
+        {
+            const int constant_index = CoreConstants::get_global_constant_index(type_name);
+            const int64_t constant_value = CoreConstants::get_global_constant_value(constant_index);
+            const int32_t scaled_value = (int32_t) constant_value;
+            if ((int64_t) scaled_value != constant_value)
+            {
+                JSB_LOG(Warning, "inconsistent translation");
+                info.GetReturnValue().Set(v8::Number::New(isolate, (double) constant_value));
+            }
+            else
+            {
+                info.GetReturnValue().Set(v8::Int32::New(isolate, scaled_value));
+            }
+            return;
+        }
+
+        // finally, classes in ClassDB
         HashMap<StringName, ClassDB::ClassInfo>::Iterator it = ClassDB::classes.find(type_name);
         if (it != ClassDB::classes.end())
         {
@@ -985,8 +1037,6 @@ namespace jsb
                 return;
             }
         }
-
-        //TODO singletons? put singletons into another module?
 
         const CharString message = vformat("godot class not found '%s'", type_name).utf8();
         isolate->ThrowError(v8::String::NewFromUtf8(isolate, message.ptr(), v8::NewStringType::kNormal, message.length()).ToLocalChecked());

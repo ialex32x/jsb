@@ -102,7 +102,7 @@ namespace jsb
         static void _clear_timer(const v8::FunctionCallbackInfo<v8::Value>& info);
 
         static void _godot_object_constructor(const v8::FunctionCallbackInfo<v8::Value>& info);
-        static void _godot_object_finalizer(void* pointer);
+        static void _godot_object_finalizer(void* pointer, bool p_persistent);
         static void _godot_object_method(const v8::FunctionCallbackInfo<v8::Value>& info);
 
         void _register_builtins(const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& self);
