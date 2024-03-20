@@ -89,11 +89,14 @@ namespace jsb
         // JS function (type_name: string): type
         static void _load_type(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void _require(const v8::FunctionCallbackInfo<v8::Value>& info);
+        JavaScriptClassInfo* _expose_godot_class(const ClassDB::ClassInfo* p_class_info, internal::Index32* r_class_id = nullptr);
+        JavaScriptClassInfo* _expose_godot_class(const StringName& p_class_name, internal::Index32* r_class_id = nullptr)
+        {
+            const HashMap<StringName, ClassDB::ClassInfo>::ConstIterator& it = ClassDB::classes.find(p_class_name);
+            return it != ClassDB::classes.end() ? _expose_godot_class(&it->value, r_class_id) : nullptr;
+        }
 
     private:
-        //TODO it's a debug function, will be removed in a future version
-        static void _list_classes(const v8::FunctionCallbackInfo<v8::Value>& info);
-
         static void _print(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void _set_timer(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void _clear_timer(const v8::FunctionCallbackInfo<v8::Value>& info);
@@ -103,7 +106,6 @@ namespace jsb
         static void _godot_object_method(const v8::FunctionCallbackInfo<v8::Value>& info);
 
         void _register_builtins(const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& self);
-        JavaScriptClassInfo* _expose_godot_class(const ClassDB::ClassInfo* p_class_info, internal::Index32* r_class_id = nullptr);
 
         // return false if something wrong with an exception thrown
         // caller should handle the exception if it's not called from js

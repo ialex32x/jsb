@@ -18,7 +18,8 @@ namespace jsb::internal
             index = p_name.rfind("\\");
             if (index < 0)
             {
-                return p_name;
+                // p_name is a pure filename without any dir hierarchy given
+                return String();
             }
         }
         return p_name.substr(0, index);
@@ -39,7 +40,6 @@ namespace jsb::internal
             if (component == same_level)
             {
                 components.remove_at(index--);
-                ERR_FAIL_COND_V(index < 0 || index >= components.size(), ERR_FILE_BAD_PATH);
                 continue;
             }
             if (component == upper_level)

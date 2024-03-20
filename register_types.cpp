@@ -3,10 +3,6 @@
 #include "internal/jsb_path_util.h"
 #include "weaver/jsb_lang.h"
 
-#ifdef TOOLS_ENABLED
-#include "weaver-editor/jsb_dts_codegen.h"
-#endif
-
 #define JSB_LANG_ENABLED 1
 
 #if JSB_LANG_ENABLED
@@ -17,10 +13,6 @@ void initialize_jsb_module(ModuleInitializationLevel p_level)
 {
     if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE)
     {
-// #ifdef TOOLS_ENABLED
-//         jsb::editor::TypeDeclarationCodeGen codegen;
-//         codegen.emit();
-// #endif
     }
 
     if (p_level == MODULE_INITIALIZATION_LEVEL_CORE)

@@ -1,5 +1,6 @@
 #include "jsb_context.h"
 
+#include "jsb_editor_utility.h"
 #include "jsb_exception_info.h"
 #include "core/string/string_builder.h"
 
@@ -10,15 +11,6 @@
 namespace jsb
 {
     namespace InternalTimerType { enum Type : uint8_t { Interval, Timeout, Immediate, }; }
-
-    namespace
-    {
-#if DEV_ENABLED
-        jsb_force_inline constexpr bool is_debug_build() { return true; }
-#else
-        jsb_force_inline constexpr bool is_debug_build() { return false;}
-#endif
-    }
 
     struct InstanceBindingCallbacks
     {
@@ -58,35 +50,6 @@ namespace jsb
     };
 
     namespace { InstanceBindingCallbacks gd_instance_binding_callbacks = {}; }
-
-    void JavaScriptContext::_list_classes(const v8::FunctionCallbackInfo<v8::Value>& info)
-    {
-        for (const KeyValue<StringName, ClassDB::ClassInfo>& cclass_slot : ClassDB::classes)
-        {
-            const ClassDB::ClassInfo& cclass = cclass_slot.value;
-            if (!!cclass.inherits)
-            {
-                JSB_LOG(Debug, "Class: %s Super: %s", cclass.name, cclass.inherits);
-            }
-            else
-            {
-                JSB_LOG(Debug, "Class: %s", cclass.name);
-            }
-            for (const KeyValue<StringName, MethodBind*>& cmethod_slot : cclass.method_map)
-            {
-                const MethodBind& cmethod = *cmethod_slot.value;
-                JSB_LOG(Debug, "    Method: %s%s%s%s%s", cmethod.get_name(),
-                    cmethod.is_static() ? " static" : "",
-                    cmethod.is_const() ? " const" : "",
-                    cmethod.is_vararg() ? " vararg" : "",
-                    cmethod.has_return() ? " return" : "");
-            }
-            for (const PropertyInfo& cproperty : cclass.property_list)
-            {
-                JSB_LOG(Debug, "    Property: %s (Usage: %d)", cproperty.name, cproperty.usage);
-            }
-        }
-    }
 
     void JavaScriptContext::_print(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
@@ -290,8 +253,18 @@ namespace jsb
             v8::Local<v8::Object> jhost = v8::Object::New(isolate);
 
             self->Set(context, v8::String::NewFromUtf8Literal(isolate, "jsb"), jhost).Check();
-            jhost->Set(context, v8::String::NewFromUtf8Literal(isolate, "list_classes"), v8::Function::New(context, _list_classes).ToLocalChecked()).Check();
-            jhost->Set(context, v8::String::NewFromUtf8Literal(isolate, "debug"), v8::Boolean::New(isolate, is_debug_build())).Check();
+            jhost->Set(context, v8::String::NewFromUtf8Literal(isolate, "DEV_ENABLED"), v8::Boolean::New(isolate, DEV_ENABLED)).Check();
+            jhost->Set(context, v8::String::NewFromUtf8Literal(isolate, "TOOLS_ENABLED"), v8::Boolean::New(isolate, TOOLS_ENABLED)).Check();
+
+#if TOOLS_ENABLED
+            // internal 'jsb.editor'
+            {
+                v8::Local<v8::Object> editor = v8::Object::New(isolate);
+
+                jhost->Set(context, v8::String::NewFromUtf8Literal(isolate, "editor"), editor).Check();
+                editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "get_classes"), v8::Function::New(context, JavaScriptEditorUtility::_get_classes).ToLocalChecked()).Check();
+            }
+#endif
         }
 
         // minimal console functions support
@@ -553,7 +526,7 @@ namespace jsb
         ClassDB::ClassInfo& gd_class_info = it->value;
 
         Object* gd_object = gd_class_info.creation_func();
-        self->SetAlignedPointerInInternalField(kObjectFieldPointer, gd_object);
+        // self->SetAlignedPointerInInternalField(kObjectFieldPointer, gd_object);
         cruntime->bind_object(class_id, gd_object, self);
         if (gd_object->is_ref_counted())
         {
@@ -627,6 +600,22 @@ namespace jsb
                 {
                     object_template->Set(propkey_name, propval_func);
                 }
+            }
+
+            // expose class constants
+            for (const KeyValue<StringName, int64_t>& pair : p_class_info->constant_map)
+            {
+                const int64_t constant_value = pair.value;
+                const int32_t scaled_value = (int32_t) constant_value;
+                const CharString constant_name = ((String) pair.key).utf8(); // utf-8 for better compatibilities
+
+                v8::Local<v8::String> prop_key = v8::String::NewFromUtf8(isolate, constant_name.ptr(), v8::NewStringType::kNormal, constant_name.length()).ToLocalChecked();
+
+                if ((int64_t) scaled_value != constant_value)
+                {
+                    JSB_LOG(Warning, "inconsistent binding %s %d", pair.key, constant_value);
+                }
+                function_template->Set(prop_key, v8::Int32::New(isolate, scaled_value));
             }
 
             //TODO expose all available fields/properties etc.
@@ -724,7 +713,7 @@ namespace jsb
         }
     }
 
-    jsb_force_inline bool gd_var_to_js(v8::Isolate* isolate, const Variant& p_cvar, v8::Local<v8::Value>& r_jval)
+    jsb_force_inline bool gd_var_to_js(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const Variant& p_cvar, v8::Local<v8::Value>& r_jval)
     {
         switch (p_cvar.get_type())
         {
@@ -787,7 +776,49 @@ namespace jsb
             }
         case Variant::NODE_PATH:
         case Variant::RID:
+            //TODO unimplemented
+            return false;
         case Variant::OBJECT:
+            {
+                Object* raw_val = p_cvar;
+                if (unlikely(!raw_val))
+                {
+                    r_jval = v8::Null(isolate);
+                    return true;
+                }
+                JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
+                if (cruntime->check_object(raw_val, r_jval))
+                {
+                    return true;
+                }
+
+                // freshly bind existing gd object (not constructed in javascript)
+                const StringName& class_name = raw_val->get_class_name();
+                JavaScriptContext* ccontext = JavaScriptContext::wrap(context);
+                internal::Index32 jclass_id;
+                if (JavaScriptClassInfo* jclass = ccontext->_expose_godot_class(class_name, &jclass_id))
+                {
+                    v8::Local<v8::FunctionTemplate> jtemplate = jclass->template_.Get(isolate);
+                    v8::Local<v8::Object> jinst = jtemplate->InstanceTemplate()->NewInstance(context).ToLocalChecked();
+
+                    if (raw_val->is_ref_counted())
+                    {
+                        //NOTE in the case this godot object created by a godot method which returns a Ref<T>,
+                        //     it's `refcount_init` will be zero after the object pointer assigned to a Variant.
+                        //     we need to resurrect the object from this special state, or it will be a dangling pointer.
+                        if (((RefCounted*) raw_val)->init_ref())
+                        {
+                            // great, it's resurrected.
+                        }
+                    }
+                    // the lifecycle will be managed by javascript runtime, DO NOT DELETE it externally
+                    cruntime->bind_object(jclass_id, raw_val, jinst);
+                    r_jval = jinst;
+                    return true;
+                }
+                JSB_LOG(Error, "failed to expose godot class '%s'", class_name);
+                return false;
+            }
         case Variant::CALLABLE:
         case Variant::SIGNAL:
         case Variant::DICTIONARY:
@@ -921,7 +952,7 @@ namespace jsb
             return;
         }
         v8::Local<v8::Value> jrval;
-        if (gd_var_to_js(isolate, crval, jrval))
+        if (gd_var_to_js(isolate, context, crval, jrval))
         {
             info.GetReturnValue().Set(jrval);
             return;

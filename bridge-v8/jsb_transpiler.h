@@ -28,8 +28,6 @@ namespace jsb
             internal::Index32 class_id(data->Value());
 
             Callee* ptr = new Callee;
-            self->SetAlignedPointerInInternalField(kObjectFieldPointer, ptr);
-
             JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
             runtime->bind_object(class_id, ptr, self);
         }
@@ -51,8 +49,6 @@ namespace jsb
             }
             P1 p1 = Converter<P1>::get(isolate, context, info[0]);
             Callee* ptr = new Callee(p1);
-            self->SetAlignedPointerInInternalField(kObjectFieldPointer, ptr);
-
             JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
             runtime->bind_object(class_id, ptr, self);
         }

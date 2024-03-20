@@ -31,19 +31,19 @@ namespace jsb
         static std::shared_ptr<JavaScriptRuntime> safe_wrap(void* p_pointer);
 
         jsb_no_discard
-        static 
-        jsb_force_inline 
+        static
+        jsb_force_inline
         JavaScriptRuntime* wrap(v8::Isolate* p_isolate)
         {
             return (JavaScriptRuntime*) p_isolate->GetData(kIsolateEmbedderData);
         }
 
         jsb_no_discard
-        jsb_force_inline 
+        jsb_force_inline
         v8::Isolate* unwrap() const { return isolate_; }
 
         jsb_no_discard
-        jsb_force_inline 
+        jsb_force_inline
         bool check(v8::Isolate* p_isolate) const { return p_isolate == isolate_; }
 
         void bind_object(internal::Index32 p_class_id, void *p_pointer, const v8::Local<v8::Object>& p_object);
@@ -52,6 +52,18 @@ namespace jsb
         jsb_force_inline bool check_object(void* p_pointer) const
         {
             return objects_index_.has(p_pointer);
+        }
+
+        jsb_force_inline bool check_object(void* p_pointer, v8::Local<v8::Value>& r_unwrap) const
+        {
+            const HashMap<void*, internal::Index64>::ConstIterator& it = objects_index_.find(p_pointer);
+            if (it != objects_index_.end())
+            {
+                const ObjectHandle& handle = objects_.get_value(it->value);
+                r_unwrap = handle.callback.Get(isolate_);
+                return true;
+            }
+            return false;
         }
 
         // return true if can die

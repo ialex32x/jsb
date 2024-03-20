@@ -221,6 +221,7 @@ namespace jsb
         handle.callback.Reset(isolate_, p_object);
         handle.callback.SetWeak(p_pointer, &object_gc_callback, v8::WeakCallbackType::kInternalFields);
         objects_index_.insert(p_pointer, object_id);
+        p_object->SetAlignedPointerInInternalField(kObjectFieldPointer, p_pointer);
     }
 
     void JavaScriptRuntime::unbind_object(void* p_pointer)

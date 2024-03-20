@@ -1,6 +1,7 @@
 
 // godot types will be exposed to JS runtime until they are actually used
 import { Node } from "godot";
+import { TSDCodeGen } from "./tsd_codegen";
 
 // entry point (editor only)
 
@@ -35,9 +36,8 @@ setInterval(function () {
 setTimeout(function(...args){
     console.log("timeout", ...args);
 
-    if (jsb.debug) {
+    if (jsb.DEV_ENABLED) {
         console.log("it's a debug build");
-        // jsb.list_classes();
     } else {
         console.log("it's a release build");
     }
@@ -63,3 +63,8 @@ async function test_async() {
 }
 
 test_async();
+
+if (jsb.TOOLS_ENABLED) {
+    let tsd = new TSDCodeGen("./hello.txt");
+    tsd.emit();
+}

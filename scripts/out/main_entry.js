@@ -11,6 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 // godot types will be exposed to JS runtime until they are actually used
 const godot_1 = require("godot");
+const tsd_codegen_1 = require("./tsd_codegen");
 // entry point (editor only)
 // log, warn, error, assert are essentially supported
 console.log("main entry in editor");
@@ -37,9 +38,8 @@ setInterval(function () {
 }, 5000);
 setTimeout(function (...args) {
     console.log("timeout", ...args);
-    if (jsb.debug) {
+    if (jsb.DEV_ENABLED) {
         console.log("it's a debug build");
-        // jsb.list_classes();
     }
     else {
         console.log("it's a release build");
@@ -65,4 +65,8 @@ function test_async() {
     });
 }
 test_async();
+if (jsb.TOOLS_ENABLED) {
+    let tsd = new tsd_codegen_1.TSDCodeGen("./hello.txt");
+    tsd.emit();
+}
 //# sourceMappingURL=main_entry.js.map
