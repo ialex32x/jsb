@@ -10,5 +10,6 @@
 #include <cstdint>
 
 #include "../internal/jsb_macros.h"
+#include "../internal/jsb_function_pointer.h"
 
 #endif

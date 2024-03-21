@@ -5,7 +5,7 @@
 namespace jsb
 {
     typedef void (*ConstructorFunc)(const v8::FunctionCallbackInfo<v8::Value>&);
-    typedef void (*FinalizerFunc)(void*, bool /* p_persistent */);
+    typedef void (*FinalizerFunc)(class JavaScriptRuntime*, void*, bool /* p_persistent */);
 
     namespace JavaScriptClassType
     {
@@ -13,7 +13,7 @@ namespace jsb
         {
             None,
             GodotObject,
-            GodotVariant,
+            GodotPrimitive,
         };
     }
 

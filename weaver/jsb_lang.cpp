@@ -40,6 +40,7 @@ namespace jsb
     void JavaScriptBridgeLanguage::frame()
     {
         runtime_->update();
+        // runtime_->gc();
     }
 
     void JavaScriptBridgeLanguage::get_reserved_words(List<String>* p_words) const

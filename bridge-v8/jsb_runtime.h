@@ -52,6 +52,7 @@ namespace jsb
          * \param p_persistent keep a strong reference on pointer, usually used on binding singleton objects which are manually managed by native codes.
          */
         void bind_object(internal::Index32 p_class_id, void* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent);
+        void bind_object(internal::Index32 p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent);
         void unbind_object(void* p_pointer);
 
         // whether the pointer registered in the object binding map
@@ -128,17 +129,33 @@ namespace jsb
             return *resolver;
         }
 
-        JavaScriptClassInfo& add_class(JavaScriptClassType::Type p_type, internal::Index32* r_class_id = nullptr)
+        /**
+         * \brief
+         * \param p_type category of the class, a GodotObject class is also registered in `godot_classes_index` map
+         * \param p_class_name class_name must be unique if it's a GodotObject class
+         * \param r_class_id
+         * \return
+         */
+        JavaScriptClassInfo& add_class(JavaScriptClassType::Type p_type, const StringName& p_class_name, internal::Index32* r_class_id = nullptr)
         {
             const internal::Index32 class_id = classes_.append(JavaScriptClassInfo());
             JavaScriptClassInfo& class_info = classes_.get_value(class_id);
             class_info.type = p_type;
+            class_info.name = p_class_name;
+            if (p_type == JavaScriptClassType::GodotObject)
+            {
+                jsb_check(!godot_classes_index_.has(p_class_name));
+                godot_classes_index_.insert(p_class_name, class_id);
+            }
             if (r_class_id)
             {
                 *r_class_id = class_id;
             }
             return class_info;
         }
+
+        jsb_force_inline JavaScriptClassInfo& get_class(internal::Index32 p_class_id) { return classes_.get_value(p_class_id); }
+        jsb_force_inline const JavaScriptClassInfo& get_class(internal::Index32 p_class_id) const { return classes_.get_value(p_class_id); }
 
     private:
         void on_context_created(const v8::Local<v8::Context>& p_context);
@@ -159,16 +176,17 @@ namespace jsb
         ArrayBufferAllocator allocator_;
 
         //TODO postpone the call of Global.Reset if calling from other threads
-        typedef void(*UnreferencingRequestCall)(internal::Index64);
-        Vector<UnreferencingRequestCall> request_calls_;
-        volatile bool pending_request_calls_;
+        // typedef void(*UnreferencingRequestCall)(internal::Index64);
+        // Vector<UnreferencingRequestCall> request_calls_;
+        // volatile bool pending_request_calls_;
 
         //TODO lock on 'objects_' when referencing?
         // lock;
 
         // indirect lookup
-        // only godot classes are mapped
+        // only godot object classes are mapped
         HashMap<StringName, internal::Index32> godot_classes_index_;
+        // internal::Index32 godot_primitives_index_[Variant::VARIANT_MAX];
 
         internal::SArray<JavaScriptClassInfo, internal::Index32> classes_;
 

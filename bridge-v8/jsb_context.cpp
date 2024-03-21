@@ -13,45 +13,6 @@ namespace jsb
 {
     namespace InternalTimerType { enum Type : uint8_t { Interval, Timeout, Immediate, }; }
 
-    struct InstanceBindingCallbacks
-    {
-        jsb_force_inline operator const GDExtensionInstanceBindingCallbacks* () const { return &callbacks_; }
-
-        InstanceBindingCallbacks()
-            : callbacks_ { create_callback, free_callback, reference_callback }
-        {}
-
-    private:
-        static void* create_callback(void* p_token, void* p_instance)
-        {
-            //TODO ??
-            JSB_LOG(Error, "unimplemented");
-            return nullptr;
-        }
-
-        static void free_callback(void* p_token, void* p_instance, void* p_binding)
-        {
-            if (std::shared_ptr<JavaScriptRuntime> cruntime = JavaScriptRuntime::safe_wrap(p_token))
-            {
-                jsb_check(p_instance == p_binding);
-                cruntime->unbind_object(p_binding);
-            }
-        }
-
-        static GDExtensionBool reference_callback(void* p_token, void* p_binding, GDExtensionBool p_reference)
-        {
-            if (std::shared_ptr<JavaScriptRuntime> cruntime = JavaScriptRuntime::safe_wrap(p_token))
-            {
-                return cruntime->reference_object(p_binding, !!p_reference);
-            }
-            return true;
-        }
-
-        GDExtensionInstanceBindingCallbacks callbacks_;
-    };
-
-    namespace { InstanceBindingCallbacks gd_instance_binding_callbacks = {}; }
-
     void JavaScriptContext::_print(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
         v8::Isolate* isolate = info.GetIsolate();
@@ -331,8 +292,8 @@ namespace jsb
         switch ((InternalTimerType::Type) type)
         {
         // interval & timeout have 2 arguments usually
-        case InternalTimerType::Interval: loop = true; // intentionally omit the break;
-        case InternalTimerType::Timeout:
+        case InternalTimerType::Interval: loop = true;
+        case InternalTimerType::Timeout:  // NOLINT(clang-diagnostic-implicit-fallthrough)
             if (!info[1]->IsUndefined() && !info[1]->Int32Value(context).To(&rate))
             {
                 isolate->ThrowError("bad time");
@@ -463,7 +424,7 @@ namespace jsb
         }
     };
 
-    void JavaScriptContext::expose()
+    void JavaScriptContext::expose_temp()
     {
         v8::Isolate* isolate = get_isolate();
         v8::HandleScope handle_scope(isolate);
@@ -472,79 +433,21 @@ namespace jsb
         v8::Local<v8::Object> global = context->Global();
 
         internal::Index32 class_id;
-        JavaScriptClassInfo& class_info = runtime_->add_class(JavaScriptClassType::None, &class_id);
-        class_info.finalizer = &Transpiler<Foo>::finalizer;
+        const StringName class_name = jsb_typename(Vector3);
+        JavaScriptClassInfo& class_info = runtime_->add_class(JavaScriptClassType::None, class_name, &class_id);
+        class_info.finalizer = &ClassTemplate<Variant>::finalizer;
 
-        v8::Local<v8::FunctionTemplate> function_template = v8::FunctionTemplate::New(isolate,
-            &Transpiler<Foo>::constructor, v8::Uint32::NewFromUnsigned(isolate, class_id));
-        function_template->InstanceTemplate()->SetInternalFieldCount(kObjectFieldCount);
-        //class_info.template_.Reset(isolate, function_template);
+        v8::Local<v8::FunctionTemplate> function_template = ClassTemplate<Variant>::create(isolate, class_id, class_info);
+        v8::Local<v8::ObjectTemplate> prototype_template = function_template->PrototypeTemplate();
 
         // methods
-        function_template->PrototypeTemplate()->Set(
-            v8::String::NewFromUtf8Literal(isolate, "test"),
-            v8::FunctionTemplate::New(isolate,
-                &Transpiler<Foo>::dispatch<int, int>,
-                v8::Uint32::NewFromUnsigned(isolate, function_pointers_.add(&Foo::test))));
-
-        //function_template->Inherit()
+        bind::with(isolate, prototype_template, function_pointers_, jsb_addrname(Vector3, dot));
+        // bind::with(isolate, prototype_template, function_pointers_, jsb_addrname(Vector3, octahedron_decode));
 
         // type
         global->Set(context,
             v8::String::NewFromUtf8Literal(isolate, "Foo"),
             function_template->GetFunction(context).ToLocalChecked()).Check();
-    }
-
-    void JavaScriptContext::_godot_object_finalizer(void* pointer, bool p_persistent)
-    {
-        Object* gd_object = (Object*) pointer;
-        if (gd_object->is_ref_counted())
-        {
-            if (((RefCounted*) gd_object)->unreference())
-            {
-                if (!p_persistent)
-                {
-                    JSB_LOG(Verbose, "deleting gd ref_counted object %d", (uintptr_t) gd_object);
-                    memdelete(gd_object);
-                }
-            }
-        }
-        else
-        {
-            //TODO only delete when the object's lifecycle is fully managed by javascript
-            if (!p_persistent)
-            {
-                JSB_LOG(Verbose, "deleting gd object %d", (uintptr_t) gd_object);
-                memdelete(gd_object);
-            }
-        }
-    }
-
-    void JavaScriptContext::_godot_object_constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
-    {
-        v8::Isolate* isolate = info.GetIsolate();
-        v8::HandleScope handle_scope(isolate);
-        v8::Isolate::Scope isolate_scope(isolate);
-        v8::Local<v8::Object> self = info.This();
-        v8::Local<v8::Uint32> data = v8::Local<v8::Uint32>::Cast(info.Data());
-        const internal::Index32 class_id(data->Value());
-
-        JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
-        const JavaScriptClassInfo& jclass_info = cruntime->classes_.get_value(class_id);
-        jsb_check(jclass_info.type == JavaScriptClassType::GodotObject);
-        const HashMap<StringName, ClassDB::ClassInfo>::Iterator it = ClassDB::classes.find(jclass_info.name);
-        jsb_check(it != ClassDB::classes.end());
-        const ClassDB::ClassInfo& gd_class_info = it->value;
-
-        Object* gd_object = gd_class_info.creation_func();
-        cruntime->bind_object(class_id, gd_object, self, false);
-        if (gd_object->is_ref_counted())
-        {
-            //NOTE IS IT A TRUTH that ref_count==1 after creation_func??
-            jsb_check(!((RefCounted*) gd_object)->is_referenced());
-        }
-
-        gd_object->set_instance_binding(cruntime, gd_object, gd_instance_binding_callbacks);
     }
 
     JavaScriptClassInfo* JavaScriptContext::_expose_godot_variant(internal::Index32* r_class_id)
@@ -577,8 +480,7 @@ namespace jsb
         }
 
         internal::Index32 class_id;
-        JavaScriptClassInfo& jclass_info = runtime_->add_class(JavaScriptClassType::GodotObject, &class_id);
-        runtime_->godot_classes_index_.insert(p_class_info->name, class_id);
+        JavaScriptClassInfo& jclass_info = runtime_->add_class(JavaScriptClassType::GodotObject, p_class_info->name, &class_id);
         JSB_LOG(Verbose, "load godot type %s (%d)", p_class_info->name, (uint32_t) class_id);
 
         // construct type template
@@ -587,16 +489,9 @@ namespace jsb
             v8::Local<v8::Context> context = isolate->GetCurrentContext();
 
             jsb_check(context == context_.Get(isolate));
-            jclass_info.name = p_class_info->name;
-            jclass_info.finalizer = &_godot_object_finalizer;
-            v8::Local<v8::FunctionTemplate> function_template = v8::FunctionTemplate::New(isolate, &_godot_object_constructor, v8::Uint32::NewFromUnsigned(isolate, class_id));
-
+            jclass_info.finalizer = &ClassTemplate<Object>::finalizer;
+            v8::Local<v8::FunctionTemplate> function_template = ClassTemplate<Object>::create(isolate, class_id, jclass_info);
             v8::Local<v8::ObjectTemplate> object_template = function_template->PrototypeTemplate();
-            function_template->InstanceTemplate()->SetInternalFieldCount(kObjectFieldCount);
-#if DEV_ENABLED
-            const CharString cname = String(p_class_info->name).utf8();
-            function_template->SetClassName(v8::String:: NewFromUtf8(isolate, cname.ptr(), v8::NewStringType::kNormal, cname.length()).ToLocalChecked());
-#endif
 
             // expose class methods
             for (const KeyValue<StringName, MethodBind*>& pair : p_class_info->method_map)
@@ -989,7 +884,7 @@ namespace jsb
         if (Object* gd_singleton = Engine::get_singleton()->get_singleton_object(type_name))
         {
             v8::Local<v8::Value> rval;
-            JSB_LOG(Verbose, "exposing singleton object %d", (uint64_t) gd_singleton);
+            JSB_LOG(Verbose, "exposing singleton object %s", (String) type_name);
             if (gd_obj_to_js(isolate, context, gd_singleton, rval, true))
             {
                 jsb_check(!rval.IsEmpty());
@@ -1011,7 +906,7 @@ namespace jsb
             const int32_t scaled_value = (int32_t) constant_value;
             if ((int64_t) scaled_value != constant_value)
             {
-                JSB_LOG(Warning, "integer overflowed %s (%d) [reversible? %d]", type_name, constant_value, (int64_t)(double) constant_value == constant_value);
+                JSB_LOG(Warning, "integer overflowed %s (%s) [reversible? %d]", type_name, itos(constant_value), (int64_t)(double) constant_value == constant_value);
                 info.GetReturnValue().Set(v8::Number::New(isolate, (double) constant_value));
             }
             else

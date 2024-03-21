@@ -65,6 +65,45 @@ namespace jsb
         HashSet<void*> all_runtimes_;
     };
 
+    struct InstanceBindingCallbacks
+    {
+        jsb_force_inline operator const GDExtensionInstanceBindingCallbacks* () const { return &callbacks_; }
+
+        InstanceBindingCallbacks()
+            : callbacks_ { create_callback, free_callback, reference_callback }
+        {}
+
+    private:
+        static void* create_callback(void* p_token, void* p_instance)
+        {
+            //TODO ??
+            JSB_LOG(Error, "unimplemented");
+            return nullptr;
+        }
+
+        static void free_callback(void* p_token, void* p_instance, void* p_binding)
+        {
+            if (std::shared_ptr<JavaScriptRuntime> cruntime = JavaScriptRuntime::safe_wrap(p_token))
+            {
+                jsb_check(p_instance == p_binding);
+                cruntime->unbind_object(p_binding);
+            }
+        }
+
+        static GDExtensionBool reference_callback(void* p_token, void* p_binding, GDExtensionBool p_reference)
+        {
+            if (std::shared_ptr<JavaScriptRuntime> cruntime = JavaScriptRuntime::safe_wrap(p_token))
+            {
+                return cruntime->reference_object(p_binding, !!p_reference);
+            }
+            return true;
+        }
+
+        GDExtensionInstanceBindingCallbacks callbacks_;
+    };
+
+    namespace { InstanceBindingCallbacks gd_instance_binding_callbacks = {}; }
+
     namespace
     {
         void PromiseRejectCallback_(v8::PromiseRejectMessage message)
@@ -122,7 +161,6 @@ namespace jsb
         create_params.array_buffer_allocator = &allocator_;
 
         thread_id_ = Thread::get_caller_id();
-        pending_request_calls_ = false;
         isolate_ = v8::Isolate::New(create_params);
         isolate_->SetData(kIsolateEmbedderData, this);
         isolate_->SetPromiseRejectCallback(PromiseRejectCallback_);
@@ -163,7 +201,7 @@ namespace jsb
             const bool is_persistent = persistent_objects_.has(handle.pointer);
 
             JavaScriptClassInfo& class_info = classes_.get_value(handle.class_id);
-            class_info.finalizer(handle.pointer, is_persistent);
+            class_info.finalizer(this, handle.pointer, is_persistent);
             handle.ref_.Reset();
             objects_index_.erase(handle.pointer);
             objects_.remove_at(first_index);
@@ -211,6 +249,12 @@ namespace jsb
 #endif
     }
 
+    void JavaScriptRuntime::bind_object(internal::Index32 p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
+    {
+        bind_object(p_class_id, (void*) p_pointer, p_object, p_persistent);
+        p_pointer->set_instance_binding(this, p_pointer, gd_instance_binding_callbacks);
+    }
+
     void JavaScriptRuntime::bind_object(internal::Index32 p_class_id, void* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
     {
         jsb_checkf(classes_.is_valid_index(p_class_id), "bad class_id");
@@ -233,7 +277,7 @@ namespace jsb
         {
             handle.ref_.SetWeak(p_pointer, &object_gc_callback, v8::WeakCallbackType::kInternalFields);
         }
-        JSB_LOG(Verbose, "bind object %d class_id %d", (uintptr_t) p_pointer, (int32_t) p_class_id);
+        JSB_LOG(Verbose, "bind object %s class_id %d", itos((int64_t) object_id), (int32_t) p_class_id);
     }
 
     void JavaScriptRuntime::unbind_object(void* p_pointer)
@@ -253,7 +297,10 @@ namespace jsb
         jsb_check(Thread::get_caller_id() == thread_id_);
 
         const HashMap<void*, internal::Index64>::Iterator it = objects_index_.find(p_pointer);
-        ERR_FAIL_COND_V_MSG(it == objects_index_.end(), true, "bad pointer");
+        if (it == objects_index_.end())
+        {
+            ERR_FAIL_V_MSG(true, "bad pointer");
+        }
         const internal::Index64 object_id = it->value;
 
         ObjectHandle& object_handle = objects_.get_value(object_id);
@@ -273,7 +320,11 @@ namespace jsb
 
         // removing references
         jsb_checkf(!object_handle.ref_.IsEmpty(), "removing references on dead values");
-        jsb_checkf(object_handle.ref_count_ > 0, "unexpected behaviour");
+        if (object_handle.ref_count_ == 0)
+        {
+            return true;
+        }
+        // jsb_checkf(object_handle.ref_count_ > 0, "unexpected behaviour");
 
         --object_handle.ref_count_;
         if (object_handle.ref_count_ == 0)
@@ -286,6 +337,7 @@ namespace jsb
 
     void JavaScriptRuntime::free_object(void* p_pointer, bool p_free)
     {
+        jsb_check(Thread::get_caller_id() == thread_id_);
         const HashMap<void*, internal::Index64>::Iterator it = objects_index_.find(p_pointer);
         ERR_FAIL_COND_MSG(it == objects_index_.end(), "bad pointer");
         const internal::Index64 object_id = it->value;
@@ -301,7 +353,7 @@ namespace jsb
         if (p_free)
         {
             const JavaScriptClassInfo& class_info = classes_.get_value(object_handle.class_id);
-            class_info.finalizer(p_pointer, is_persistent);
+            class_info.finalizer(this, p_pointer, is_persistent);
         }
         object_handle.ref_.Reset();
         // `object_handle` becomes invalid after `remove_at`, so do it finally.

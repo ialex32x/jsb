@@ -12,29 +12,6 @@ namespace jsb
         kContextEmbedderData = 0,
     };
 
-    struct FunctionPointers
-    {
-        FunctionPointers(): cursor_(0) { pointer_.resize(16 * 512); }
-
-        template<typename Func>
-        uint32_t add(Func func)
-        {
-            uint32_t last_cursor = cursor_;
-            if (pointer_.size() - last_cursor <= sizeof(func))
-            {
-                pointer_.resize(pointer_.size() * 2);
-            }
-            memcpy(pointer_.ptrw() + last_cursor, &func, sizeof(func));
-            cursor_ += sizeof(func);
-            return last_cursor;
-        }
-
-        uint8_t* operator[](uint32_t p_index) { return pointer_.ptrw() + p_index; }
-
-        uint32_t cursor_;
-        Vector<uint8_t> pointer_;
-    };
-
     /**
      * a sandbox-like execution context for scripting (NOT thread-safe)
      * \note members starting with '_' are assumed the a v8 scope already existed in the caller
@@ -61,7 +38,7 @@ namespace jsb
         }
 
         //TODO temp code
-        void expose();
+        void expose_temp();
 
         // jsb_force_inline uint8_t* get_function_pointer(uint32_t p_offset) { return function_pointers_[p_offset]; }
         jsb_force_inline static uint8_t* get_function(const v8::Local<v8::Context>& p_context, uint32_t p_offset)
@@ -102,8 +79,6 @@ namespace jsb
         static void _set_timer(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void _clear_timer(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-        static void _godot_object_constructor(const v8::FunctionCallbackInfo<v8::Value>& info);
-        static void _godot_object_finalizer(void* pointer, bool p_persistent);
         static void _godot_object_method(const v8::FunctionCallbackInfo<v8::Value>& info);
 
         void _register_builtins(const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& self);
@@ -115,7 +90,7 @@ namespace jsb
         // hold a reference to JavaScriptRuntime which ensure runtime being destructed after context
         std::shared_ptr<class JavaScriptRuntime> runtime_;
 
-        FunctionPointers function_pointers_;
+        internal::FunctionPointers function_pointers_;
         JavaScriptModuleCache module_cache_;
         v8::Global<v8::Object> jmodule_cache_;
 
