@@ -68,7 +68,7 @@ namespace jsb
             if (it != objects_index_.end())
             {
                 const ObjectHandle& handle = objects_.get_value(it->value);
-                r_unwrap = handle.callback.Get(isolate_);
+                r_unwrap = handle.ref_.Get(isolate_);
                 return true;
             }
             return false;
@@ -144,13 +144,13 @@ namespace jsb
         void on_context_created(const v8::Local<v8::Context>& p_context);
         void on_context_destroyed(const v8::Local<v8::Context>& p_context);
 
-        static void object_gc_callback(const v8::WeakCallbackInfo<void>& info)
+        jsb_force_inline static void object_gc_callback(const v8::WeakCallbackInfo<void>& info)
         {
             JavaScriptRuntime* cruntime = wrap(info.GetIsolate());
             cruntime->free_object(info.GetParameter(), true);
         }
 
-        bool free_object(void* p_pointer, bool p_free);
+        void free_object(void* p_pointer, bool p_free);
 
         /*volatile*/
         Thread::ID thread_id_;

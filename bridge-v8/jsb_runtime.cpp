@@ -164,7 +164,6 @@ namespace jsb
 
             JavaScriptClassInfo& class_info = classes_.get_value(handle.class_id);
             class_info.finalizer(handle.pointer, is_persistent);
-            handle.callback.Reset();
             handle.ref_.Reset();
             objects_index_.erase(handle.pointer);
             objects_.remove_at(first_index);
@@ -214,32 +213,37 @@ namespace jsb
 
     void JavaScriptRuntime::bind_object(internal::Index32 p_class_id, void* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
     {
-        jsb_check(classes_.is_valid_index(p_class_id));
+        jsb_checkf(classes_.is_valid_index(p_class_id), "bad class_id");
+        jsb_checkf(!objects_index_.has(p_pointer), "duplicated bindings");
+
         const internal::Index64 object_id = objects_.add({});
         ObjectHandle& handle = objects_.get_value(object_id);
 
         handle.class_id = p_class_id;
         handle.pointer = p_pointer;
-        handle.callback.Reset(isolate_, p_object);
-        handle.callback.SetWeak(p_pointer, &object_gc_callback, v8::WeakCallbackType::kInternalFields);
+        handle.ref_.Reset(isolate_, p_object);
         objects_index_.insert(p_pointer, object_id);
         p_object->SetAlignedPointerInInternalField(kObjectFieldPointer, p_pointer);
         if (p_persistent)
         {
             persistent_objects_.insert(p_pointer);
             handle.ref_count_ = 1;
-            handle.ref_.Reset(isolate_, p_object);
+        }
+        else
+        {
+            handle.ref_.SetWeak(p_pointer, &object_gc_callback, v8::WeakCallbackType::kInternalFields);
         }
         JSB_LOG(Verbose, "bind object %d class_id %d", (uintptr_t) p_pointer, (int32_t) p_class_id);
     }
 
     void JavaScriptRuntime::unbind_object(void* p_pointer)
     {
-        //TODO temp code
         //TODO thread-safety issues on objects_* access
         jsb_check(Thread::get_caller_id() == thread_id_);
-
-        free_object(p_pointer, false);
+        if (objects_index_.has(p_pointer))
+        {
+            free_object(p_pointer, false);
+        }
     }
 
     bool JavaScriptRuntime::reference_object(void* p_pointer, bool p_is_inc)
@@ -254,53 +258,54 @@ namespace jsb
 
         ObjectHandle& object_handle = objects_.get_value(object_id);
 
+        // adding references
         if (p_is_inc)
         {
             if (object_handle.ref_count_ == 0)
             {
-                //TODO scope issues
-                const v8::Local<v8::Value> temp = object_handle.callback.Get(isolate_);
-                jsb_check(!temp.IsEmpty());
-                object_handle.ref_.Reset(isolate_, temp);
+                // becomes a strong reference
+                jsb_check(!object_handle.ref_.IsEmpty());
+                object_handle.ref_.ClearWeak();
             }
             ++object_handle.ref_count_;
             return false;
         }
 
-        if (object_handle.ref_count_ == 0)
-        {
-            jsb_check(object_handle.ref_.IsEmpty());
-            return true;
-        }
+        // removing references
+        jsb_checkf(!object_handle.ref_.IsEmpty(), "removing references on dead values");
+        jsb_checkf(object_handle.ref_count_ > 0, "unexpected behaviour");
+
         --object_handle.ref_count_;
         if (object_handle.ref_count_ == 0)
         {
-            object_handle.ref_.Reset();
+            object_handle.ref_.SetWeak(p_pointer, &object_gc_callback, v8::WeakCallbackType::kInternalFields);
             return true;
         }
         return false;
     }
 
-    bool JavaScriptRuntime::free_object(void* p_pointer, bool p_free)
+    void JavaScriptRuntime::free_object(void* p_pointer, bool p_free)
     {
-        HashMap<void*, internal::Index64>::Iterator it = objects_index_.find(p_pointer);
-        ERR_FAIL_COND_V_MSG(it == objects_index_.end(), false, "bad pointer");
+        const HashMap<void*, internal::Index64>::Iterator it = objects_index_.find(p_pointer);
+        ERR_FAIL_COND_MSG(it == objects_index_.end(), "bad pointer");
         const internal::Index64 object_id = it->value;
 
         ObjectHandle& object_handle = objects_.get_value(object_id);
+        jsb_check(object_handle.pointer == p_pointer);
         const bool is_persistent = persistent_objects_.has(p_pointer);
+
+        // remove index at first to make `free_object` safely reentrant
+        if (is_persistent) persistent_objects_.erase(p_pointer);
+        objects_index_.erase(p_pointer);
+
         if (p_free)
         {
             const JavaScriptClassInfo& class_info = classes_.get_value(object_handle.class_id);
-            jsb_check(object_handle.pointer == p_pointer);
             class_info.finalizer(p_pointer, is_persistent);
         }
-        object_handle.callback.Reset();
         object_handle.ref_.Reset();
-        objects_index_.erase(p_pointer);
-        if (is_persistent) persistent_objects_.erase(p_pointer);
+        // `object_handle` becomes invalid after `remove_at`, so do it finally.
         objects_.remove_at(object_id);
-        return true;
     }
 
 }

@@ -88,7 +88,7 @@ namespace jsb
             const int32_t scaled_value = (int32_t) field_value;
             if (field_value != (int64_t) scaled_value)
             {
-                JSB_LOG(Warning, "integer overflowed");
+                JSB_LOG(Warning, "integer overflowed %s (%d) [reversible? %d]", field_name, field_value, (int64_t)(double) field_value == field_value);
                 set_field(isolate, context, obj, field_name, v8::Number::New(isolate, (double) field_value));
             }
             else

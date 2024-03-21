@@ -22,6 +22,11 @@ let times = 5;
 // NOTE: they return a timer_id which is an integer instead of Timeout object like in NodeJS
 timer_id = setInterval(function () {
     console.log("tick");
+    for (let i = 0; i < 50; ++i) {
+        const node = new godot_1.Node();
+        node.set_name(`test_node_${i}`);
+        console.log(node.get_name());
+    }
     --times;
     if (times == 0) {
         clearInterval(timer_id);
@@ -44,9 +49,6 @@ setTimeout(function (...args) {
     else {
         console.log("it's a release build");
     }
-    const node = new godot_1.Node();
-    node.set_name("test_node");
-    console.log(node.get_name());
 }, 1500, 123, 456.789, "abc");
 function delay(seconds) {
     return __awaiter(this, void 0, void 0, function* () {

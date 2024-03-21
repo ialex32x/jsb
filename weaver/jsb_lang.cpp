@@ -22,6 +22,7 @@ namespace jsb
             constexpr const char* xxx = __FILE__;
             runtime_->add_module_resolver<jsb::DefaultModuleResolver>()
                 .add_search_path("res://")
+                // search path for editor only scripts
                 .add_search_path(jsb::internal::PathUtil::combine(
                     jsb::internal::PathUtil::dirname(::OS::get_singleton()->get_executable_path()),
                     "../modules/jsb/scripts/out"));

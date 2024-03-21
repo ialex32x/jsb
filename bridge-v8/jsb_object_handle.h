@@ -19,12 +19,10 @@ namespace jsb
         // must be a real pointer which implies that different objects have different addresses.
         void* pointer;
 
-        // hook on v8 gc callback
-        v8::Global<v8::Value> callback;
-
-        //TODO
-        // an optional strong reference
+        // this reference is initially weak and hooked on v8 gc callback.
+        // it becomes a strong reference after the `ref_count_` explicitly increased.
         v8::Global<v8::Value> ref_;
+
         uint32_t ref_count_;
     };
 }

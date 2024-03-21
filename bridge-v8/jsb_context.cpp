@@ -1011,7 +1011,7 @@ namespace jsb
             const int32_t scaled_value = (int32_t) constant_value;
             if ((int64_t) scaled_value != constant_value)
             {
-                JSB_LOG(Warning, "inconsistent translation");
+                JSB_LOG(Warning, "integer overflowed %s (%d) [reversible? %d]", type_name, constant_value, (int64_t)(double) constant_value == constant_value);
                 info.GetReturnValue().Set(v8::Number::New(isolate, (double) constant_value));
             }
             else
