@@ -5,17 +5,6 @@
 
 namespace jsb
 {
-    // namespace PrivateData
-    // {
-    //     enum Type : uint8_t
-    //     {
-    //         Nothing,          // unused
-    //         GCObject,         // ensure to be finalized by JavaScriptRuntime before isolate disposed
-    //         External,         // unmanaged
-    //         PlainOldData,     // allocated with `memalloc`
-    //     };
-    // }
-
     enum : uint32_t
     {
         kObjectFieldPointer,
@@ -26,7 +15,8 @@ namespace jsb
     {
         internal::Index32 class_id;
 
-        // primitive pointer to the native object
+        // primitive pointer to the native object.
+        // must be a real pointer which implies that different objects have different addresses.
         void* pointer;
 
         // hook on v8 gc callback

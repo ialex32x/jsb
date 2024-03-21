@@ -920,9 +920,11 @@ namespace jsb
         if (!method_bind->is_static())
         {
             v8::Local<v8::Object> self = info.This();
+
+            // avoid unexpected `this` in a relatively cheap way
             if (!self->IsObject() || self->InternalFieldCount() != kObjectFieldCount)
             {
-                isolate->ThrowError("call method without a valid instance bound");
+                isolate->ThrowError("bad this");
                 return;
             }
 
