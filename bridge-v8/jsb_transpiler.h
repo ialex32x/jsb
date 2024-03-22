@@ -52,19 +52,51 @@ namespace jsb
 {
     template<typename> struct PrimitiveAccess {};
 
-    template<> struct PrimitiveAccess<Vector3>
+    template<typename> struct VariantCaster {};
+
+    template<> struct VariantCaster<Vector2>
     {
-        static Vector3 from(const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_val)
+        constexpr static Variant::Type Type = Variant::VECTOR2;
+        static Vector2* from(const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_val)
         {
             Variant* variant = (Variant*) p_val.As<v8::Object>()->GetAlignedPointerFromInternalField(kObjectFieldPointer);
-            return *VariantInternal::get_vector3(variant);
+            return VariantInternal::get_vector2(variant);
+        }
+    };
+
+    template<> struct VariantCaster<Vector3>
+    {
+        constexpr static Variant::Type Type = Variant::VECTOR3;
+        static Vector3* from(const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_val)
+        {
+            Variant* variant = (Variant*) p_val.As<v8::Object>()->GetAlignedPointerFromInternalField(kObjectFieldPointer);
+            return VariantInternal::get_vector3(variant);
+        }
+    };
+
+    template<> struct VariantCaster<Vector4>
+    {
+        enum { Type = Variant::VECTOR4 };
+        static Vector4* from(const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_val)
+        {
+            Variant* variant = (Variant*) p_val.As<v8::Object>()->GetAlignedPointerFromInternalField(kObjectFieldPointer);
+            return VariantInternal::get_vector4(variant);
+        }
+    };
+
+    template<typename T>
+    struct PrimitiveAccessBoilerplate
+    {
+        static T from(const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_val)
+        {
+            return *VariantCaster<T>::from(context, p_val);
         }
 
         //TODO test
-        static bool return_(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::FunctionCallbackInfo<v8::Value>& info, Vector3 val)
+        static bool return_(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::FunctionCallbackInfo<v8::Value>& info, T val)
         {
             JavaScriptRuntime* cruntime =JavaScriptRuntime::wrap(isolate);
-            const internal::Index32 class_id = cruntime->get_class_id(Variant::VECTOR3);
+            const internal::Index32 class_id = cruntime->get_class_id(VariantCaster<T>::Type);
             const JavaScriptClassInfo& class_info = cruntime->get_class(class_id);
 
             v8::Local<v8::FunctionTemplate> jtemplate = class_info.template_.Get(isolate);
@@ -79,18 +111,13 @@ namespace jsb
         }
     };
 
-    template<> struct PrimitiveAccess<Vector3*>
-    {
-        static Vector3* from(const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_val)
-        {
-            Variant* variant = (Variant*) p_val.As<v8::Object>()->GetAlignedPointerFromInternalField(kObjectFieldPointer);
-            return VariantInternal::get_vector3(variant);
-        }
-    };
+    template<> struct PrimitiveAccess<Vector2> : PrimitiveAccessBoilerplate<Vector2> {};
+    template<> struct PrimitiveAccess<Vector3> : PrimitiveAccessBoilerplate<Vector3> {};
+    template<> struct PrimitiveAccess<Vector4> : PrimitiveAccessBoilerplate<Vector4> {};
 
-    template<> struct PrimitiveAccess<const Vector3&> : PrimitiveAccess<Vector3>
-    {
-    };
+    template<> struct PrimitiveAccess<const Vector2&> : PrimitiveAccessBoilerplate<Vector2> {};
+    template<> struct PrimitiveAccess<const Vector3&> : PrimitiveAccessBoilerplate<Vector3> {};
+    template<> struct PrimitiveAccess<const Vector4&> : PrimitiveAccessBoilerplate<Vector4> {};
 
     template<> struct PrimitiveAccess<real_t>
     {
@@ -99,6 +126,19 @@ namespace jsb
             return (real_t) p_val->NumberValue(context).ToChecked();
         }
         static bool return_(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::FunctionCallbackInfo<v8::Value>& info, real_t val)
+        {
+            info.GetReturnValue().Set(val);
+            return true;
+        }
+    };
+
+    template<> struct PrimitiveAccess<int32_t>
+    {
+        static int32_t from(const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_val)
+        {
+            return p_val->Int32Value(context).ToChecked();
+        }
+        static bool return_(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::FunctionCallbackInfo<v8::Value>& info, int32_t val)
         {
             info.GetReturnValue().Set(val);
             return true;
@@ -115,7 +155,7 @@ namespace jsb
             typedef TReturn (TSelf::*Functor)();
             JSB_CONTEXT_BOILERPLATE();
 
-            TSelf* p_self = PrimitiveAccess<TSelf*>::from(context, info.This());
+            TSelf* p_self = VariantCaster<TSelf>::from(context, info.This());
             TReturn result = (p_self->*func)();
             if (!PrimitiveAccess<TReturn>::return_(isolate, context, info, result))
             {
@@ -129,7 +169,7 @@ namespace jsb
             typedef TReturn (TSelf::*Functor)(P0);
             JSB_CONTEXT_BOILERPLATE();
 
-            TSelf* p_self = PrimitiveAccess<TSelf*>::from(context, info.This());
+            TSelf* p_self = VariantCaster<TSelf>::from(context, info.This());
             P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
             TReturn result = (p_self->*func)(p0);
             if (!PrimitiveAccess<TReturn>::return_(isolate, context, info, result))
@@ -144,7 +184,7 @@ namespace jsb
             typedef TReturn (TSelf::*Functor)(P0, P1);
             JSB_CONTEXT_BOILERPLATE();
 
-            TSelf* p_self = PrimitiveAccess<TSelf*>::from(context, info.This());
+            TSelf* p_self = VariantCaster<TSelf>::from(context, info.This());
             P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
             P1 p1 = PrimitiveAccess<P1>::from(context, info[1]);
             TReturn result = (p_self->*func)(p0, p1);
@@ -185,7 +225,7 @@ namespace jsb
             typedef TReturn (*Functor)(TSelf*);
             JSB_CONTEXT_BOILERPLATE();
 
-            TSelf* p_self = PrimitiveAccess<TSelf*>::from(context, info.This());
+            TSelf* p_self = VariantCaster<TSelf>::from(context, info.This());
             TReturn result = (*func)(p_self);
             if (!PrimitiveAccess<TReturn>::return_(isolate, context, info, result))
             {
@@ -204,7 +244,7 @@ namespace jsb
             typedef void (TSelf::*Functor)(P0);
             JSB_CONTEXT_BOILERPLATE();
 
-            TSelf* p_self = PrimitiveAccess<TSelf*>::from(context, info.This());
+            TSelf* p_self = VariantCaster<TSelf>::from(context, info.This());
             P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
             (p_self->*func)(p0);
         }
@@ -215,7 +255,7 @@ namespace jsb
             typedef void (*Functor)(TSelf*, P0);
             JSB_CONTEXT_BOILERPLATE();
 
-            TSelf* p_self = PrimitiveAccess<TSelf*>::from(context, info.This());
+            TSelf* p_self = VariantCaster<TSelf>::from(context, info.This());
             P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
             (*func)(p_self, p0);
         }
@@ -293,6 +333,47 @@ namespace jsb
             runtime->bind_object(class_id, ptr, self, false);
         }
 
+        template<typename P0>
+        static void constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
+        {
+            v8::Isolate* isolate = info.GetIsolate();
+            v8::HandleScope handle_scope(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            v8::Local<v8::Context> context = isolate->GetCurrentContext();
+            v8::Local<v8::Object> self = info.This();
+            internal::Index32 class_id(v8::Local<v8::Uint32>::Cast(info.Data())->Value());
+            if (info.Length() != 1)
+            {
+                isolate->ThrowError("bad args");
+                return;
+            }
+            P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
+            Variant* ptr = memnew(Variant(TSelf(p0)));
+            JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
+            runtime->bind_object(class_id, ptr, self, false);
+        }
+
+        template<typename P0, typename P1>
+        static void constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
+        {
+            v8::Isolate* isolate = info.GetIsolate();
+            v8::HandleScope handle_scope(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            v8::Local<v8::Context> context = isolate->GetCurrentContext();
+            v8::Local<v8::Object> self = info.This();
+            internal::Index32 class_id(v8::Local<v8::Uint32>::Cast(info.Data())->Value());
+            if (info.Length() != 2)
+            {
+                isolate->ThrowError("bad args");
+                return;
+            }
+            P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
+            P1 p1 = PrimitiveAccess<P1>::from(context, info[1]);
+            Variant* ptr = memnew(Variant(TSelf(p0, p1)));
+            JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
+            runtime->bind_object(class_id, ptr, self, false);
+        }
+
         template<typename P0, typename P1, typename P2>
         static void constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
         {
@@ -311,6 +392,29 @@ namespace jsb
             P1 p1 = PrimitiveAccess<P1>::from(context, info[1]);
             P2 p2 = PrimitiveAccess<P2>::from(context, info[2]);
             Variant* ptr = memnew(Variant(TSelf(p0, p1, p2)));
+            JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
+            runtime->bind_object(class_id, ptr, self, false);
+        }
+
+        template<typename P0, typename P1, typename P2, typename P3>
+        static void constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
+        {
+            v8::Isolate* isolate = info.GetIsolate();
+            v8::HandleScope handle_scope(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            v8::Local<v8::Context> context = isolate->GetCurrentContext();
+            v8::Local<v8::Object> self = info.This();
+            internal::Index32 class_id(v8::Local<v8::Uint32>::Cast(info.Data())->Value());
+            if (info.Length() != 4)
+            {
+                isolate->ThrowError("bad args");
+                return;
+            }
+            P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
+            P1 p1 = PrimitiveAccess<P1>::from(context, info[1]);
+            P2 p2 = PrimitiveAccess<P2>::from(context, info[2]);
+            P3 p3 = PrimitiveAccess<P3>::from(context, info[3]);
+            Variant* ptr = memnew(Variant(TSelf(p0, p1, p2, p3)));
             JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
             runtime->bind_object(class_id, ptr, self, false);
         }

@@ -425,12 +425,26 @@ namespace jsb
     };
 
     //TODO stub functions for accessing fields of classes
+    jsb_force_inline static real_t Vector2_x_getter(Vector2* self) { return self->x; }
+    jsb_force_inline static void Vector2_x_setter(Vector2* self, real_t x) { self->x = x; }
+    jsb_force_inline static real_t Vector2_y_getter(Vector2* self) { return self->y; }
+    jsb_force_inline static void Vector2_y_setter(Vector2* self, real_t y) { self->y = y; }
+
     jsb_force_inline static real_t Vector3_x_getter(Vector3* self) { return self->x; }
     jsb_force_inline static void Vector3_x_setter(Vector3* self, real_t x) { self->x = x; }
     jsb_force_inline static real_t Vector3_y_getter(Vector3* self) { return self->y; }
     jsb_force_inline static void Vector3_y_setter(Vector3* self, real_t y) { self->y = y; }
     jsb_force_inline static real_t Vector3_z_getter(Vector3* self) { return self->z; }
     jsb_force_inline static void Vector3_z_setter(Vector3* self, real_t z) { self->z = z; }
+
+    jsb_force_inline static real_t Vector4_x_getter(Vector4* self) { return self->x; }
+    jsb_force_inline static void Vector4_x_setter(Vector4* self, real_t x) { self->x = x; }
+    jsb_force_inline static real_t Vector4_y_getter(Vector4* self) { return self->y; }
+    jsb_force_inline static void Vector4_y_setter(Vector4* self, real_t y) { self->y = y; }
+    jsb_force_inline static real_t Vector4_z_getter(Vector4* self) { return self->z; }
+    jsb_force_inline static void Vector4_z_setter(Vector4* self, real_t z) { self->z = z; }
+    jsb_force_inline static real_t Vector4_w_getter(Vector4* self) { return self->w; }
+    jsb_force_inline static void Vector4_w_setter(Vector4* self, real_t w) { self->w = w; }
 
     void JavaScriptContext::expose_temp()
     {
@@ -440,25 +454,63 @@ namespace jsb
         v8::Local<v8::Context> context = context_.Get(isolate);
         v8::Local<v8::Object> global = context->Global();
 
-        internal::Index32 class_id;
-        const StringName class_name = jsb_typename(Vector3);
-        JavaScriptClassInfo& class_info = runtime_->add_class(JavaScriptClassType::None, class_name, &class_id);
-        runtime_->godot_primitives_index_[Variant::VECTOR3] = class_id;
+        {
+            internal::Index32 class_id;
+            const StringName class_name = jsb_typename(Vector2);
+            JavaScriptClassInfo& class_info = runtime_->add_class(JavaScriptClassType::GodotPrimitive, class_name, &class_id);
+            runtime_->godot_primitives_index_[Variant::VECTOR2] = class_id;
 
-        v8::Local<v8::FunctionTemplate> function_template = VariantClassTemplate<Vector3>::create<real_t, real_t, real_t>(isolate, class_id, class_info);
-        v8::Local<v8::ObjectTemplate> prototype_template = function_template->PrototypeTemplate();
+            v8::Local<v8::FunctionTemplate> function_template = VariantClassTemplate<Vector2>::create<real_t, real_t>(isolate, class_id, class_info);
+            v8::Local<v8::ObjectTemplate> prototype_template = function_template->PrototypeTemplate();
 
-        // methods
-        bind::method(isolate, prototype_template, function_pointers_, jsb_methodbind(Vector3, dot));
-        bind::method(isolate, prototype_template, function_pointers_, jsb_methodbind(Vector3, move_toward));
-        bind::property(isolate, prototype_template, function_pointers_, Vector3_x_getter, Vector3_x_setter, jsb_nameof(Vector3, x));
-        bind::property(isolate, prototype_template, function_pointers_, Vector3_y_getter, Vector3_y_setter, jsb_nameof(Vector3, y));
-        bind::property(isolate, prototype_template, function_pointers_, Vector3_z_getter, Vector3_z_setter, jsb_nameof(Vector3, z));
+            // methods
+            bind::method(isolate, prototype_template, function_pointers_, jsb_methodbind(Vector2, dot));
+            bind::method(isolate, prototype_template, function_pointers_, jsb_methodbind(Vector2, move_toward));
+            bind::property(isolate, prototype_template, function_pointers_, Vector2_x_getter, Vector2_x_setter, jsb_nameof(Vector2, x));
+            bind::property(isolate, prototype_template, function_pointers_, Vector2_y_getter, Vector2_y_setter, jsb_nameof(Vector2, y));
 
-        // type
-        global->Set(context,
-            v8::String::NewFromUtf8Literal(isolate, jsb_typename(Vector3)),
-            function_template->GetFunction(context).ToLocalChecked()).Check();
+            // type
+            global->Set(context, v8::String::NewFromUtf8Literal(isolate, jsb_typename(Vector3)), function_template->GetFunction(context).ToLocalChecked()).Check();
+        }
+        {
+            internal::Index32 class_id;
+            const StringName class_name = jsb_typename(Vector3);
+            JavaScriptClassInfo& class_info = runtime_->add_class(JavaScriptClassType::GodotPrimitive, class_name, &class_id);
+            runtime_->godot_primitives_index_[Variant::VECTOR3] = class_id;
+
+            v8::Local<v8::FunctionTemplate> function_template = VariantClassTemplate<Vector3>::create<real_t, real_t, real_t>(isolate, class_id, class_info);
+            v8::Local<v8::ObjectTemplate> prototype_template = function_template->PrototypeTemplate();
+
+            // methods
+            bind::method(isolate, prototype_template, function_pointers_, jsb_methodbind(Vector3, dot));
+            bind::method(isolate, prototype_template, function_pointers_, jsb_methodbind(Vector3, move_toward));
+            bind::method(isolate, prototype_template, function_pointers_, jsb_methodbind(Vector3, octahedron_encode));
+            bind::property(isolate, prototype_template, function_pointers_, Vector3_x_getter, Vector3_x_setter, jsb_nameof(Vector3, x));
+            bind::property(isolate, prototype_template, function_pointers_, Vector3_y_getter, Vector3_y_setter, jsb_nameof(Vector3, y));
+            bind::property(isolate, prototype_template, function_pointers_, Vector3_z_getter, Vector3_z_setter, jsb_nameof(Vector3, z));
+
+            // type
+            global->Set(context, v8::String::NewFromUtf8Literal(isolate, jsb_typename(Vector3)), function_template->GetFunction(context).ToLocalChecked()).Check();
+        }
+        {
+            internal::Index32 class_id;
+            const StringName class_name = jsb_typename(Vector4);
+            JavaScriptClassInfo& class_info = runtime_->add_class(JavaScriptClassType::GodotPrimitive, class_name, &class_id);
+            runtime_->godot_primitives_index_[Variant::VECTOR4] = class_id;
+
+            v8::Local<v8::FunctionTemplate> function_template = VariantClassTemplate<Vector4>::create<real_t, real_t, real_t, real_t>(isolate, class_id, class_info);
+            v8::Local<v8::ObjectTemplate> prototype_template = function_template->PrototypeTemplate();
+
+            // methods
+            bind::method(isolate, prototype_template, function_pointers_, jsb_methodbind(Vector4, dot));
+            bind::property(isolate, prototype_template, function_pointers_, Vector4_x_getter, Vector4_x_setter, jsb_nameof(Vector4, x));
+            bind::property(isolate, prototype_template, function_pointers_, Vector4_y_getter, Vector4_y_setter, jsb_nameof(Vector4, y));
+            bind::property(isolate, prototype_template, function_pointers_, Vector4_z_getter, Vector4_z_setter, jsb_nameof(Vector4, z));
+            bind::property(isolate, prototype_template, function_pointers_, Vector4_w_getter, Vector4_w_setter, jsb_nameof(Vector4, w));
+
+            // type
+            global->Set(context, v8::String::NewFromUtf8Literal(isolate, jsb_typename(Vector3)), function_template->GetFunction(context).ToLocalChecked()).Check();
+        }
     }
 
     JavaScriptClassInfo* JavaScriptContext::_expose_godot_variant(internal::Index32* r_class_id)
@@ -579,6 +631,9 @@ namespace jsb
             }
             return false;
 
+        case Variant::OBJECT:
+            //TODO ...
+            return false;
         // math types
         case Variant::VECTOR2:
         case Variant::VECTOR2I:
@@ -601,7 +656,6 @@ namespace jsb
         case Variant::STRING_NAME:
         case Variant::NODE_PATH:
         case Variant::RID:
-        case Variant::OBJECT:
         case Variant::CALLABLE:
         case Variant::SIGNAL:
         case Variant::DICTIONARY:
@@ -617,7 +671,28 @@ namespace jsb
         case Variant::PACKED_VECTOR2_ARRAY:
         case Variant::PACKED_VECTOR3_ARRAY:
         case Variant::PACKED_COLOR_ARRAY:
-            //TODO unimplemented
+            {
+                //TODO TEMP SOLUTION
+                if (p_jval->IsObject())
+                {
+                    v8::Local<v8::Object> jobj = p_jval.As<v8::Object>();
+                    if (jobj->InternalFieldCount() == kObjectFieldCount)
+                    {
+                        //TODO check the class to make it safe to cast (space cheaper?)
+                        //TODO or, add one more InternalField to ensure it (time cheaper?)
+                        void* pointer = jobj->GetAlignedPointerFromInternalField(isolate, kObjectFieldPointer);
+                        JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
+                        if (const JavaScriptClassInfo* class_info = cruntime->get_object_class(pointer))
+                        {
+                            if (class_info->type == JavaScriptClassType::GodotPrimitive)
+                            {
+                                r_cvar = *(Variant*) pointer;
+                            }
+                        }
+                    }
+                }
+                return false;
+            }
         default: return false;
         }
     }
@@ -689,6 +764,18 @@ namespace jsb
                 r_jval = v8::String::NewFromUtf8(isolate, repr_val.get_data(), v8::NewStringType::kNormal, repr_val.length()).ToLocalChecked();
                 return true;
             }
+        case Variant::STRING_NAME:
+            {
+                //TODO losing type
+                const String raw_val2 = p_cvar;
+                const CharString repr_val = raw_val2.utf8();
+                r_jval = v8::String::NewFromUtf8(isolate, repr_val.get_data(), v8::NewStringType::kNormal, repr_val.length()).ToLocalChecked();
+                return true;
+            }
+        case Variant::OBJECT:
+            {
+                return gd_obj_to_js(isolate, context, (Object*) p_cvar, r_jval, false);
+            }
         // math types
         case Variant::VECTOR2:
         case Variant::VECTOR2I:
@@ -708,22 +795,10 @@ namespace jsb
 
         // misc types
         case Variant::COLOR:
-        case Variant::STRING_NAME:
-            {
-                //TODO losing type
-                const String raw_val2 = p_cvar;
-                const CharString repr_val = raw_val2.utf8();
-                r_jval = v8::String::NewFromUtf8(isolate, repr_val.get_data(), v8::NewStringType::kNormal, repr_val.length()).ToLocalChecked();
-                return true;
-            }
         case Variant::NODE_PATH:
         case Variant::RID:
             //TODO unimplemented
             return false;
-        case Variant::OBJECT:
-            {
-                return gd_obj_to_js(isolate, context, (Object*) p_cvar, r_jval, false);
-            }
         case Variant::CALLABLE:
         case Variant::SIGNAL:
         case Variant::DICTIONARY:
@@ -739,6 +814,21 @@ namespace jsb
         case Variant::PACKED_VECTOR2_ARRAY:
         case Variant::PACKED_VECTOR3_ARRAY:
         case Variant::PACKED_COLOR_ARRAY:
+            {
+                JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
+                if (internal::Index32 class_id = cruntime->get_class_id(p_cvar.get_type()))
+                {
+                    JavaScriptClassInfo& class_info = cruntime->get_class(class_id);
+                    v8::Local<v8::FunctionTemplate> jtemplate = class_info.template_.Get(isolate);
+                    r_jval = jtemplate->InstanceTemplate()->NewInstance(context).ToLocalChecked();
+                    jsb_check(r_jval.As<v8::Object>()->InternalFieldCount() == kObjectFieldCount);
+
+                    // the lifecycle will be managed by javascript runtime, DO NOT DELETE it externally
+                    cruntime->bind_object(class_id, p_cvar, r_jval.As<v8::Object>(), false);
+                    return true;
+                }
+                return false;
+            }
             //TODO unimplemented
         default: return false;
         }

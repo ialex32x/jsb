@@ -283,7 +283,7 @@ namespace jsb::internal
 		    {
 		        if (!_used_timers.is_valid_index(index))
 		        {
-		            JSB_LOG(Error, "timer active (invalid) %d", (uint64_t)index);
+		            JSB_LOG(Error, "timer active (invalid) %d", (uint32_t) index);
 		            continue;
 		        }
 
@@ -321,7 +321,7 @@ namespace jsb::internal
 				return true;
 			}
 
-			JSB_LOG(Error, "invalid timer index %d", (int64_t)p_index);
+			JSB_LOG(Error, "invalid timer index %d", (uint32_t) p_index);
 			return false;
 		}
 

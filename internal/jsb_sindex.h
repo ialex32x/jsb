@@ -138,6 +138,7 @@ namespace jsb::internal
         jsb_force_inline ~Index32() = default;
 
         jsb_force_inline bool is_valid() const { return packed_ != 0; }
+        jsb_force_inline operator bool() const { return packed_ != 0; }
 
         jsb_force_inline int32_t get_index() const { return (int32_t) (packed_ >> kRevisionBits); }
         jsb_force_inline int32_t get_revision() const { return (int32_t) (packed_ & kRevisionMask); }
