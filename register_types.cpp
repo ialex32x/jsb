@@ -6,7 +6,7 @@
 #define JSB_LANG_ENABLED 1
 
 #if JSB_LANG_ENABLED
-static jsb::JavaScriptBridgeLanguage* script_language_js = nullptr;
+static JavaScriptLanguage* script_language_js = nullptr;
 #endif
 
 void initialize_jsb_module(ModuleInitializationLevel p_level)
@@ -47,7 +47,7 @@ void initialize_jsb_module(ModuleInitializationLevel p_level)
 
         // register javascript language
 #if JSB_LANG_ENABLED
-        script_language_js = memnew(jsb::JavaScriptBridgeLanguage());
+        script_language_js = memnew(JavaScriptLanguage());
 	    ScriptServer::register_language(script_language_js);
 #endif
     }
