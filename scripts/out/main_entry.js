@@ -29,10 +29,11 @@ timer_id = setInterval(function () {
     // }
     --times;
     if (times == 0) {
+        console.log("stop tick", timer_id);
         clearInterval(timer_id);
-        console.log("stop tick");
     }
 }, 1000);
+console.log("start tick", timer_id);
 setImmediate(function () {
     console.log("immediate");
 });
