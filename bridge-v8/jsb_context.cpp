@@ -317,29 +317,29 @@ namespace jsb
                 action.store(index - extra_arg_index, v8::Global<v8::Value>(isolate, info[index]));
             }
             cruntime->timer_manager_.set_timer(handle, std::move(action), rate, loop);
-            info.GetReturnValue().Set(v8::Int32::New(isolate, (int32_t) handle));
+            info.GetReturnValue().Set(v8::Int32::NewFromUnsigned(isolate, (uint32_t) handle));
         }
         else
         {
             cruntime->timer_manager_.set_timer(handle, JavaScriptTimerAction(v8::Global<v8::Function>(isolate, func), 0), rate, loop);
-            info.GetReturnValue().Set(v8::Int32::New(isolate, (int32_t) handle));
+            info.GetReturnValue().Set((uint32_t) handle);
         }
     }
 
     void JavaScriptContext::_clear_timer(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
         v8::Isolate* isolate = info.GetIsolate();
-        if (info.Length() < 1 || !info[0]->IsInt32())
+        if (info.Length() < 1 || !info[0]->IsUint32())
         {
             isolate->ThrowError("bad argument");
             return;
         }
 
         v8::Local<v8::Context> context = isolate->GetCurrentContext();
-        int32_t handle = 0;
-        if (!info[0]->Int32Value(context).To(&handle))
+        uint32_t handle = 0;
+        if (!info[0]->Uint32Value(context).To(&handle))
         {
-            isolate->ThrowError("bad time");
+            isolate->ThrowError("bad timer");
             return;
         }
         JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
@@ -470,7 +470,7 @@ namespace jsb
             bind::property(isolate, prototype_template, function_pointers_, Vector2_y_getter, Vector2_y_setter, jsb_nameof(Vector2, y));
 
             // type
-            global->Set(context, v8::String::NewFromUtf8Literal(isolate, jsb_typename(Vector3)), function_template->GetFunction(context).ToLocalChecked()).Check();
+            global->Set(context, v8::String::NewFromUtf8Literal(isolate, jsb_typename(Vector2)), function_template->GetFunction(context).ToLocalChecked()).Check();
         }
         {
             internal::Index32 class_id;
@@ -509,7 +509,7 @@ namespace jsb
             bind::property(isolate, prototype_template, function_pointers_, Vector4_w_getter, Vector4_w_setter, jsb_nameof(Vector4, w));
 
             // type
-            global->Set(context, v8::String::NewFromUtf8Literal(isolate, jsb_typename(Vector3)), function_template->GetFunction(context).ToLocalChecked()).Check();
+            global->Set(context, v8::String::NewFromUtf8Literal(isolate, jsb_typename(Vector4)), function_template->GetFunction(context).ToLocalChecked()).Check();
         }
     }
 
@@ -544,7 +544,7 @@ namespace jsb
 
         internal::Index32 class_id;
         JavaScriptClassInfo& jclass_info = runtime_->add_class(JavaScriptClassType::GodotObject, p_class_info->name, &class_id);
-        JSB_LOG(Verbose, "load godot type %s (%d)", p_class_info->name, (uint32_t) class_id);
+        JSB_LOG(Verbose, "expose godot type %s (%d)", p_class_info->name, (uint32_t) class_id);
 
         // construct type template
         {
@@ -741,7 +741,7 @@ namespace jsb
 
     jsb_force_inline bool gd_var_to_js(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const Variant& p_cvar, v8::Local<v8::Value>& r_jval)
     {
-        switch (p_cvar.get_type())
+        switch (const Variant::Type var_type = p_cvar.get_type())
         {
         case Variant::NIL: r_jval = v8::Null(isolate); return true;
         case Variant::BOOL: r_jval = v8::Boolean::New(isolate, p_cvar); return true;
@@ -815,8 +815,9 @@ namespace jsb
         case Variant::PACKED_VECTOR3_ARRAY:
         case Variant::PACKED_COLOR_ARRAY:
             {
+                //TODO TEMP SOLUTION
                 JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
-                if (internal::Index32 class_id = cruntime->get_class_id(p_cvar.get_type()))
+                if (internal::Index32 class_id = cruntime->get_class_id(var_type))
                 {
                     JavaScriptClassInfo& class_info = cruntime->get_class(class_id);
                     v8::Local<v8::FunctionTemplate> jtemplate = class_info.template_.Get(isolate);

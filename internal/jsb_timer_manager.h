@@ -24,7 +24,7 @@ namespace jsb::internal
 	    jsb_force_inline TimerHandle(TimerHandle&& p_other) noexcept: id(p_other.id) {}
 	    jsb_force_inline TimerHandle& operator=(TimerHandle&& p_other) noexcept { id = p_other.id; return *this; }
 
-		jsb_force_inline explicit operator int32_t() const { return (int32_t) id; }
+		jsb_force_inline explicit operator uint32_t() const { return (uint32_t) id; }
 
 	private:
 		Index32 id;
