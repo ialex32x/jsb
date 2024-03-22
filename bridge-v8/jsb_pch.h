@@ -9,6 +9,10 @@
 
 #include <cstdint>
 
+#include "core/math/vector2.h"
+#include "core/math/vector3.h"
+#include "core/math/vector4.h"
+
 #include "../internal/jsb_macros.h"
 #include "../internal/jsb_function_pointer.h"
 

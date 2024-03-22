@@ -151,6 +151,7 @@ namespace jsb
             {
                 *r_class_id = class_id;
             }
+            JSB_LOG(Verbose, "new class %s (%d)", p_class_name, (uint32_t) class_id);
             return class_info;
         }
 
