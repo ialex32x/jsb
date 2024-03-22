@@ -11,6 +11,23 @@
 
 namespace jsb
 {
+    template<typename T>
+    jsb_force_inline int32_t jsb_downscale(int64_t p_val, const T& p_msg)
+    {
+#if DEV_ENABLED
+        if (p_val != (int64_t) (int32_t) p_val) JSB_LOG(Warning, "inconsistent int64_t conversion: %s", p_msg);
+#endif
+        return (int32_t) p_val;
+    }
+
+    jsb_force_inline int32_t jsb_downscale(int64_t p_val)
+    {
+#if DEV_ENABLED
+        if (p_val != (int64_t) (int32_t) p_val) JSB_LOG(Warning, "inconsistent int64_t conversion");
+#endif
+        return (int32_t) p_val;
+    }
+
     namespace InternalTimerType { enum Type : uint8_t { Interval, Timeout, Immediate, }; }
 
     void JavaScriptContext::_print(const v8::FunctionCallbackInfo<v8::Value>& info)
@@ -581,7 +598,7 @@ namespace jsb
                 const CharString constant_name = ((String) pair.key).utf8(); // utf-8 for better compatibilities
                 v8::Local<v8::String> prop_key = v8::String::NewFromUtf8(isolate, constant_name.ptr(), v8::NewStringType::kNormal, constant_name.length()).ToLocalChecked();
 
-                function_template->Set(prop_key, v8::Int32::New(isolate, jsb_downscalef(constant_value, pair.key)));
+                function_template->Set(prop_key, v8::Int32::New(isolate, jsb_downscale(constant_value, pair.key)));
             }
 
             //TODO expose all available fields/properties etc.

@@ -132,7 +132,7 @@ namespace jsb
             return false;
         }
 
-        jmodule->Set(context, v8::String::NewFromUtf8Literal(isolate, "filename"), jfilename);
+        jmodule->Set(context, v8::String::NewFromUtf8Literal(isolate, "filename"), jfilename).Check();
         return true;
     }
 

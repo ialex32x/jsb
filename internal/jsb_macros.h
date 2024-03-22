@@ -11,8 +11,12 @@
 #include "core/os/thread.h"
 #include "core/os/os.h"
 
+#ifndef JSB_MIN_LOG_LEVEL
+#   define JSB_MIN_LOG_LEVEL Verbose
+#endif
+
 #if DEV_ENABLED
-#   define JSB_LOG(Severity, Format, ...) print_line(vformat("[%s] " Format, ((void) sizeof(jsb::internal::ELogSeverity::Severity), #Severity), ##__VA_ARGS__))
+#   define JSB_LOG(Severity, Format, ...) if constexpr (jsb::internal::ELogSeverity::Severity >= jsb::internal::ELogSeverity::JSB_MIN_LOG_LEVEL) print_line(vformat("[%s] " Format, ((void) sizeof(jsb::internal::ELogSeverity::Severity), #Severity), ##__VA_ARGS__))
 #   define jsb_check(Condition) CRASH_COND(!(Condition))
 #   define jsb_checkf(Condition, Message) CRASH_COND_MSG(!(Condition), (Message))
 #   define jsb_ensure(Condition) CRASH_COND(!(Condition))
@@ -26,9 +30,6 @@
 #define jsb_typename(TypeName) ((void) sizeof(TypeName), #TypeName)
 #define jsb_nameof(TypeName, MemberName) ((void) sizeof(TypeName::MemberName), #MemberName)
 #define jsb_methodbind(TypeName, MemberName) &TypeName::MemberName, #MemberName
-
-#define jsb_downscale(v64) ::jsb::internal::downscale(v64)
-#define jsb_downscalef(v64, v_msg) ::jsb::internal::downscale(v64, v_msg)
 
 #define JSB_CONSOLE(Severity, Message) print_line(Severity, Message)
 
@@ -54,7 +55,7 @@ namespace jsb::internal
 {
     namespace ELogSeverity
     {
-        enum Type
+        enum Type : uint8_t
         {
 #pragma push_macro("DEF")
 #   undef   DEF
@@ -62,23 +63,6 @@ namespace jsb::internal
 #   include "jsb_log_severity.h"
 #pragma pop_macro("DEF")
         };
-    }
-
-    template<typename T>
-    jsb_force_inline int32_t downscale(int64_t p_val, const T& p_msg)
-    {
-#if DEV_ENABLED
-        if (p_val != (int64_t) (int32_t) p_val) JSB_LOG(Warning, "inconsistent int64_t conversion: %s", p_msg);
-#endif
-        return (int32_t) p_val;
-    }
-
-    jsb_force_inline int32_t downscale(int64_t p_val)
-    {
-#if DEV_ENABLED
-        if (p_val != (int64_t) (int32_t) p_val) JSB_LOG(Warning, "inconsistent int64_t conversion");
-#endif
-        return (int32_t) p_val;
     }
 }
 

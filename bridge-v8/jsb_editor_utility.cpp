@@ -43,7 +43,7 @@ namespace jsb
         template<int N>
         void set_field(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& obj, const char (&field_name)[N], const v8::Local<v8::Value>& field_value)
         {
-            obj->Set(context, v8::String::NewFromUtf8Literal(isolate, field_name), field_value);
+            obj->Set(context, v8::String::NewFromUtf8Literal(isolate, field_name), field_value).Check();
         }
 
         template<int N>

@@ -31,6 +31,7 @@ javascript_shared_defines = [
     # `devtools` do not response the upgrade request with a `sec-websocket-protocol` header which does not apply the handshake requirements of `WSLPeer`
     # and the connection will break immediately by `devtools` if `selected_protocol` is assigned manually in `WSLPeer`
     "JSB_WITH_LWS=1",
+    "JSB_MIN_LOG_LEVEL=Verbose",
 ]
 
 env_jsb = env_modules.Clone()

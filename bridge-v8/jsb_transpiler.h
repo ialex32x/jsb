@@ -424,7 +424,7 @@ namespace jsb
             Variant* self = (Variant*) pointer;
             if (!p_persistent)
             {
-                JSB_LOG(Verbose, "deleting object %d", (uintptr_t) self);
+                JSB_LOG(Verbose, "deleting object %s", itos((uintptr_t) self));
                 memdelete(self);
             }
         }
@@ -468,7 +468,7 @@ namespace jsb
                 {
                     if (!p_persistent)
                     {
-                        JSB_LOG(Verbose, "deleting gd ref_counted object %d", (uintptr_t) self);
+                        JSB_LOG(Verbose, "deleting gd ref_counted object %s", itos((uintptr_t) self));
                         memdelete(self);
                     }
                 }
@@ -478,7 +478,7 @@ namespace jsb
                 //TODO only delete when the object's lifecycle is fully managed by javascript
                 if (!p_persistent)
                 {
-                    JSB_LOG(Verbose, "deleting gd object %d", (uintptr_t) self);
+                    JSB_LOG(Verbose, "deleting gd object %s", itos((uintptr_t) self));
                     memdelete(self);
                 }
             }
