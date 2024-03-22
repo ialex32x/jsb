@@ -19,13 +19,15 @@ namespace jsb
         if (!once_inited_)
         {
             once_inited_ = true;
-            constexpr const char* xxx = __FILE__;
             runtime_->add_module_resolver<jsb::DefaultModuleResolver>()
                 .add_search_path("res://")
                 // search path for editor only scripts
                 .add_search_path(jsb::internal::PathUtil::combine(
                     jsb::internal::PathUtil::dirname(::OS::get_singleton()->get_executable_path()),
                     "../modules/jsb/scripts/out"));
+
+            //TODO experimental codes about handling native class binding
+            context_->expose_temp();
 
             // editor entry script
             context_->load("main_entry");

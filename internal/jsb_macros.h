@@ -25,7 +25,7 @@
 
 #define jsb_typename(TypeName) ((void) sizeof(TypeName), #TypeName)
 #define jsb_nameof(TypeName, MemberName) ((void) sizeof(TypeName::MemberName), #MemberName)
-#define jsb_addrname(TypeName, MemberName) &TypeName::MemberName, #MemberName
+#define jsb_methodbind(TypeName, MemberName) &TypeName::MemberName, #MemberName
 
 #define jsb_downscale(v64) ::jsb::internal::downscale(v64)
 #define jsb_downscalef(v64, v_msg) ::jsb::internal::downscale(v64, v_msg)

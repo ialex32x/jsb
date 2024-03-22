@@ -424,6 +424,14 @@ namespace jsb
         }
     };
 
+    //TODO stub functions for accessing fields of classes
+    jsb_force_inline static real_t Vector3_x_getter(Vector3* self) { return self->x; }
+    jsb_force_inline static void Vector3_x_setter(Vector3* self, real_t x) { self->x = x; }
+    jsb_force_inline static real_t Vector3_y_getter(Vector3* self) { return self->y; }
+    jsb_force_inline static void Vector3_y_setter(Vector3* self, real_t y) { self->y = y; }
+    jsb_force_inline static real_t Vector3_z_getter(Vector3* self) { return self->z; }
+    jsb_force_inline static void Vector3_z_setter(Vector3* self, real_t z) { self->z = z; }
+
     void JavaScriptContext::expose_temp()
     {
         v8::Isolate* isolate = get_isolate();
@@ -435,18 +443,21 @@ namespace jsb
         internal::Index32 class_id;
         const StringName class_name = jsb_typename(Vector3);
         JavaScriptClassInfo& class_info = runtime_->add_class(JavaScriptClassType::None, class_name, &class_id);
-        class_info.finalizer = &ClassTemplate<Variant>::finalizer;
+        runtime_->godot_primitives_index_[Variant::VECTOR3] = class_id;
 
-        v8::Local<v8::FunctionTemplate> function_template = ClassTemplate<Variant>::create(isolate, class_id, class_info);
+        v8::Local<v8::FunctionTemplate> function_template = VariantClassTemplate<Vector3>::create<real_t, real_t, real_t>(isolate, class_id, class_info);
         v8::Local<v8::ObjectTemplate> prototype_template = function_template->PrototypeTemplate();
 
         // methods
-        bind::with(isolate, prototype_template, function_pointers_, jsb_addrname(Vector3, dot));
-        // bind::with(isolate, prototype_template, function_pointers_, jsb_addrname(Vector3, octahedron_decode));
+        bind::method(isolate, prototype_template, function_pointers_, jsb_methodbind(Vector3, dot));
+        bind::method(isolate, prototype_template, function_pointers_, jsb_methodbind(Vector3, move_toward));
+        bind::property(isolate, prototype_template, function_pointers_, Vector3_x_getter, Vector3_x_setter, jsb_nameof(Vector3, x));
+        bind::property(isolate, prototype_template, function_pointers_, Vector3_y_getter, Vector3_y_setter, jsb_nameof(Vector3, y));
+        bind::property(isolate, prototype_template, function_pointers_, Vector3_z_getter, Vector3_z_setter, jsb_nameof(Vector3, z));
 
         // type
         global->Set(context,
-            v8::String::NewFromUtf8Literal(isolate, "Foo"),
+            v8::String::NewFromUtf8Literal(isolate, jsb_typename(Vector3)),
             function_template->GetFunction(context).ToLocalChecked()).Check();
     }
 
@@ -489,7 +500,6 @@ namespace jsb
             v8::Local<v8::Context> context = isolate->GetCurrentContext();
 
             jsb_check(context == context_.Get(isolate));
-            jclass_info.finalizer = &ClassTemplate<Object>::finalizer;
             v8::Local<v8::FunctionTemplate> function_template = ClassTemplate<Object>::create(isolate, class_id, jclass_info);
             v8::Local<v8::ObjectTemplate> object_template = function_template->PrototypeTemplate();
 
@@ -524,14 +534,10 @@ namespace jsb
 
             //TODO expose all available fields/properties etc.
 
-            // store `template` before setting `inherit`
-            jclass_info.template_.Reset(isolate, function_template);
-
             // setup the prototype chain (inherit)
             internal::Index32 super_id;
             if (const JavaScriptClassInfo* jsuper_class = _expose_godot_class(p_class_info->inherits_ptr, &super_id))
             {
-                jclass_info.super_ = super_id;
                 v8::Local<v8::FunctionTemplate> base_template = jsuper_class->template_.Get(isolate);
                 jsb_check(!base_template.IsEmpty());
                 function_template->Inherit(base_template);

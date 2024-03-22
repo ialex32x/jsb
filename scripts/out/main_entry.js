@@ -22,11 +22,11 @@ let times = 5;
 // NOTE: they return a timer_id which is an integer instead of Timeout object like in NodeJS
 timer_id = setInterval(function () {
     console.log("tick");
-    for (let i = 0; i < 50; ++i) {
-        const node = new godot_1.Node();
-        node.set_name(`test_node_${i}`);
-        console.log(node.get_name());
-    }
+    // for (let i = 0; i < 50; ++i) {
+    //     const node = new Node();
+    //     node.set_name(`test_node_${i}`);
+    //     console.log(node.get_name());
+    // }
     --times;
     if (times == 0) {
         clearInterval(timer_id);
@@ -72,4 +72,11 @@ if (jsb.TOOLS_ENABLED) {
     let tsd = new tsd_codegen_1.TSDCodeGen("./hello.txt");
     tsd.emit();
 }
+console.log("c++ binding test");
+console.log(typeof Vector3);
+const v1 = new Vector3(1, 1, 1);
+const v2 = new Vector3(2, 3, 4);
+console.log("dot", v2.dot(v1));
+const v3 = v1.move_toward(v2, 0.5);
+console.log(v3.x, v3.y, v3.z);
 //# sourceMappingURL=main_entry.js.map

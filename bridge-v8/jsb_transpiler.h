@@ -22,9 +22,31 @@
     {\
         v8::Local<v8::FunctionTemplate> template_ =  v8::FunctionTemplate::New(isolate, &constructor, v8::Uint32::NewFromUnsigned(isolate, class_id));\
         template_->InstanceTemplate()->SetInternalFieldCount(kObjectFieldCount);\
+        class_info.finalizer = &finalizer;\
+        class_info.template_.Reset(isolate, template_);\
         JSB_CLASS_BOILERPLATE_NAME(template_, class_info.name);\
         return template_;\
     }
+
+#define JSB_CLASS_BOILERPLATE_ARGS() \
+    template<typename...TArgs>\
+    jsb_force_inline static v8::Local<v8::FunctionTemplate> create(v8::Isolate* isolate, internal::Index32 class_id, JavaScriptClassInfo& class_info)\
+    {\
+        v8::Local<v8::FunctionTemplate> template_ =  v8::FunctionTemplate::New(isolate, &constructor<TArgs...>, v8::Uint32::NewFromUnsigned(isolate, class_id));\
+        template_->InstanceTemplate()->SetInternalFieldCount(kObjectFieldCount);\
+        class_info.finalizer = &finalizer;\
+        class_info.template_.Reset(isolate, template_);\
+        JSB_CLASS_BOILERPLATE_NAME(template_, class_info.name);\
+        return template_;\
+    }
+
+#define JSB_CONTEXT_BOILERPLATE() \
+    v8::Isolate* isolate = info.GetIsolate();\
+    v8::HandleScope handle_scope(isolate);\
+    v8::Isolate::Scope isolate_scope(isolate);\
+    v8::Local<v8::Context> context = isolate->GetCurrentContext();\
+    Functor& func = *(Functor*) JavaScriptContext::get_function(context, info.Data()->Uint32Value(context).ToChecked());\
+    (void) 0
 
 namespace jsb
 {
@@ -32,10 +54,37 @@ namespace jsb
 
     template<> struct PrimitiveAccess<Vector3>
     {
-        static Vector3* from(Variant* p_var) { return VariantInternal::get_vector3(p_var); }
-        static Vector3 from(const v8::Local<v8::Value>& p_val)
+        static Vector3 from(const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_val)
         {
-            return *from((Variant*) p_val.As<v8::Object>()->GetAlignedPointerFromInternalField(kObjectFieldPointer));
+            Variant* variant = (Variant*) p_val.As<v8::Object>()->GetAlignedPointerFromInternalField(kObjectFieldPointer);
+            return *VariantInternal::get_vector3(variant);
+        }
+
+        //TODO test
+        static bool return_(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::FunctionCallbackInfo<v8::Value>& info, Vector3 val)
+        {
+            JavaScriptRuntime* cruntime =JavaScriptRuntime::wrap(isolate);
+            const internal::Index32 class_id = cruntime->get_class_id(Variant::VECTOR3);
+            const JavaScriptClassInfo& class_info = cruntime->get_class(class_id);
+
+            v8::Local<v8::FunctionTemplate> jtemplate = class_info.template_.Get(isolate);
+            v8::Local<v8::Object> r_jval = jtemplate->InstanceTemplate()->NewInstance(context).ToLocalChecked();
+            jsb_check(r_jval.As<v8::Object>()->InternalFieldCount() == kObjectFieldCount);
+
+            Variant* p_cvar = memnew(Variant(val));
+            // the lifecycle will be managed by javascript runtime, DO NOT DELETE it externally
+            cruntime->bind_object(class_id, p_cvar, r_jval.As<v8::Object>(), false);
+            info.GetReturnValue().Set(r_jval);
+            return true;
+        }
+    };
+
+    template<> struct PrimitiveAccess<Vector3*>
+    {
+        static Vector3* from(const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_val)
+        {
+            Variant* variant = (Variant*) p_val.As<v8::Object>()->GetAlignedPointerFromInternalField(kObjectFieldPointer);
+            return VariantInternal::get_vector3(variant);
         }
     };
 
@@ -45,7 +94,15 @@ namespace jsb
 
     template<> struct PrimitiveAccess<real_t>
     {
-        static bool return_(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::FunctionCallbackInfo<v8::Value>& info, real_t val) { info.GetReturnValue().Set(val); return true; }
+        static real_t from(const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_val)
+        {
+            return (real_t) p_val->NumberValue(context).ToChecked();
+        }
+        static bool return_(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::FunctionCallbackInfo<v8::Value>& info, real_t val)
+        {
+            info.GetReturnValue().Set(val);
+            return true;
+        }
     };
 
     // call with return
@@ -56,16 +113,9 @@ namespace jsb
         static void method(const v8::FunctionCallbackInfo<v8::Value>& info)
         {
             typedef TReturn (TSelf::*Functor)();
+            JSB_CONTEXT_BOILERPLATE();
 
-            v8::Isolate* isolate = info.GetIsolate();
-            v8::HandleScope handle_scope(isolate);
-            v8::Isolate::Scope isolate_scope(isolate);
-            v8::Local<v8::Context> context = isolate->GetCurrentContext();
-            Functor& func = *(Functor*) JavaScriptContext::get_function(context, info.Data()->Uint32Value(context).ToChecked());
-            v8::Local<v8::Object> self = info.This();
-            void* pointer = self->GetAlignedPointerFromInternalField(kObjectFieldPointer);
-
-            TSelf* p_self = PrimitiveAccess<TSelf>::from((Variant*) pointer);
+            TSelf* p_self = PrimitiveAccess<TSelf*>::from(context, info.This());
             TReturn result = (p_self->*func)();
             if (!PrimitiveAccess<TReturn>::return_(isolate, context, info, result))
             {
@@ -73,22 +123,31 @@ namespace jsb
             }
         }
 
-        template<typename TSelf, typename P1>
+        template<typename TSelf, typename P0>
         static void method(const v8::FunctionCallbackInfo<v8::Value>& info)
         {
-            typedef TReturn (TSelf::*Functor)(P1);
+            typedef TReturn (TSelf::*Functor)(P0);
+            JSB_CONTEXT_BOILERPLATE();
 
-            v8::Isolate* isolate = info.GetIsolate();
-            v8::HandleScope handle_scope(isolate);
-            v8::Isolate::Scope isolate_scope(isolate);
-            v8::Local<v8::Context> context = isolate->GetCurrentContext();
-            Functor& func = *(Functor*) JavaScriptContext::get_function(context, info.Data()->Uint32Value(context).ToChecked());
-            v8::Local<v8::Object> self = info.This();
-            void* pointer = self->GetAlignedPointerFromInternalField(kObjectFieldPointer);
+            TSelf* p_self = PrimitiveAccess<TSelf*>::from(context, info.This());
+            P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
+            TReturn result = (p_self->*func)(p0);
+            if (!PrimitiveAccess<TReturn>::return_(isolate, context, info, result))
+            {
+                isolate->ThrowError("failed to translate return value");
+            }
+        }
 
-            TSelf* p_self = PrimitiveAccess<TSelf>::from((Variant*) pointer);
-            P1 p1 = PrimitiveAccess<P1>::from(info[0]);
-            TReturn result = (p_self->*func)(p1);
+        template<typename TSelf, typename P0, typename P1>
+        static void method(const v8::FunctionCallbackInfo<v8::Value>& info)
+        {
+            typedef TReturn (TSelf::*Functor)(P0, P1);
+            JSB_CONTEXT_BOILERPLATE();
+
+            TSelf* p_self = PrimitiveAccess<TSelf*>::from(context, info.This());
+            P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
+            P1 p1 = PrimitiveAccess<P1>::from(context, info[1]);
+            TReturn result = (p_self->*func)(p0, p1);
             if (!PrimitiveAccess<TReturn>::return_(isolate, context, info, result))
             {
                 isolate->ThrowError("failed to translate return value");
@@ -98,15 +157,40 @@ namespace jsb
         static void function(const v8::FunctionCallbackInfo<v8::Value>& info)
         {
             typedef TReturn (*Functor)();
-
-            v8::Isolate* isolate = info.GetIsolate();
-            v8::HandleScope handle_scope(isolate);
-            v8::Isolate::Scope isolate_scope(isolate);
-            v8::Local<v8::Context> context = isolate->GetCurrentContext();
-            Functor& func = *(Functor*) JavaScriptContext::get_function(context, info.Data()->Uint32Value(context).ToChecked());
+            JSB_CONTEXT_BOILERPLATE();
 
             TReturn result = (*func)();
-            //TODO push result
+            if (!PrimitiveAccess<TReturn>::return_(isolate, context, info, result))
+            {
+                isolate->ThrowError("failed to translate return value");
+            }
+        }
+
+        template<typename P0>
+        static void function(const v8::FunctionCallbackInfo<v8::Value>& info)
+        {
+            typedef TReturn (*Functor)(P0);
+            JSB_CONTEXT_BOILERPLATE();
+            P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
+            TReturn result = (*func)(p0);
+            if (!PrimitiveAccess<TReturn>::return_(isolate, context, info, result))
+            {
+                isolate->ThrowError("failed to translate return value");
+            }
+        }
+
+        template<typename TSelf>
+        static void getter(const v8::FunctionCallbackInfo<v8::Value>& info)
+        {
+            typedef TReturn (*Functor)(TSelf*);
+            JSB_CONTEXT_BOILERPLATE();
+
+            TSelf* p_self = PrimitiveAccess<TSelf*>::from(context, info.This());
+            TReturn result = (*func)(p_self);
+            if (!PrimitiveAccess<TReturn>::return_(isolate, context, info, result))
+            {
+                isolate->ThrowError("failed to translate return value");
+            }
         }
     };
 
@@ -114,6 +198,27 @@ namespace jsb
     template<>
     struct SpecializedReturn<void>
     {
+        template<typename TSelf, typename P0>
+        static void method(const v8::FunctionCallbackInfo<v8::Value>& info)
+        {
+            typedef void (TSelf::*Functor)(P0);
+            JSB_CONTEXT_BOILERPLATE();
+
+            TSelf* p_self = PrimitiveAccess<TSelf*>::from(context, info.This());
+            P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
+            (p_self->*func)(p0);
+        }
+
+        template<typename TSelf, typename P0>
+        static void setter(const v8::FunctionCallbackInfo<v8::Value>& info)
+        {
+            typedef void (*Functor)(TSelf*, P0);
+            JSB_CONTEXT_BOILERPLATE();
+
+            TSelf* p_self = PrimitiveAccess<TSelf*>::from(context, info.This());
+            P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
+            (*func)(p_self, p0);
+        }
 
     };
 
@@ -121,6 +226,7 @@ namespace jsb
     struct ClassTemplate
     {
         JSB_CLASS_BOILERPLATE()
+        JSB_CLASS_BOILERPLATE_ARGS()
 
         static void constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
         {
@@ -135,9 +241,83 @@ namespace jsb
             runtime->bind_object(class_id, ptr, self, false);
         }
 
+        template<typename P0, typename P1, typename P2>
+        static void constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
+        {
+            v8::Isolate* isolate = info.GetIsolate();
+            v8::HandleScope handle_scope(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            v8::Local<v8::Context> context = isolate->GetCurrentContext();
+            v8::Local<v8::Object> self = info.This();
+            internal::Index32 class_id(v8::Local<v8::Uint32>::Cast(info.Data())->Value());
+            if (info.Length() != 3)
+            {
+                isolate->ThrowError("bad args");
+                return;
+            }
+            P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
+            P1 p1 = PrimitiveAccess<P1>::from(context, info[1]);
+            P2 p2 = PrimitiveAccess<P2>::from(context, info[2]);
+            TSelf* ptr = memnew(TSelf(p0, p1, p2));
+            JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
+            runtime->bind_object(class_id, ptr, self, false);
+        }
+
         static void finalizer(JavaScriptRuntime* runtime, void* pointer, bool p_persistent)
         {
             TSelf* self = (TSelf*) pointer;
+            if (!p_persistent)
+            {
+                JSB_LOG(Verbose, "deleting object %d", (uintptr_t) self);
+                memdelete(self);
+            }
+        }
+    };
+
+    template<typename TSelf>
+    struct VariantClassTemplate
+    {
+        JSB_CLASS_BOILERPLATE()
+        JSB_CLASS_BOILERPLATE_ARGS()
+
+        static void constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
+        {
+            v8::Isolate* isolate = info.GetIsolate();
+            v8::HandleScope handle_scope(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            v8::Local<v8::Object> self = info.This();
+            internal::Index32 class_id(v8::Local<v8::Uint32>::Cast(info.Data())->Value());
+
+            Variant* ptr = memnew(Variant);
+            JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
+            runtime->bind_object(class_id, ptr, self, false);
+        }
+
+        template<typename P0, typename P1, typename P2>
+        static void constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
+        {
+            v8::Isolate* isolate = info.GetIsolate();
+            v8::HandleScope handle_scope(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            v8::Local<v8::Context> context = isolate->GetCurrentContext();
+            v8::Local<v8::Object> self = info.This();
+            internal::Index32 class_id(v8::Local<v8::Uint32>::Cast(info.Data())->Value());
+            if (info.Length() != 3)
+            {
+                isolate->ThrowError("bad args");
+                return;
+            }
+            P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
+            P1 p1 = PrimitiveAccess<P1>::from(context, info[1]);
+            P2 p2 = PrimitiveAccess<P2>::from(context, info[2]);
+            Variant* ptr = memnew(Variant(TSelf(p0, p1, p2)));
+            JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
+            runtime->bind_object(class_id, ptr, self, false);
+        }
+
+        static void finalizer(JavaScriptRuntime* runtime, void* pointer, bool p_persistent)
+        {
+            Variant* self = (Variant*) pointer;
             if (!p_persistent)
             {
                 JSB_LOG(Verbose, "deleting object %d", (uintptr_t) self);
@@ -204,13 +384,22 @@ namespace jsb
     namespace bind
     {
         template<typename TSelf, typename TReturn, size_t N>
-        static void with(v8::Isolate* isolate, const v8::Local<v8::ObjectTemplate>& prototype, internal::FunctionPointers& fp, TReturn (TSelf::*func)(), const char (&name)[N])
+        static void property(v8::Isolate* isolate, const v8::Local<v8::ObjectTemplate>& prototype, internal::FunctionPointers& fp, TReturn (*getter)(TSelf*), void (*setter)(TSelf*, TReturn), const char (&name)[N])
+        {
+            prototype->SetAccessorProperty(v8::String::NewFromUtf8Literal(isolate, name),
+                v8::FunctionTemplate::New(isolate, &SpecializedReturn<TReturn>::template getter<TSelf>, v8::Uint32::NewFromUnsigned(isolate, fp.add(getter))),
+                v8::FunctionTemplate::New(isolate, &SpecializedReturn<void>::template setter<TSelf, TReturn>, v8::Uint32::NewFromUnsigned(isolate, fp.add(setter)))
+                    );
+        }
+
+        template<typename TSelf, typename TReturn, size_t N>
+        static void method(v8::Isolate* isolate, const v8::Local<v8::ObjectTemplate>& prototype, internal::FunctionPointers& fp, TReturn (TSelf::*func)(), const char (&name)[N])
         {
             prototype->Set(v8::String::NewFromUtf8Literal(isolate, name), v8::FunctionTemplate::New(isolate, &SpecializedReturn<TReturn>::template method<TSelf>, v8::Uint32::NewFromUnsigned(isolate, fp.add(func))));
         }
 
         template<typename TSelf, typename TReturn, typename... TArgs, size_t N>
-        static void with(v8::Isolate* isolate, const v8::Local<v8::ObjectTemplate>& prototype, internal::FunctionPointers& fp, TReturn (TSelf::*func)(TArgs...) const, const char (&name)[N])
+        static void method(v8::Isolate* isolate, const v8::Local<v8::ObjectTemplate>& prototype, internal::FunctionPointers& fp, TReturn (TSelf::*func)(TArgs...) const, const char (&name)[N])
         {
             prototype->Set(v8::String::NewFromUtf8Literal(isolate, name), v8::FunctionTemplate::New(isolate, &SpecializedReturn<TReturn>::template method<TSelf, TArgs...>, v8::Uint32::NewFromUnsigned(isolate, fp.add(func))));
         }

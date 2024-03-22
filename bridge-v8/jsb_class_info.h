@@ -19,9 +19,6 @@ namespace jsb
 
     struct JavaScriptClassInfo
     {
-        //TODO RESERVED FOR FUTURE USE
-        internal::Index32 super_;
-
         // the func to release the exposed C++ (godot/variant/native) object
         // it's called when a JS value with this class type garbage collected by JS runtime
         FinalizerFunc finalizer;

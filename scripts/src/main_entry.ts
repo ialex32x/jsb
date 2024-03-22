@@ -17,11 +17,11 @@ let times = 5;
 timer_id = setInterval(function () {
     console.log("tick");
 
-    for (let i = 0; i < 50; ++i) {
-        const node = new Node();
-        node.set_name(`test_node_${i}`);
-        console.log(node.get_name());
-    }
+    // for (let i = 0; i < 50; ++i) {
+    //     const node = new Node();
+    //     node.set_name(`test_node_${i}`);
+    //     console.log(node.get_name());
+    // }
 
     --times;
     if (times == 0) {
@@ -71,3 +71,12 @@ if (jsb.TOOLS_ENABLED) {
     let tsd = new TSDCodeGen("./hello.txt");
     tsd.emit();
 }
+
+console.log("c++ binding test");
+console.log(typeof Vector3);
+const v1 = new Vector3(1, 1, 1);
+const v2 = new Vector3(2, 3, 4);
+console.log("dot", v2.dot(v1));
+
+const v3 = v1.move_toward(v2, 0.5)
+console.log(v3.x, v3.y, v3.z)

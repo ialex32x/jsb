@@ -157,6 +157,9 @@ namespace jsb
         jsb_force_inline JavaScriptClassInfo& get_class(internal::Index32 p_class_id) { return classes_.get_value(p_class_id); }
         jsb_force_inline const JavaScriptClassInfo& get_class(internal::Index32 p_class_id) const { return classes_.get_value(p_class_id); }
 
+        // [EXPERIMENTAL] get class id of primitive type (all of them are actually based on godot Variant)
+        jsb_force_inline internal::Index32 get_class_id(Variant::Type p_type) const { return godot_primitives_index_[p_type]; }
+
     private:
         void on_context_created(const v8::Local<v8::Context>& p_context);
         void on_context_destroyed(const v8::Local<v8::Context>& p_context);
@@ -186,7 +189,9 @@ namespace jsb
         // indirect lookup
         // only godot object classes are mapped
         HashMap<StringName, internal::Index32> godot_classes_index_;
-        // internal::Index32 godot_primitives_index_[Variant::VARIANT_MAX];
+
+        //TODO
+        internal::Index32 godot_primitives_index_[Variant::VARIANT_MAX] = {};
 
         internal::SArray<JavaScriptClassInfo, internal::Index32> classes_;
 
