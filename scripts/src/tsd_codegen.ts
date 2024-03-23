@@ -18,9 +18,6 @@ class IndentWriter implements CodeWriter {
     }
 }
 
-export class DeleteMe { };
-export const deleteMe = 1;
-
 // d.ts generator
 export default class TSDCodeGen implements CodeWriter {
     // private _filePath: string;

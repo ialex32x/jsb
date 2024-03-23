@@ -475,7 +475,7 @@ namespace jsb
         {
             internal::Index32 class_id;
             const StringName class_name = jsb_typename(Vector2);
-            JavaScriptClassInfo& class_info = runtime_->add_class(JavaScriptClassType::GodotPrimitive, class_name, &class_id);
+            NativeClassInfo& class_info = runtime_->add_class(NativeClassInfo::GodotPrimitive, class_name, &class_id);
             runtime_->godot_primitives_index_[Variant::VECTOR2] = class_id;
 
             v8::Local<v8::FunctionTemplate> function_template = VariantClassTemplate<Vector2>::create<real_t, real_t>(isolate, class_id, class_info);
@@ -493,7 +493,7 @@ namespace jsb
         {
             internal::Index32 class_id;
             const StringName class_name = jsb_typename(Vector3);
-            JavaScriptClassInfo& class_info = runtime_->add_class(JavaScriptClassType::GodotPrimitive, class_name, &class_id);
+            NativeClassInfo& class_info = runtime_->add_class(NativeClassInfo::GodotPrimitive, class_name, &class_id);
             runtime_->godot_primitives_index_[Variant::VECTOR3] = class_id;
 
             v8::Local<v8::FunctionTemplate> function_template = VariantClassTemplate<Vector3>::create<real_t, real_t, real_t>(isolate, class_id, class_info);
@@ -513,7 +513,7 @@ namespace jsb
         {
             internal::Index32 class_id;
             const StringName class_name = jsb_typename(Vector4);
-            JavaScriptClassInfo& class_info = runtime_->add_class(JavaScriptClassType::GodotPrimitive, class_name, &class_id);
+            NativeClassInfo& class_info = runtime_->add_class(NativeClassInfo::GodotPrimitive, class_name, &class_id);
             runtime_->godot_primitives_index_[Variant::VECTOR4] = class_id;
 
             v8::Local<v8::FunctionTemplate> function_template = VariantClassTemplate<Vector4>::create<real_t, real_t, real_t, real_t>(isolate, class_id, class_info);
@@ -531,7 +531,7 @@ namespace jsb
         }
     }
 
-    JavaScriptClassInfo* JavaScriptContext::_expose_godot_variant(internal::Index32* r_class_id)
+    NativeClassInfo* JavaScriptContext::_expose_godot_variant(internal::Index32* r_class_id)
     {
         //TODO uncertain
         // add_class(None);
@@ -539,7 +539,7 @@ namespace jsb
         return nullptr;
     }
 
-    JavaScriptClassInfo* JavaScriptContext::_expose_godot_class(const ClassDB::ClassInfo* p_class_info, internal::Index32* r_class_id)
+    NativeClassInfo* JavaScriptContext::_expose_godot_class(const ClassDB::ClassInfo* p_class_info, internal::Index32* r_class_id)
     {
         if (!p_class_info)
         {
@@ -561,7 +561,7 @@ namespace jsb
         }
 
         internal::Index32 class_id;
-        JavaScriptClassInfo& jclass_info = runtime_->add_class(JavaScriptClassType::GodotObject, p_class_info->name, &class_id);
+        NativeClassInfo& jclass_info = runtime_->add_class(NativeClassInfo::GodotObject, p_class_info->name, &class_id);
         JSB_LOG(Verbose, "expose godot type %s (%d)", p_class_info->name, (uint32_t) class_id);
 
         // construct type template
@@ -606,7 +606,7 @@ namespace jsb
 
             // setup the prototype chain (inherit)
             internal::Index32 super_id;
-            if (const JavaScriptClassInfo* jsuper_class = _expose_godot_class(p_class_info->inherits_ptr, &super_id))
+            if (const NativeClassInfo* jsuper_class = _expose_godot_class(p_class_info->inherits_ptr, &super_id))
             {
                 v8::Local<v8::FunctionTemplate> base_template = jsuper_class->template_.Get(isolate);
                 jsb_check(!base_template.IsEmpty());
@@ -699,10 +699,10 @@ namespace jsb
                         //TODO check the class to make it safe to cast (space cheaper?)
                         //TODO or, add one more InternalField to ensure it (time cheaper?)
                         void* pointer = jobj->GetAlignedPointerFromInternalField(isolate, kObjectFieldPointer);
-                        JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
-                        if (const JavaScriptClassInfo* class_info = cruntime->get_object_class(pointer))
+                        const JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
+                        if (const NativeClassInfo* class_info = cruntime->get_object_class(pointer))
                         {
-                            if (class_info->type == JavaScriptClassType::GodotPrimitive)
+                            if (class_info->type == NativeClassInfo::GodotPrimitive)
                             {
                                 r_cvar = *(Variant*) pointer;
                             }
@@ -732,7 +732,7 @@ namespace jsb
         const StringName& class_name = p_cvar->get_class_name();
         JavaScriptContext* ccontext = JavaScriptContext::wrap(context);
         internal::Index32 jclass_id;
-        if (JavaScriptClassInfo* jclass = ccontext->_expose_godot_class(class_name, &jclass_id))
+        if (const NativeClassInfo* jclass = ccontext->_expose_godot_class(class_name, &jclass_id))
         {
             v8::Local<v8::FunctionTemplate> jtemplate = jclass->template_.Get(isolate);
             r_jval = jtemplate->InstanceTemplate()->NewInstance(context).ToLocalChecked();
@@ -835,9 +835,9 @@ namespace jsb
             {
                 //TODO TEMP SOLUTION
                 JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
-                if (internal::Index32 class_id = cruntime->get_class_id(var_type))
+                if (const internal::Index32 class_id = cruntime->get_class_id(var_type))
                 {
-                    JavaScriptClassInfo& class_info = cruntime->get_class(class_id);
+                    const NativeClassInfo& class_info = cruntime->get_class(class_id);
                     v8::Local<v8::FunctionTemplate> jtemplate = class_info.template_.Get(isolate);
                     r_jval = jtemplate->InstanceTemplate()->NewInstance(context).ToLocalChecked();
                     jsb_check(r_jval.As<v8::Object>()->InternalFieldCount() == kObjectFieldCount);
@@ -1035,7 +1035,7 @@ namespace jsb
         HashMap<StringName, ClassDB::ClassInfo>::Iterator it = ClassDB::classes.find(type_name);
         if (it != ClassDB::classes.end())
         {
-            if (JavaScriptClassInfo* godot_class = ccontext->_expose_godot_class(&it->value))
+            if (NativeClassInfo* godot_class = ccontext->_expose_godot_class(&it->value))
             {
                 info.GetReturnValue().Set(godot_class->template_.Get(isolate)->GetFunction(context).ToLocalChecked());
                 return;

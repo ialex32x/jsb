@@ -19,12 +19,12 @@ namespace jsb
             function_.Reset();
         }
 
-        jsb_force_inline JavaScriptFunction(JavaScriptFunction&& p_other) = default;
+        jsb_force_inline JavaScriptFunction(JavaScriptFunction&& p_other) noexcept = default;
         jsb_force_inline JavaScriptFunction& operator=(JavaScriptFunction&& p_other) = default;
 
         jsb_force_inline bool operator!() const { return function_.IsEmpty(); }
 
-        jsb_force_inline void get_function(v8::Isolate* isolate, v8::Local<v8::Function>& r_func)
+        jsb_force_inline void get_function(v8::Isolate* isolate, v8::Local<v8::Function>& r_func) const
         {
             r_func = function_.Get(isolate);
         }

@@ -1,7 +1,8 @@
 
 // godot types will be exposed to JS runtime until they are actually used
 import { Node, Engine } from "godot";
-import TSDCodeGen, { DeleteMe } from "./tsd_codegen";
+import TSDCodeGen from "./tsd_codegen";
+import { DeleteMe } from "./scratchpad";
 
 // entry point (editor only)
 

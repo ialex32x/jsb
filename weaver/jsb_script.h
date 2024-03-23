@@ -3,6 +3,7 @@
 
 #include "core/object/script_language.h"
 #include "jsb_weaver_consts.h"
+#include "modules/jsb/bridge-v8/jsb_class_info.h"
 
 class JavaScript : public Script
 {
@@ -18,6 +19,9 @@ private:
     String source_;
     String path_;
     JavaScript* base_ = nullptr;
+
+    //TODO generate class_info with internal js module object
+    jsb::JavaScriptClassInfo class_info_;
 
 public:
 #pragma region Script Implementation

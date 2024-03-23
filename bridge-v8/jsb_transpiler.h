@@ -18,7 +18,7 @@
 #endif
 
 #define JSB_CLASS_BOILERPLATE() \
-    jsb_force_inline static v8::Local<v8::FunctionTemplate> create(v8::Isolate* isolate, internal::Index32 class_id, JavaScriptClassInfo& class_info)\
+    jsb_force_inline static v8::Local<v8::FunctionTemplate> create(v8::Isolate* isolate, internal::Index32 class_id, NativeClassInfo& class_info)\
     {\
         v8::Local<v8::FunctionTemplate> template_ =  v8::FunctionTemplate::New(isolate, &constructor, v8::Uint32::NewFromUnsigned(isolate, class_id));\
         template_->InstanceTemplate()->SetInternalFieldCount(kObjectFieldCount);\
@@ -30,7 +30,7 @@
 
 #define JSB_CLASS_BOILERPLATE_ARGS() \
     template<typename...TArgs>\
-    jsb_force_inline static v8::Local<v8::FunctionTemplate> create(v8::Isolate* isolate, internal::Index32 class_id, JavaScriptClassInfo& class_info)\
+    jsb_force_inline static v8::Local<v8::FunctionTemplate> create(v8::Isolate* isolate, internal::Index32 class_id, NativeClassInfo& class_info)\
     {\
         v8::Local<v8::FunctionTemplate> template_ =  v8::FunctionTemplate::New(isolate, &constructor<TArgs...>, v8::Uint32::NewFromUnsigned(isolate, class_id));\
         template_->InstanceTemplate()->SetInternalFieldCount(kObjectFieldCount);\
@@ -97,7 +97,7 @@ namespace jsb
         {
             JavaScriptRuntime* cruntime =JavaScriptRuntime::wrap(isolate);
             const internal::Index32 class_id = cruntime->get_class_id(VariantCaster<T>::Type);
-            const JavaScriptClassInfo& class_info = cruntime->get_class(class_id);
+            const NativeClassInfo& class_info = cruntime->get_class(class_id);
 
             v8::Local<v8::FunctionTemplate> jtemplate = class_info.template_.Get(isolate);
             v8::Local<v8::Object> r_jval = jtemplate->InstanceTemplate()->NewInstance(context).ToLocalChecked();
@@ -444,8 +444,8 @@ namespace jsb
             const internal::Index32 class_id(v8::Local<v8::Uint32>::Cast(info.Data())->Value());
 
             JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
-            const JavaScriptClassInfo& jclass_info = cruntime->get_class(class_id);
-            jsb_check(jclass_info.type == JavaScriptClassType::GodotObject);
+            const NativeClassInfo& jclass_info = cruntime->get_class(class_id);
+            jsb_check(jclass_info.type == NativeClassInfo::GodotObject);
             const HashMap<StringName, ClassDB::ClassInfo>::Iterator it = ClassDB::classes.find(jclass_info.name);
             jsb_check(it != ClassDB::classes.end());
             const ClassDB::ClassInfo& gd_class_info = it->value;

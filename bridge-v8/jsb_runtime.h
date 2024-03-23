@@ -75,7 +75,7 @@ namespace jsb
             return false;
         }
 
-        jsb_force_inline const JavaScriptClassInfo* get_object_class(void* p_pointer) const
+        jsb_force_inline const NativeClassInfo* get_object_class(void* p_pointer) const
         {
             const HashMap<void*, internal::Index64>::ConstIterator& it = objects_index_.find(p_pointer);
             if (it == objects_index_.end())
@@ -136,13 +136,13 @@ namespace jsb
          * \param r_class_id
          * \return
          */
-        JavaScriptClassInfo& add_class(JavaScriptClassType::Type p_type, const StringName& p_class_name, internal::Index32* r_class_id = nullptr)
+        NativeClassInfo& add_class(NativeClassInfo::Type p_type, const StringName& p_class_name, internal::Index32* r_class_id = nullptr)
         {
-            const internal::Index32 class_id = classes_.append(JavaScriptClassInfo());
-            JavaScriptClassInfo& class_info = classes_.get_value(class_id);
+            const internal::Index32 class_id = classes_.append(NativeClassInfo());
+            NativeClassInfo& class_info = classes_.get_value(class_id);
             class_info.type = p_type;
             class_info.name = p_class_name;
-            if (p_type == JavaScriptClassType::GodotObject)
+            if (p_type == NativeClassInfo::GodotObject)
             {
                 jsb_check(!godot_classes_index_.has(p_class_name));
                 godot_classes_index_.insert(p_class_name, class_id);
@@ -155,8 +155,8 @@ namespace jsb
             return class_info;
         }
 
-        jsb_force_inline JavaScriptClassInfo& get_class(internal::Index32 p_class_id) { return classes_.get_value(p_class_id); }
-        jsb_force_inline const JavaScriptClassInfo& get_class(internal::Index32 p_class_id) const { return classes_.get_value(p_class_id); }
+        jsb_force_inline NativeClassInfo& get_class(internal::Index32 p_class_id) { return classes_.get_value(p_class_id); }
+        jsb_force_inline const NativeClassInfo& get_class(internal::Index32 p_class_id) const { return classes_.get_value(p_class_id); }
 
         // [EXPERIMENTAL] get class id of primitive type (all of them are actually based on godot Variant)
         jsb_force_inline internal::Index32 get_class_id(Variant::Type p_type) const { return godot_primitives_index_[p_type]; }
@@ -194,7 +194,7 @@ namespace jsb
         //TODO
         internal::Index32 godot_primitives_index_[Variant::VARIANT_MAX] = {};
 
-        internal::SArray<JavaScriptClassInfo, internal::Index32> classes_;
+        internal::SArray<NativeClassInfo, internal::Index32> classes_;
 
         // cpp objects should be added here since the gc callback is not guaranteed by v8
         // we need to delete them on finally releasing JavaScriptRuntime

@@ -193,14 +193,14 @@ namespace jsb
             pair.value = nullptr;
         }
 
-        // cleanup weak callbacks not invoked by v8
+        // cleanup weak callbacks not invoked by v8 
         while (!objects_.is_empty())
         {
             const internal::Index64 first_index = objects_.get_first_index();
             ObjectHandle& handle = objects_.get_value(first_index);
             const bool is_persistent = persistent_objects_.has(handle.pointer);
 
-            JavaScriptClassInfo& class_info = classes_.get_value(handle.class_id);
+            const NativeClassInfo& class_info = classes_.get_value(handle.class_id);
             class_info.finalizer(this, handle.pointer, is_persistent);
             handle.ref_.Reset();
             objects_index_.erase(handle.pointer);
@@ -212,7 +212,7 @@ namespace jsb
         while (!classes_.is_empty())
         {
             const internal::Index32 first_index = classes_.get_first_index();
-            JavaScriptClassInfo& class_info = classes_.get_value(first_index);
+            NativeClassInfo& class_info = classes_.get_value(first_index);
             class_info.template_.Reset();
             classes_.remove_at(first_index);
         }
@@ -352,7 +352,7 @@ namespace jsb
 
         if (p_free)
         {
-            const JavaScriptClassInfo& class_info = classes_.get_value(object_handle.class_id);
+            const NativeClassInfo& class_info = classes_.get_value(object_handle.class_id);
             class_info.finalizer(this, p_pointer, is_persistent);
         }
         object_handle.ref_.Reset();

@@ -73,13 +73,13 @@ namespace jsb
         // JS function (type_name: string): type
         static void _load_type(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void _require(const v8::FunctionCallbackInfo<v8::Value>& info);
-        JavaScriptClassInfo* _expose_godot_class(const ClassDB::ClassInfo* p_class_info, internal::Index32* r_class_id = nullptr);
-        JavaScriptClassInfo* _expose_godot_class(const StringName& p_class_name, internal::Index32* r_class_id = nullptr)
+        NativeClassInfo* _expose_godot_class(const ClassDB::ClassInfo* p_class_info, internal::Index32* r_class_id = nullptr);
+        NativeClassInfo* _expose_godot_class(const StringName& p_class_name, internal::Index32* r_class_id = nullptr)
         {
             const HashMap<StringName, ClassDB::ClassInfo>::ConstIterator& it = ClassDB::classes.find(p_class_name);
             return it != ClassDB::classes.end() ? _expose_godot_class(&it->value, r_class_id) : nullptr;
         }
-        JavaScriptClassInfo* _expose_godot_variant(internal::Index32* r_class_id);
+        NativeClassInfo* _expose_godot_variant(internal::Index32* r_class_id);
 
     private:
         static void _print(const v8::FunctionCallbackInfo<v8::Value>& info);

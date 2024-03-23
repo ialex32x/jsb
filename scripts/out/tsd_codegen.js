@@ -1,6 +1,5 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteMe = exports.DeleteMe = void 0;
 const godot_1 = require("godot");
 class IndentWriter {
     constructor(base) {
@@ -11,11 +10,6 @@ class IndentWriter {
         return this;
     }
 }
-class DeleteMe {
-}
-exports.DeleteMe = DeleteMe;
-;
-exports.deleteMe = 1;
 // d.ts generator
 class TSDCodeGen {
     constructor(filePath) {
