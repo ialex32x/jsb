@@ -155,6 +155,7 @@ namespace jsb
             return class_info;
         }
 
+        // [unsafe]
         jsb_force_inline NativeClassInfo& get_class(internal::Index32 p_class_id) { return classes_.get_value(p_class_id); }
         jsb_force_inline const NativeClassInfo& get_class(internal::Index32 p_class_id) const { return classes_.get_value(p_class_id); }
 

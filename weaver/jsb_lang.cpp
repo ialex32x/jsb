@@ -38,6 +38,9 @@ void JavaScriptLanguage::init()
 
         // editor entry script
         context_->load("main_entry");
+
+        jsb::JavaScriptClassInfo class_info;
+        context_->dump("scratchpad", class_info);
     }
     JSB_LOG(Verbose, "jsb lang init");
 }

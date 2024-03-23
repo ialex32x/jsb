@@ -37,6 +37,8 @@ namespace jsb
             return context_ == p_context;
         }
 
+        Error dump(const String& p_module_id, JavaScriptClassInfo& r_class_info);
+
         //TODO temp code
         jsb_deleteme
         void expose_temp();
@@ -100,6 +102,9 @@ namespace jsb
         internal::FunctionPointers function_pointers_;
         JavaScriptModuleCache module_cache_;
         v8::Global<v8::Object> jmodule_cache_;
+
+        // symbol for class_id on FunctionTemplate of native class
+        v8::Global<v8::Symbol> sym_class_id_;
 
         // main context
         v8::Global<v8::Context> context_;

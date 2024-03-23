@@ -228,6 +228,10 @@ namespace jsb
     {
         v8::Isolate* isolate = runtime_->isolate_;
 
+        {
+            sym_class_id_.Reset(isolate, v8::Symbol::New(isolate));
+        }
+
         // internal 'jsb'
         {
             v8::Local<v8::Object> jhost = v8::Object::New(isolate);
@@ -391,10 +395,9 @@ namespace jsb
         v8::Local<v8::Context> context = context_.Get(get_isolate());
 
         runtime_->on_context_destroyed(context);
-        {
-            context->SetAlignedPointerInEmbedderData(kContextEmbedderData, nullptr);
-        }
+        context->SetAlignedPointerInEmbedderData(kContextEmbedderData, nullptr);
 
+        sym_class_id_.Reset();
         jmodule_cache_.Reset();
         context_.Reset();
     }
@@ -463,6 +466,53 @@ namespace jsb
     jsb_force_inline static void Vector4_z_setter(Vector4* self, real_t z) { self->z = z; }
     jsb_force_inline static real_t Vector4_w_getter(Vector4* self) { return self->w; }
     jsb_force_inline static void Vector4_w_setter(Vector4* self, real_t w) { self->w = w; }
+
+    //TODO just a temp test, try to read javascript class info from module cache with the given module_id
+    //TODO `module_id` is not file path based for now, will it be better to directly use the path as `module_id`??
+    Error JavaScriptContext::dump(const String &p_module_id, JavaScriptClassInfo &r_class_info)
+    {
+        const JavaScriptModule* module = module_cache_.find(p_module_id);
+        if (!module)
+        {
+            return ERR_FILE_NOT_FOUND;
+        }
+
+        v8::Isolate* isolate = get_isolate();
+        v8::HandleScope handle_scope(isolate);
+        v8::Local<v8::Context> context = context_.Get(isolate);
+        v8::Local<v8::Object> exports = module->exports.Get(isolate);
+        v8::Local<v8::Value> default_val;
+        if (!exports->Get(context, v8::String::NewFromUtf8Literal(isolate, "default")).ToLocal(&default_val)
+            || !default_val->IsObject())
+        {
+            return ERR_CANT_RESOLVE;
+        }
+
+        //TODO
+        v8::Local<v8::Object> default_obj = default_val.As<v8::Object>();
+        v8::Local<v8::String> name_str = default_obj->Get(context, v8::String::NewFromUtf8Literal(isolate, "name")).ToLocalChecked().As<v8::String>();
+        v8::String::Utf8Value name(isolate, name_str);
+        String cname(*name, name.length());
+
+        r_class_info.name = cname;
+        v8::Local<v8::Value> class_id_val;
+        const v8::Local<v8::Symbol> class_id_symbol = sym_class_id_.Get(isolate);
+        if (!default_obj->Get(context, class_id_symbol).ToLocal(&class_id_val) || !class_id_val->IsUint32())
+        {
+            // ignore a javascript which does not inherit from native class (directly and indirectly both)
+            return ERR_UNAUTHORIZED;
+        }
+
+        // unsafe
+        const NativeClassInfo& native_class_info = runtime_->get_class((internal::Index32) class_id_val->Uint32Value(context).ToChecked());
+
+        JSB_LOG(Verbose, "class name %s", cname);
+        JSB_LOG(Verbose, "native class? %s", native_class_info.name);
+        r_class_info.native = native_class_info.name;
+
+        //TODO collect methods/signals/properties
+        return OK;
+    }
 
     void JavaScriptContext::expose_temp()
     {
@@ -603,6 +653,11 @@ namespace jsb
             }
 
             //TODO expose all available fields/properties etc.
+
+            // set `class_id` on the exposed godot class for the convenience when finding it from any subclasses in javascript.
+            // currently used in `dump(in module_id, out class_info)`
+            const v8::Local<v8::Symbol> class_id_symbol = sym_class_id_.Get(isolate);
+            function_template->Set(class_id_symbol, v8::Uint32::NewFromUnsigned(isolate, class_id));
 
             // setup the prototype chain (inherit)
             internal::Index32 super_id;
@@ -1078,7 +1133,7 @@ namespace jsb
 
     bool JavaScriptContext::_get_main_module(v8::Local<v8::Object>* r_main_module) const
     {
-        if (JavaScriptModule* cmain_module = module_cache_.get_main())
+        if (const JavaScriptModule* cmain_module = module_cache_.get_main())
         {
             if (r_main_module)
             {

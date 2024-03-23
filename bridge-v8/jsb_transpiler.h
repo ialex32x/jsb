@@ -8,10 +8,10 @@
 
 #if DEV_ENABLED
 #   define JSB_CLASS_BOILERPLATE_NAME(TemplateName, ClassName) \
-    if ((const void *) ClassName) \
+    if ((const void *) (ClassName)) \
     {\
         const CharString cname = String(ClassName).utf8();\
-        TemplateName->SetClassName(v8::String:: NewFromUtf8(isolate, cname.ptr(), v8::NewStringType::kNormal, cname.length()).ToLocalChecked());\
+        (TemplateName)->SetClassName(v8::String:: NewFromUtf8(isolate, cname.ptr(), v8::NewStringType::kNormal, cname.length()).ToLocalChecked());\
     } (void)0
 #else
 #   define JSB_CLASS_BOILERPLATE_NAME(TemplateName, ClassName) (void) 0

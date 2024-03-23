@@ -11,6 +11,7 @@ namespace jsb
 
         v8::Global<v8::Object> module;
         v8::Global<v8::Object> exports;
+
     };
 
     struct JavaScriptModuleCache

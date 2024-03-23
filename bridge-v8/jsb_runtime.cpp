@@ -193,7 +193,7 @@ namespace jsb
             pair.value = nullptr;
         }
 
-        // cleanup weak callbacks not invoked by v8 
+        // cleanup weak callbacks not invoked by v8
         while (!objects_.is_empty())
         {
             const internal::Index64 first_index = objects_.get_first_index();
