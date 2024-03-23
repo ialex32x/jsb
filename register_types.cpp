@@ -1,13 +1,11 @@
 #include "register_types.h"
 
-#include "internal/jsb_path_util.h"
 #include "weaver/jsb_lang.h"
+#include "weaver/jsb_resource_loader.h"
+#include "weaver/jsb_resource_saver.h"
 
-#define JSB_LANG_ENABLED 1
-
-#if JSB_LANG_ENABLED
-static JavaScriptLanguage* script_language_js = nullptr;
-#endif
+Ref<ResourceFormatLoaderJavaScript> resource_loader_js;
+Ref<ResourceFormatSaverJavaScript> resource_saver_js;
 
 void initialize_jsb_module(ModuleInitializationLevel p_level)
 {
@@ -17,39 +15,16 @@ void initialize_jsb_module(ModuleInitializationLevel p_level)
 
     if (p_level == MODULE_INITIALIZATION_LEVEL_CORE)
     {
-        // //TODO simple dirty temp code for testing
-        // {
-        //     std::shared_ptr<jsb::JavaScriptRuntime> cruntime = std::make_shared<jsb::JavaScriptRuntime>();
-        //     std::shared_ptr<jsb::JavaScriptContext> ccontext = std::make_shared<jsb::JavaScriptContext>(cruntime);
-        //
-        //     cruntime->add_module_resolver<jsb::DefaultModuleResolver>();
-        //     cruntime->add_module_resolver<jsb::FileSystemModuleResolver>()
-        //         .add_search_path(jsb::internal::PathUtil::combine(
-        //         jsb::internal::PathUtil::dirname(::OS::get_singleton()->get_executable_path()),
-        //         "../modules/jsb/weaver-editor/scripts"));
-        //
-        //     {
-        //         //TODO temp code
-        //         ccontext->expose();
-        //     }
-        //
-        //     ccontext->load("main_entry");
-        //     // not all classes available in the LEVEL_CORE phase
-        //     static CharString source =
-        //         "{ let f = new Foo(); console.log(f.test(1122)); }\n"
-        //         "require('javascripts/main');\n"
-        //         "";
-        //     ccontext->eval(source, "eval-1");
-        //     ccontext->eval("console.log('right'); something wrong prevents compilation\n", "eval-2");
-        //     // rt->gc();
-        // }
-        print_line("jsb temp code ok");
-
         // register javascript language
-#if JSB_LANG_ENABLED
-        script_language_js = memnew(JavaScriptLanguage());
+        JavaScriptLanguage* script_language_js = memnew(JavaScriptLanguage());
 	    ScriptServer::register_language(script_language_js);
-#endif
+
+		resource_loader_js.instantiate();
+		ResourceLoader::add_resource_format_loader(resource_loader_js);
+
+		resource_saver_js.instantiate();
+		ResourceSaver::add_resource_format_saver(resource_saver_js);
+
     }
 }
 
@@ -57,9 +32,15 @@ void uninitialize_jsb_module(ModuleInitializationLevel p_level)
 {
     if (p_level == MODULE_INITIALIZATION_LEVEL_CORE)
     {
-#if JSB_LANG_ENABLED
+		ResourceLoader::remove_resource_format_loader(resource_loader_js);
+		resource_loader_js.unref();
+
+		ResourceSaver::remove_resource_format_saver(resource_saver_js);
+		resource_saver_js.unref();
+
+        JavaScriptLanguage *script_language_js = JavaScriptLanguage::get_singleton();
+        jsb_check(script_language_js);
         ScriptServer::unregister_language(script_language_js);
         memdelete(script_language_js);
-#endif
     }
 }

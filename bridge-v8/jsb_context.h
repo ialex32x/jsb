@@ -38,6 +38,7 @@ namespace jsb
         }
 
         //TODO temp code
+        jsb_deleteme
         void expose_temp();
 
         // jsb_force_inline uint8_t* get_function_pointer(uint32_t p_offset) { return function_pointers_[p_offset]; }
@@ -46,10 +47,16 @@ namespace jsb
             return wrap(p_context)->function_pointers_[p_offset];
         }
 
+        //NOTE AVOID USING THIS CALL, CONSIDERING REMOVING IT.
+        //     eval from source
+        jsb_deprecated
         Error eval(const CharString& p_source, const String& p_filename);
 
         // load a script (as module)
         Error load(const String& p_name);
+
+        //TODO is there a simple way to compile (validate) the script without any side effect?
+        bool validate(const String& p_name, struct JavaScriptExceptionInfo* r_err = nullptr);
 
         jsb_force_inline v8::Isolate* get_isolate() const { jsb_check(runtime_); return runtime_->isolate_; }
 

@@ -41,6 +41,9 @@
 #   define jsb_force_inline
 #endif
 
+#define jsb_deprecated
+#define jsb_deleteme
+
 #define jsb_no_discard [[nodiscard]]
 
 #if !defined(JSB_DISABLE_STACKALLOC)

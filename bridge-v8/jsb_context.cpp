@@ -1088,6 +1088,12 @@ namespace jsb
         return false;
     }
 
+    bool JavaScriptContext::validate(const String &p_source, JavaScriptExceptionInfo *r_err)
+    {
+        //TODO try to compile?
+        return true;
+    }
+
     v8::MaybeLocal<v8::Value> JavaScriptContext::_compile_run(const char* p_source, int p_source_len, const String& p_filename)
     {
         v8::Isolate* isolate = get_isolate();

@@ -2,19 +2,22 @@
 #define JAVASCRIPT_SCRIPT_H
 
 #include "core/object/script_language.h"
+#include "jsb_weaver_consts.h"
 
 class JavaScript : public Script
 {
+    typedef Script super;
     GDCLASS(JavaScript, Script)
 
 private:
     // fields
-    bool tool = false;
-    bool valid = false;
-    bool reloading = false;
+    bool tool_ = false;
+    bool valid_ = false;
+    bool reloading_ = false;
 
-    String source;
-    String path;
+    String source_;
+    String path_;
+    JavaScript* base_ = nullptr;
 
 public:
 #pragma region Script Implementation
@@ -29,8 +32,8 @@ public:
 	virtual PlaceHolderScriptInstance *placeholder_instance_create(Object *p_this)  override { return nullptr; }
 	virtual bool instance_has(const Object *p_this) const override;
 
-	virtual bool has_source_code() const override { return !source.is_empty(); }
-	virtual String get_source_code() const override { return source; }
+	virtual bool has_source_code() const override { return !source_.is_empty(); }
+	virtual String get_source_code() const override { return source_; }
 	virtual void set_source_code(const String &p_code) override;
 	virtual Error reload(bool p_keep_state = false) override;
 
@@ -42,12 +45,12 @@ public:
 
 	// TODO: In the next compat breakage rename to `*_script_*` to disambiguate from `Object::has_method()`.
 	virtual bool has_method(const StringName &p_method) const override;
-	virtual bool has_static_method(const StringName &p_method) const override { return false; }
+	virtual bool has_static_method(const StringName &p_method) const override;
 
 	virtual MethodInfo get_method_info(const StringName &p_method) const override;
 
-	virtual bool is_tool() const override { return tool; }
-	virtual bool is_valid() const override { return valid; }
+	virtual bool is_tool() const override { return tool_; }
+	virtual bool is_valid() const override { return valid_; }
 	virtual bool is_abstract() const override;
 
 	virtual ScriptLanguage* get_language() const override;

@@ -3,18 +3,15 @@
 #include "core/error/error_list.h"
 
 Error ResourceFormatSaverJavaScript::save(const Ref<Resource> &p_resource, const String &p_path, uint32_t p_flags) {
-    Ref<JavaScript> sqscr = p_resource;
+    const Ref<JavaScript> sqscr = p_resource;
     ERR_FAIL_COND_V(sqscr.is_null(), ERR_INVALID_PARAMETER);
-
-    String source = sqscr->get_source_code();
 
     {
         Error err;
-        Ref<FileAccess> file = FileAccess::open(p_path, FileAccess::WRITE, &err);
+        const Ref<FileAccess> file = FileAccess::open(p_path, FileAccess::WRITE, &err);
 
         ERR_FAIL_COND_V_MSG(err, err, "Cannot save JavaScript file '" + p_path + "'.");
-
-        file->store_string(source);
+        file->store_string(sqscr->get_source_code());
         if (file->get_error() != OK && file->get_error() != ERR_FILE_EOF) {
             return ERR_CANT_CREATE;
         }
@@ -30,7 +27,7 @@ Error ResourceFormatSaverJavaScript::save(const Ref<Resource> &p_resource, const
 
 void ResourceFormatSaverJavaScript::get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions) const {
     if (Object::cast_to<JavaScript>(*p_resource)) {
-        p_extensions->push_back("js");
+        p_extensions->push_back(JSB_RES_EXT);
     }
 }
 

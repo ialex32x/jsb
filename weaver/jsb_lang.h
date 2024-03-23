@@ -2,11 +2,22 @@
 #define JAVASCRIPT_LANGUAGE_H
 
 #include "core/object/script_language.h"
+#include "../internal/jsb_macros.h"
+#include "jsb_weaver_consts.h"
 #include "jsb_bridge.h"
 
 class JavaScriptLanguage : public ScriptLanguage
 {
+private:
+	static JavaScriptLanguage* singleton_;
+
+    bool once_inited_ = false;
+    std::shared_ptr<jsb::JavaScriptRuntime> runtime_;
+    std::shared_ptr<jsb::JavaScriptContext> context_;
+
 public:
+    jsb_force_inline static JavaScriptLanguage* get_singleton() { return singleton_; }
+
     JavaScriptLanguage();
     virtual ~JavaScriptLanguage() override;
 
@@ -14,9 +25,8 @@ public:
     virtual void finish() override;
     virtual void frame() override;
 
-    virtual Error execute_file(const String &p_path);
     virtual void get_reserved_words(List<String> *p_words) const override;
-    virtual bool is_control_flow_keyword(String p_keywords) const override;
+    virtual bool is_control_flow_keyword(String p_keyword) const override;
     virtual void get_doc_comment_delimiters(List<String>* p_delimiters) const override;
     virtual void get_comment_delimiters(List<String> *p_delimiters) const override;
     virtual void get_string_delimiters(List<String> *p_delimiters) const override;
@@ -28,9 +38,9 @@ public:
     virtual void get_recognized_extensions(List<String> *p_extensions) const override;
 
 #pragma region DEFAULTLY AND PARTIALLY SUPPORTED
-    virtual String get_name() const override { return "JavaScript"; }
-    virtual String get_type() const override { return "JavaScript"; }
-    virtual String get_extension() const override { return "js"; }
+    virtual String get_name() const override { return JSB_RES_TYPE; }
+    virtual String get_type() const override { return JSB_RES_TYPE; }
+    virtual String get_extension() const override { return JSB_RES_EXT; }
 
     virtual bool is_using_templates() override { return true; }
     virtual bool has_named_classes() const override { return true; }
@@ -55,7 +65,7 @@ public:
     virtual void debug_get_globals(List<String> *p_locals, List<Variant> *p_values, int p_max_subitems, int p_max_depth) override {}
     virtual String debug_parse_stack_level_expression(int p_level, const String &p_expression, int p_max_subitems, int p_max_depth) override { return ""; }
     virtual Vector<StackInfo> debug_get_current_stack_info() override { return {}; }
-    virtual void reload_tool_script(const Ref<Script> &p_script, bool p_soft_reload) override { reload_script(p_script, p_soft_reload); }
+    virtual void reload_tool_script(const Ref<Script> &p_script, bool p_soft_reload) override;
 
     virtual void get_public_functions(List<MethodInfo> *p_functions) const override {}
     virtual void get_public_constants(List<Pair<String, Variant>> *p_constants) const override {}
@@ -71,12 +81,6 @@ public:
     virtual String get_global_class_name(const String &p_path, String *r_base_type = nullptr, String *r_icon_path = nullptr) const override { return {}; }
 #pragma endregion
 
-private:
-    void reload_script(const Ref<Script> &p_script, bool p_soft_reload);
-
-    bool once_inited_ = false;
-    std::shared_ptr<jsb::JavaScriptRuntime> runtime_;
-    std::shared_ptr<jsb::JavaScriptContext> context_;
 };
 
 #endif

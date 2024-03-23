@@ -6,6 +6,9 @@
 
 class JavaScriptInstance : public ScriptInstance
 {
+private:
+	Ref<JavaScript> script;
+
 public:
 #pragma region ScriptIntance Implementation
     virtual Object* get_owner() override;
