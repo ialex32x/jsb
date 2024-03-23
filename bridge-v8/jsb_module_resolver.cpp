@@ -2,6 +2,7 @@
 
 #include "jsb_context.h"
 #include "../internal/jsb_path_util.h"
+#include "../weaver/jsb_weaver_consts.h"
 
 namespace jsb
 {
@@ -38,10 +39,19 @@ namespace jsb
     // early and simple validation: check source file existence
     bool DefaultModuleResolver::get_source_info(const String &p_module_id, String& r_asset_path)
     {
-        String extended = p_module_id + ".js";
+        static const String ext = "." JSB_RES_EXT;
+        const String extended = p_module_id.ends_with(ext) ? p_module_id : p_module_id + ext;
+
+        // directly inspect it at first if it's an explicit path
+        if (extended.begins_with("res://") && get_file_access()->file_exists(extended))
+        {
+            r_asset_path = extended;
+            return true;
+        }
+
         for (const String& search_path : search_paths_)
         {
-            String filename = internal::PathUtil::combine(search_path, extended);
+            const String filename = internal::PathUtil::combine(search_path, extended);
             if (get_file_access()->file_exists(filename))
             {
                 r_asset_path = filename;
@@ -56,7 +66,6 @@ namespace jsb
     {
         String normalized;
         const Error err = internal::PathUtil::extract(p_path, normalized);
-
         ERR_FAIL_COND_V(err != OK, *this);
         search_paths_.append(normalized);
         return *this;
@@ -131,6 +140,10 @@ namespace jsb
         {
             return false;
         }
+        // if (jexports->HasOwnProperty(context, v8::String::NewFromUtf8Literal(isolate, "default")).ToChecked())
+        // {
+        //     JSB_LOG(Verbose, "module with default slot %s (%s)", p_module.id, filename_abs);
+        // }
 
         jmodule->Set(context, v8::String::NewFromUtf8Literal(isolate, "filename"), jfilename).Check();
         return true;

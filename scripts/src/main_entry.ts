@@ -1,7 +1,7 @@
 
 // godot types will be exposed to JS runtime until they are actually used
 import { Node, Engine } from "godot";
-import { TSDCodeGen } from "./tsd_codegen";
+import TSDCodeGen, { DeleteMe } from "./tsd_codegen";
 
 // entry point (editor only)
 
@@ -71,6 +71,7 @@ test_async();
 if (jsb.TOOLS_ENABLED) {
     let tsd = new TSDCodeGen("./hello.txt");
     tsd.emit();
+    let dm = new DeleteMe();
 }
 
 console.log("c++ binding test");

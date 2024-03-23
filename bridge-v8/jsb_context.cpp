@@ -151,7 +151,7 @@ namespace jsb
         }
 
         // try resolve the module id
-        String combined_id = internal::PathUtil::combine(internal::PathUtil::dirname(p_parent_id), p_module_id);
+        const String combined_id = internal::PathUtil::combine(internal::PathUtil::dirname(p_parent_id), p_module_id);
         String normalized_id;
         if (internal::PathUtil::extract(combined_id, normalized_id) != OK || normalized_id.is_empty())
         {
@@ -165,7 +165,7 @@ namespace jsb
         {
             // supported module properties: id, filename, cache, loaded, exports, children
             JavaScriptModule& module = module_cache_.insert(normalized_id, true);
-            CharString cmodule_id = normalized_id.utf8();
+            const CharString cmodule_id = normalized_id.utf8();
             v8::Local<v8::Object> module_obj = v8::Object::New(isolate);
             v8::Local<v8::String> propkey_loaded = v8::String::NewFromUtf8Literal(isolate, "loaded");
             v8::Local<v8::String> propkey_children = v8::String::NewFromUtf8Literal(isolate, "children");
@@ -190,9 +190,10 @@ namespace jsb
                 return false;
             }
 
+            // build the module tree
             if (!p_parent_id.is_empty())
             {
-                if (JavaScriptModule* cparent_module = module_cache_.find(p_parent_id))
+                if (const JavaScriptModule* cparent_module = module_cache_.find(p_parent_id))
                 {
                     v8::Local<v8::Object> jparent_module = cparent_module->module.Get(isolate);
                     v8::Local<v8::Value> jparent_children_v;

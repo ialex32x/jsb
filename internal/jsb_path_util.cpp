@@ -27,9 +27,19 @@ namespace jsb::internal
 
     Error PathUtil::extract(const String& p_path, String& o_path)
     {
-        static String same_level = ".";
-        static String upper_level = "..";
-        static String sp = "/";
+        const static String same_level = ".";
+        const static String upper_level = "..";
+        const static String sp = "/";
+        const static String same_level_d = "./";
+        const static String upper_level_d = "../";
+
+        // avoid reconstructing a new string without any changes.
+        // simple but enough?
+        if (!p_path.contains(same_level_d) && !p_path.contains(upper_level_d))
+        {
+            o_path = p_path;
+            return OK;
+        }
 
         Vector<String> components = p_path.split(sp);
         int index = components.size() - 1;

@@ -25,23 +25,22 @@ namespace jsb
 
         jsb_force_inline JavaScriptModule* find(const String& p_name) const
         {
-            HashMap<String, JavaScriptModule*>::ConstIterator it = module_cache_.find(p_name);
-            if (it != module_cache_.end())
-            {
-                return it->value;
-            }
-            return nullptr;
+            const HashMap<String, JavaScriptModule*>::ConstIterator it = module_cache_.find(p_name);
+            return it != module_cache_.end() ? it->value : nullptr;
         }
 
         jsb_force_inline JavaScriptModule& insert(const String& p_name, bool p_main_candidate)
         {
-            jsb_check(!find(p_name));
-
-            JSB_LOG(Verbose, "loading new module %s", p_name);
+            jsb_checkf(!p_name.is_empty(), "empty module name is not allowed");
+            jsb_checkf(!find(p_name), "duplicated module name %s", p_name);
             if (p_main_candidate && main_.is_empty())
             {
                 main_ = p_name;
-                JSB_LOG(Verbose, "set main module name %s", p_name);
+                JSB_LOG(Verbose, "load main module %s", p_name);
+            }
+            else
+            {
+                JSB_LOG(Verbose, "loading module %s", p_name);
             }
             JavaScriptModule* module = memnew(JavaScriptModule);
             module_cache_.insert(p_name, module);
@@ -50,8 +49,7 @@ namespace jsb
 
         jsb_force_inline JavaScriptModule* get_main() const
         {
-            if (main_.is_empty()) return nullptr;
-            return find(main_);
+            return main_.is_empty() ? nullptr : find(main_);
         }
 
         jsb_force_inline bool is_main(const String& p_name) const
