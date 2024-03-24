@@ -215,6 +215,7 @@ namespace jsb
                 }
             }
             module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, true)).Check();
+            _parse_script_class(isolate, context, module);
             r_module = &module;
             return true;
         }
@@ -224,13 +225,45 @@ namespace jsb
         return false;
     }
 
+    void JavaScriptContext::_parse_script_class(v8::Isolate* p_isolate, const v8::Local<v8::Context>& p_context, JavaScriptModule &p_module)
+    {
+        //TODO just a temp test trying to read javascript class info from module
+        //TODO `module_id` is not file path based for now, will it be better to directly use the path as `module_id`??
+        v8::Local<v8::Object> exports = p_module.exports.Get(p_isolate);
+        v8::Local<v8::Value> default_val;
+        if (!exports->Get(p_context, v8::String::NewFromUtf8Literal(p_isolate, "default")).ToLocal(&default_val)
+            || !default_val->IsObject())
+        {
+            return;
+        }
+
+        v8::Local<v8::Object> default_obj = default_val.As<v8::Object>();
+        v8::Local<v8::String> name_str = default_obj->Get(p_context, v8::String::NewFromUtf8Literal(p_isolate, "name")).ToLocalChecked().As<v8::String>();
+        v8::String::Utf8Value name(p_isolate, name_str);
+        v8::Local<v8::Value> class_id_val;
+        if (!default_obj->Get(p_context, runtime_->get_symbol(Symbols::ClassId)).ToLocal(&class_id_val) || !class_id_val->IsUint32())
+        {
+            // ignore a javascript which does not inherit from native class (directly and indirectly both)
+            return;
+        }
+
+        // unsafe
+        const NativeClassID native_class_id = (NativeClassID) class_id_val->Uint32Value(p_context).ToChecked();
+        const NativeClassInfo& native_class_info = runtime_->get_class(native_class_id);
+
+        // JavaScriptClassInfo& js_class_info = runtime->add_godotjs_class();
+        JavaScriptClassInfo js_class_info;
+        js_class_info.js_class_name = String(*name, name.length());
+        js_class_info.native_class_id = native_class_id;
+        js_class_info.native_class_name = native_class_info.name;
+
+        JSB_LOG(Verbose, "class name %s (native %s)", js_class_info.js_class_name, js_class_info.native_class_name);
+        //TODO collect methods/signals/properties
+    }
+
     void JavaScriptContext::_register_builtins(const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& self)
     {
         v8::Isolate* isolate = runtime_->isolate_;
-
-        {
-            sym_class_id_.Reset(isolate, v8::Symbol::New(isolate));
-        }
 
         // internal 'jsb'
         {
@@ -397,7 +430,6 @@ namespace jsb
         runtime_->on_context_destroyed(context);
         context->SetAlignedPointerInEmbedderData(kContextEmbedderData, nullptr);
 
-        sym_class_id_.Reset();
         jmodule_cache_.Reset();
         context_.Reset();
     }
@@ -446,73 +478,21 @@ namespace jsb
     };
 
     //TODO stub functions for accessing fields of classes
-    jsb_force_inline static real_t Vector2_x_getter(Vector2* self) { return self->x; }
-    jsb_force_inline static void Vector2_x_setter(Vector2* self, real_t x) { self->x = x; }
-    jsb_force_inline static real_t Vector2_y_getter(Vector2* self) { return self->y; }
-    jsb_force_inline static void Vector2_y_setter(Vector2* self, real_t y) { self->y = y; }
+#define JSB_GENERATE_PROP_ACCESSORS(ClassName, FieldType, FieldName) \
+    jsb_force_inline static FieldType ClassName##_##FieldName##_getter(ClassName* self) { return self->FieldName; } \
+    jsb_force_inline static void ClassName##_##FieldName##_setter(ClassName* self, FieldType FieldName) { self->FieldName = FieldName; }
 
-    jsb_force_inline static real_t Vector3_x_getter(Vector3* self) { return self->x; }
-    jsb_force_inline static void Vector3_x_setter(Vector3* self, real_t x) { self->x = x; }
-    jsb_force_inline static real_t Vector3_y_getter(Vector3* self) { return self->y; }
-    jsb_force_inline static void Vector3_y_setter(Vector3* self, real_t y) { self->y = y; }
-    jsb_force_inline static real_t Vector3_z_getter(Vector3* self) { return self->z; }
-    jsb_force_inline static void Vector3_z_setter(Vector3* self, real_t z) { self->z = z; }
+    JSB_GENERATE_PROP_ACCESSORS(Vector2, real_t, x);
+    JSB_GENERATE_PROP_ACCESSORS(Vector2, real_t, y);
 
-    jsb_force_inline static real_t Vector4_x_getter(Vector4* self) { return self->x; }
-    jsb_force_inline static void Vector4_x_setter(Vector4* self, real_t x) { self->x = x; }
-    jsb_force_inline static real_t Vector4_y_getter(Vector4* self) { return self->y; }
-    jsb_force_inline static void Vector4_y_setter(Vector4* self, real_t y) { self->y = y; }
-    jsb_force_inline static real_t Vector4_z_getter(Vector4* self) { return self->z; }
-    jsb_force_inline static void Vector4_z_setter(Vector4* self, real_t z) { self->z = z; }
-    jsb_force_inline static real_t Vector4_w_getter(Vector4* self) { return self->w; }
-    jsb_force_inline static void Vector4_w_setter(Vector4* self, real_t w) { self->w = w; }
+    JSB_GENERATE_PROP_ACCESSORS(Vector3, real_t, x);
+    JSB_GENERATE_PROP_ACCESSORS(Vector3, real_t, y);
+    JSB_GENERATE_PROP_ACCESSORS(Vector3, real_t, z);
 
-    //TODO just a temp test, try to read javascript class info from module cache with the given module_id
-    //TODO `module_id` is not file path based for now, will it be better to directly use the path as `module_id`??
-    Error JavaScriptContext::dump(const String &p_module_id, JavaScriptClassInfo &r_class_info)
-    {
-        const JavaScriptModule* module = module_cache_.find(p_module_id);
-        if (!module)
-        {
-            return ERR_FILE_NOT_FOUND;
-        }
-
-        v8::Isolate* isolate = get_isolate();
-        v8::HandleScope handle_scope(isolate);
-        v8::Local<v8::Context> context = context_.Get(isolate);
-        v8::Local<v8::Object> exports = module->exports.Get(isolate);
-        v8::Local<v8::Value> default_val;
-        if (!exports->Get(context, v8::String::NewFromUtf8Literal(isolate, "default")).ToLocal(&default_val)
-            || !default_val->IsObject())
-        {
-            return ERR_CANT_RESOLVE;
-        }
-
-        //TODO
-        v8::Local<v8::Object> default_obj = default_val.As<v8::Object>();
-        v8::Local<v8::String> name_str = default_obj->Get(context, v8::String::NewFromUtf8Literal(isolate, "name")).ToLocalChecked().As<v8::String>();
-        v8::String::Utf8Value name(isolate, name_str);
-        String cname(*name, name.length());
-
-        r_class_info.name = cname;
-        v8::Local<v8::Value> class_id_val;
-        const v8::Local<v8::Symbol> class_id_symbol = sym_class_id_.Get(isolate);
-        if (!default_obj->Get(context, class_id_symbol).ToLocal(&class_id_val) || !class_id_val->IsUint32())
-        {
-            // ignore a javascript which does not inherit from native class (directly and indirectly both)
-            return ERR_UNAUTHORIZED;
-        }
-
-        // unsafe
-        const NativeClassInfo& native_class_info = runtime_->get_class((internal::Index32) class_id_val->Uint32Value(context).ToChecked());
-
-        JSB_LOG(Verbose, "class name %s", cname);
-        JSB_LOG(Verbose, "native class? %s", native_class_info.name);
-        r_class_info.native = native_class_info.name;
-
-        //TODO collect methods/signals/properties
-        return OK;
-    }
+    JSB_GENERATE_PROP_ACCESSORS(Vector4, real_t, x);
+    JSB_GENERATE_PROP_ACCESSORS(Vector4, real_t, y);
+    JSB_GENERATE_PROP_ACCESSORS(Vector4, real_t, z);
+    JSB_GENERATE_PROP_ACCESSORS(Vector4, real_t, w);
 
     void JavaScriptContext::expose_temp()
     {
@@ -523,7 +503,7 @@ namespace jsb
         v8::Local<v8::Object> global = context->Global();
 
         {
-            internal::Index32 class_id;
+            NativeClassID class_id;
             const StringName class_name = jsb_typename(Vector2);
             NativeClassInfo& class_info = runtime_->add_class(NativeClassInfo::GodotPrimitive, class_name, &class_id);
             runtime_->godot_primitives_index_[Variant::VECTOR2] = class_id;
@@ -541,7 +521,7 @@ namespace jsb
             global->Set(context, v8::String::NewFromUtf8Literal(isolate, jsb_typename(Vector2)), function_template->GetFunction(context).ToLocalChecked()).Check();
         }
         {
-            internal::Index32 class_id;
+            NativeClassID class_id;
             const StringName class_name = jsb_typename(Vector3);
             NativeClassInfo& class_info = runtime_->add_class(NativeClassInfo::GodotPrimitive, class_name, &class_id);
             runtime_->godot_primitives_index_[Variant::VECTOR3] = class_id;
@@ -561,7 +541,7 @@ namespace jsb
             global->Set(context, v8::String::NewFromUtf8Literal(isolate, jsb_typename(Vector3)), function_template->GetFunction(context).ToLocalChecked()).Check();
         }
         {
-            internal::Index32 class_id;
+            NativeClassID class_id;
             const StringName class_name = jsb_typename(Vector4);
             NativeClassInfo& class_info = runtime_->add_class(NativeClassInfo::GodotPrimitive, class_name, &class_id);
             runtime_->godot_primitives_index_[Variant::VECTOR4] = class_id;
@@ -581,36 +561,28 @@ namespace jsb
         }
     }
 
-    NativeClassInfo* JavaScriptContext::_expose_godot_variant(internal::Index32* r_class_id)
-    {
-        //TODO uncertain
-        // add_class(None);
-        // register(Transpiler<Vector2>::xxx);
-        return nullptr;
-    }
-
-    NativeClassInfo* JavaScriptContext::_expose_godot_class(const ClassDB::ClassInfo* p_class_info, internal::Index32* r_class_id)
+    NativeClassInfo* JavaScriptContext::_expose_godot_class(const ClassDB::ClassInfo* p_class_info, NativeClassID* r_class_id)
     {
         if (!p_class_info)
         {
             if (r_class_id)
             {
-                *r_class_id = internal::Index32::none();
+                *r_class_id = NativeClassID::none();
             }
             return nullptr;
         }
 
-        const HashMap<StringName, internal::Index32>::Iterator found = runtime_->godot_classes_index_.find(p_class_info->name);
+        const HashMap<StringName, NativeClassID>::Iterator found = runtime_->godot_classes_index_.find(p_class_info->name);
         if (found != runtime_->godot_classes_index_.end())
         {
             if (r_class_id)
             {
                 *r_class_id = found->value;
             }
-            return &runtime_->classes_.get_value(found->value);
+            return &runtime_->get_class(found->value);
         }
 
-        internal::Index32 class_id;
+        NativeClassID class_id;
         NativeClassInfo& jclass_info = runtime_->add_class(NativeClassInfo::GodotObject, p_class_info->name, &class_id);
         JSB_LOG(Verbose, "expose godot type %s (%d)", p_class_info->name, (uint32_t) class_id);
 
@@ -656,11 +628,11 @@ namespace jsb
 
             // set `class_id` on the exposed godot class for the convenience when finding it from any subclasses in javascript.
             // currently used in `dump(in module_id, out class_info)`
-            const v8::Local<v8::Symbol> class_id_symbol = sym_class_id_.Get(isolate);
+            const v8::Local<v8::Symbol> class_id_symbol = runtime_->get_symbol(Symbols::ClassId);
             function_template->Set(class_id_symbol, v8::Uint32::NewFromUnsigned(isolate, class_id));
 
             // setup the prototype chain (inherit)
-            internal::Index32 super_id;
+            NativeClassID super_id;
             if (const NativeClassInfo* jsuper_class = _expose_godot_class(p_class_info->inherits_ptr, &super_id))
             {
                 v8::Local<v8::FunctionTemplate> base_template = jsuper_class->template_.Get(isolate);
@@ -786,7 +758,7 @@ namespace jsb
         // freshly bind existing gd object (not constructed in javascript)
         const StringName& class_name = p_cvar->get_class_name();
         JavaScriptContext* ccontext = JavaScriptContext::wrap(context);
-        internal::Index32 jclass_id;
+        NativeClassID jclass_id;
         if (const NativeClassInfo* jclass = ccontext->_expose_godot_class(class_name, &jclass_id))
         {
             v8::Local<v8::FunctionTemplate> jtemplate = jclass->template_.Get(isolate);
@@ -890,7 +862,7 @@ namespace jsb
             {
                 //TODO TEMP SOLUTION
                 JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
-                if (const internal::Index32 class_id = cruntime->get_class_id(var_type))
+                if (const NativeClassID class_id = cruntime->get_class_id(var_type))
                 {
                     const NativeClassInfo& class_info = cruntime->get_class(class_id);
                     v8::Local<v8::FunctionTemplate> jtemplate = class_info.template_.Get(isolate);

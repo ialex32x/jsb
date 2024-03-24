@@ -165,6 +165,10 @@ namespace jsb
         isolate_->SetData(kIsolateEmbedderData, this);
         isolate_->SetPromiseRejectCallback(PromiseRejectCallback_);
 
+        for (int index = 0; index < Symbols::kNum; ++index)
+        {
+            symbols_[index].Reset(isolate_, v8::Symbol::New(isolate_));
+        }
         module_loaders_.insert("godot", memnew(GodotModuleLoader));
         JavaScriptRuntimeStore::get_shared().add(this);
 #if JSB_WITH_DEBUGGER
@@ -174,6 +178,20 @@ namespace jsb
 
     JavaScriptRuntime::~JavaScriptRuntime()
     {
+        while (!gdjs_classes_.is_empty())
+        {
+            GodotJSClassID id = gdjs_classes_.get_first_index();
+            // JavaScriptClassInfo& class_info = gdjs_classes_[id];
+            // class_info.xxx.Reset();
+            gdjs_classes_.remove_at(id);
+        }
+        gdjs_classes_index_.clear();
+
+        for (int index = 0; index < Symbols::kNum; ++index)
+        {
+            symbols_[index].Reset();
+        }
+
 #if JSB_WITH_DEBUGGER
         debugger_.reset();
 #endif
@@ -200,7 +218,7 @@ namespace jsb
             ObjectHandle& handle = objects_.get_value(first_index);
             const bool is_persistent = persistent_objects_.has(handle.pointer);
 
-            const NativeClassInfo& class_info = classes_.get_value(handle.class_id);
+            const NativeClassInfo& class_info = native_classes_.get_value(handle.class_id);
             class_info.finalizer(this, handle.pointer, is_persistent);
             handle.ref_.Reset();
             objects_index_.erase(handle.pointer);
@@ -209,12 +227,12 @@ namespace jsb
         }
 
         // cleanup all class templates
-        while (!classes_.is_empty())
+        while (!native_classes_.is_empty())
         {
-            const internal::Index32 first_index = classes_.get_first_index();
-            NativeClassInfo& class_info = classes_.get_value(first_index);
+            const NativeClassID first_index = native_classes_.get_first_index();
+            NativeClassInfo& class_info = native_classes_.get_value(first_index);
             class_info.template_.Reset();
-            classes_.remove_at(first_index);
+            native_classes_.remove_at(first_index);
         }
 
         isolate_->Dispose();
@@ -249,15 +267,15 @@ namespace jsb
 #endif
     }
 
-    void JavaScriptRuntime::bind_object(internal::Index32 p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
+    void JavaScriptRuntime::bind_object(NativeClassID p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
     {
         bind_object(p_class_id, (void*) p_pointer, p_object, p_persistent);
         p_pointer->set_instance_binding(this, p_pointer, gd_instance_binding_callbacks);
     }
 
-    void JavaScriptRuntime::bind_object(internal::Index32 p_class_id, void* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
+    void JavaScriptRuntime::bind_object(NativeClassID p_class_id, void* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
     {
-        jsb_checkf(classes_.is_valid_index(p_class_id), "bad class_id");
+        jsb_checkf(native_classes_.is_valid_index(p_class_id), "bad class_id");
         jsb_checkf(!objects_index_.has(p_pointer), "duplicated bindings");
 
         const internal::Index64 object_id = objects_.add({});
@@ -352,7 +370,7 @@ namespace jsb
 
         if (p_free)
         {
-            const NativeClassInfo& class_info = classes_.get_value(object_handle.class_id);
+            const NativeClassInfo& class_info = native_classes_.get_value(object_handle.class_id);
             class_info.finalizer(this, p_pointer, is_persistent);
         }
         object_handle.ref_.Reset();

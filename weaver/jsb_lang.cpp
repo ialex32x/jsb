@@ -39,9 +39,7 @@ void JavaScriptLanguage::init()
 
         // editor entry script
         context_->load("main_entry");
-
-        jsb::JavaScriptClassInfo class_info;
-        context_->dump("scratchpad", class_info);
+        // runtime_->find_gdjs_class("TestClass");
     }
     JSB_LOG(Verbose, "jsb lang init");
 }
@@ -177,13 +175,4 @@ void JavaScriptLanguage::reload_tool_script(const Ref<Script> &p_script, bool p_
 void JavaScriptLanguage::get_recognized_extensions(List<String>* p_extensions) const
 {
     p_extensions->push_back(JSB_RES_EXT);
-}
-
-void JavaScriptLanguage::bind_script_instance(Object *p_object, JavaScript* p_script, JavaScriptInstance *p_instance)
-{
-    //TODO multi-thread scripting not supported for now
-    const jsb::JavaScriptClassInfo& class_info = p_script->get_class_info();
-    const jsb::NativeClassInfo* native_class_info = runtime_->find_godot_class(class_info.native);
-    jsb_check(native_class_info);
-    // native_class_info.
 }

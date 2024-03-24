@@ -18,12 +18,82 @@ namespace jsb
         kIsolateEmbedderData = 0,
     };
 
+    namespace Symbols
+    {
+        enum Type : uint8_t
+        {
+            ClassId,
+
+            kNum,
+        };
+    }
+
     // JavaScriptRuntime it-self is NOT thread-safe.
     class JavaScriptRuntime : public std::enable_shared_from_this<JavaScriptRuntime>
     {
+    private:
+        friend class JavaScriptContext;
+
+        // symbol for class_id on FunctionTemplate of native class
+        v8::Global<v8::Symbol> symbols_[Symbols::kNum];
+
+        /*volatile*/
+        Thread::ID thread_id_;
+
+        v8::Isolate* isolate_;
+        ArrayBufferAllocator allocator_;
+
+        //TODO postpone the call of Global.Reset if calling from other threads
+        // typedef void(*UnreferencingRequestCall)(internal::Index64);
+        // Vector<UnreferencingRequestCall> request_calls_;
+        // volatile bool pending_request_calls_;
+
+        //TODO lock on 'objects_' when referencing?
+        // lock;
+
+        // indirect lookup
+        // only godot object classes are mapped
+        HashMap<StringName, NativeClassID> godot_classes_index_;
+
+        //TODO
+        NativeClassID godot_primitives_index_[Variant::VARIANT_MAX] = {};
+
+        // all exposed native classes
+        internal::SArray<NativeClassInfo, NativeClassID> native_classes_;
+
+        //TODO all exported default classes inherit native godot class (directly or indirectly)
+        // they're only collected on a module loaded
+        internal::SArray<JavaScriptClassInfo, GodotJSClassID> gdjs_classes_;
+        // gdjs class name => js class id
+        HashMap<StringName, GodotJSClassID> gdjs_classes_index_;
+
+        // cpp objects should be added here since the gc callback is not guaranteed by v8
+        // we need to delete them on finally releasing JavaScriptRuntime
+        internal::SArray<ObjectHandle> objects_;
+
+        // (unsafe) mapping object pointer to object_id
+        HashMap<void*, internal::Index64> objects_index_;
+        HashSet<void*> persistent_objects_;
+
+        // module_id => loader
+        HashMap<String, class IModuleLoader*> module_loaders_;
+        Vector<IModuleResolver*> module_resolvers_;
+
+        uint64_t last_ticks_;
+        internal::TTimerManager<JavaScriptTimerAction> timer_manager_;
+
+#if JSB_WITH_DEBUGGER
+        std::unique_ptr<class JavaScriptDebugger> debugger_;
+#endif
+
     public:
         JavaScriptRuntime();
         ~JavaScriptRuntime();
+
+        jsb_force_inline v8::Local<v8::Symbol> get_symbol(Symbols::Type p_type) const
+        {
+            return symbols_[p_type].Get(isolate_);
+        }
 
         // return a JavaScriptRuntime pointer via `p_pointer` if it's still alive
         // `p_pointer` should point to a JavaScriptRuntime instance
@@ -51,8 +121,8 @@ namespace jsb
          * \param p_class_id
          * \param p_persistent keep a strong reference on pointer, usually used on binding singleton objects which are manually managed by native codes.
          */
-        void bind_object(internal::Index32 p_class_id, void* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent);
-        void bind_object(internal::Index32 p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent);
+        void bind_object(NativeClassID p_class_id, void* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent);
+        void bind_object(NativeClassID p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent);
         void unbind_object(void* p_pointer);
 
         // whether the pointer registered in the object binding map
@@ -83,11 +153,11 @@ namespace jsb
                 return nullptr;
             }
             const ObjectHandle& handle = objects_.get_value(it->value);
-            if (!classes_.is_valid_index(handle.class_id))
+            if (!native_classes_.is_valid_index(handle.class_id))
             {
                 return nullptr;
             }
-            return &classes_.get_value(handle.class_id);
+            return &native_classes_.get_value(handle.class_id);
         }
 
         // return true if can die
@@ -136,10 +206,10 @@ namespace jsb
          * \param r_class_id
          * \return
          */
-        NativeClassInfo& add_class(NativeClassInfo::Type p_type, const StringName& p_class_name, internal::Index32* r_class_id = nullptr)
+        NativeClassInfo& add_class(NativeClassInfo::Type p_type, const StringName& p_class_name, NativeClassID* r_class_id = nullptr)
         {
-            const internal::Index32 class_id = classes_.append(NativeClassInfo());
-            NativeClassInfo& class_info = classes_.get_value(class_id);
+            const NativeClassID class_id = native_classes_.append(NativeClassInfo());
+            NativeClassInfo& class_info = native_classes_.get_value(class_id);
             class_info.type = p_type;
             class_info.name = p_class_name;
             if (p_type == NativeClassInfo::GodotObject)
@@ -155,18 +225,36 @@ namespace jsb
             return class_info;
         }
 
-        jsb_force_inline const NativeClassInfo* find_godot_class(const StringName& p_name) const
+        jsb_force_inline const NativeClassInfo* find_godot_class(const StringName& p_name, NativeClassID& r_class_id) const
         {
-            const HashMap<StringName, internal::Index32>::ConstIterator it = godot_classes_index_.find(p_name);
-            return it != godot_classes_index_.end() ? &classes_[it->value] : nullptr;
+            const HashMap<StringName, NativeClassID>::ConstIterator it = godot_classes_index_.find(p_name);
+            if (it != godot_classes_index_.end())
+            {
+                r_class_id = it->value;
+                return &native_classes_[r_class_id];
+            }
+            return nullptr;
         }
 
         // [unsafe]
-        jsb_force_inline NativeClassInfo& get_class(internal::Index32 p_class_id) { return classes_.get_value(p_class_id); }
-        jsb_force_inline const NativeClassInfo& get_class(internal::Index32 p_class_id) const { return classes_.get_value(p_class_id); }
+        jsb_force_inline NativeClassInfo& get_class(NativeClassID p_class_id) { return native_classes_.get_value(p_class_id); }
+        jsb_force_inline const NativeClassInfo& get_class(NativeClassID p_class_id) const { return native_classes_.get_value(p_class_id); }
 
         // [EXPERIMENTAL] get class id of primitive type (all of them are actually based on godot Variant)
-        jsb_force_inline internal::Index32 get_class_id(Variant::Type p_type) const { return godot_primitives_index_[p_type]; }
+        jsb_force_inline NativeClassID get_class_id(Variant::Type p_type) const { return godot_primitives_index_[p_type]; }
+
+        jsb_force_inline JavaScriptClassInfo& get_gdjs_class(GodotJSClassID p_class_id) { return gdjs_classes_[p_class_id]; }
+        jsb_force_inline const JavaScriptClassInfo& get_gdjs_class(GodotJSClassID p_class_id) const { return gdjs_classes_[p_class_id]; }
+        jsb_force_inline const JavaScriptClassInfo* find_gdjs_class(const StringName& p_name, GodotJSClassID* r_class_id) const
+        {
+            const HashMap<StringName, GodotJSClassID>::ConstIterator it = gdjs_classes_index_.find(p_name);
+            if (it != gdjs_classes_index_.end())
+            {
+                if (r_class_id) *r_class_id = it->value;
+                return &gdjs_classes_[it->value];
+            }
+            return nullptr;
+        }
 
     private:
         void on_context_created(const v8::Local<v8::Context>& p_context);
@@ -179,50 +267,6 @@ namespace jsb
         }
 
         void free_object(void* p_pointer, bool p_free);
-
-        /*volatile*/
-        Thread::ID thread_id_;
-
-        v8::Isolate* isolate_;
-        ArrayBufferAllocator allocator_;
-
-        //TODO postpone the call of Global.Reset if calling from other threads
-        // typedef void(*UnreferencingRequestCall)(internal::Index64);
-        // Vector<UnreferencingRequestCall> request_calls_;
-        // volatile bool pending_request_calls_;
-
-        //TODO lock on 'objects_' when referencing?
-        // lock;
-
-        // indirect lookup
-        // only godot object classes are mapped
-        HashMap<StringName, internal::Index32> godot_classes_index_;
-
-        //TODO
-        internal::Index32 godot_primitives_index_[Variant::VARIANT_MAX] = {};
-
-        internal::SArray<NativeClassInfo, internal::Index32> classes_;
-
-        // cpp objects should be added here since the gc callback is not guaranteed by v8
-        // we need to delete them on finally releasing JavaScriptRuntime
-        internal::SArray<ObjectHandle> objects_;
-
-        // (unsafe) mapping object pointer to object_id
-        HashMap<void*, internal::Index64> objects_index_;
-        HashSet<void*> persistent_objects_;
-
-        // module_id => loader
-        HashMap<String, class IModuleLoader*> module_loaders_;
-        Vector<IModuleResolver*> module_resolvers_;
-
-        uint64_t last_ticks_;
-        internal::TTimerManager<JavaScriptTimerAction> timer_manager_;
-
-#if JSB_WITH_DEBUGGER
-        std::unique_ptr<class JavaScriptDebugger> debugger_;
-#endif
-
-        friend class JavaScriptContext;
     };
 }
 

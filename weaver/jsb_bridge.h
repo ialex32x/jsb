@@ -6,7 +6,6 @@
 #   include "../bridge-v8/jsb_context.h"
 #   include "../bridge-v8/jsb_exception_info.h"
 #   include "../bridge-v8/jsb_class_info.h"
-#   include "../bridge-v8/jsb_class_instance.h"
 #elif JSB_WITH_QUICKJS
 #   include "../bridge-quickjs/jsb_runtime.h"
 #   error "not implemented"

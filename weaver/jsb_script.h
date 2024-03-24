@@ -19,12 +19,14 @@ private:
     String source_;
     String path_;
     JavaScript* base_ = nullptr;
-
-    //TODO generate class_info with internal js module object
-    jsb::JavaScriptClassInfo class_info_;
+    std::shared_ptr<jsb::JavaScriptRuntime> runtime_;
+    jsb::GodotJSClassID gdjs_class_id_;
 
 public:
-    jsb_force_inline const jsb::JavaScriptClassInfo& get_class_info() const { return class_info_; }
+    jsb_force_inline const jsb::JavaScriptClassInfo& get_js_class_info() const
+    {
+        return runtime_->get_gdjs_class(gdjs_class_id_);
+    }
 
 #pragma region Script Implementation
 	virtual bool can_instantiate() const override;

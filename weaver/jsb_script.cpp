@@ -56,19 +56,23 @@ bool JavaScript::inherits_script(const Ref<Script> &p_script) const
 
 StringName JavaScript::get_instance_base_type() const
 {
-    return class_info_.native;
+    return get_js_class_info().native_class_name;
 }
 
 ScriptInstance* JavaScript::instance_create(Object *p_this)
 {
-    //TODO
-    return nullptr;
-    // JavaScriptInstance* instance = memnew(JavaScriptInstance);
-    // instance->owner_ = p_this;
-    // instance->owner_->set_script_instance(instance);
-    // instance->script_ = Ref(this);
-    // JavaScriptLanguage::get_singleton()->bind_script_instance(p_this, this, instance);
-    // return instance;
+    //TODO multi-thread scripting not supported for now
+    JavaScriptLanguage* lang = JavaScriptLanguage::get_singleton();
+    jsb::JavaScriptContext* ccontext = lang->get_context();
+
+    JavaScriptInstance* instance = memnew(JavaScriptInstance);
+    instance->owner_ = p_this;
+    instance->owner_->set_script_instance(instance);
+    instance->script_ = Ref(this);
+
+    // class_info_.
+    // ccontext->create_script_instance_binding(instance);
+    return instance;
 }
 
 Error JavaScript::reload(bool p_keep_state)
@@ -98,7 +102,7 @@ PropertyInfo JavaScript::get_class_category() const
 
 bool JavaScript::has_method(const StringName &p_method) const
 {
-    return class_info_.methods.has(p_method);
+    return get_js_class_info().methods.has(p_method);
 }
 
 MethodInfo JavaScript::get_method_info(const StringName &p_method) const
@@ -112,7 +116,7 @@ MethodInfo JavaScript::get_method_info(const StringName &p_method) const
 
 bool JavaScript::is_abstract() const
 {
-    return class_info_.flags & jsb::JavaScriptClassInfo::Abstract;
+    return get_js_class_info().flags & jsb::JavaScriptClassInfo::Abstract;
 }
 
 ScriptLanguage* JavaScript::get_language() const
@@ -122,12 +126,12 @@ ScriptLanguage* JavaScript::get_language() const
 
 bool JavaScript::has_script_signal(const StringName &p_signal) const
 {
-    return class_info_.signals.has(p_signal);
+    return get_js_class_info().signals.has(p_signal);
 }
 
 void JavaScript::get_script_method_list(List<MethodInfo> *p_list) const
 {
-    for (const KeyValue<StringName, jsb::JavaScriptMethodInfo>& it : class_info_.methods)
+    for (const KeyValue<StringName, jsb::JavaScriptMethodInfo>& it : get_js_class_info().methods)
     {
         //TODO details?
         MethodInfo mi = {};
@@ -144,7 +148,7 @@ void JavaScript::get_script_property_list(List<PropertyInfo> *p_list) const
 
 void JavaScript::get_script_signal_list(List<MethodInfo> *r_signals) const
 {
-    for (const KeyValue<StringName, jsb::JavaScriptMethodInfo>& it : class_info_.signals)
+    for (const KeyValue<StringName, jsb::JavaScriptMethodInfo>& it : get_js_class_info().signals)
     {
         //TODO details?
         MethodInfo mi = {};
@@ -174,8 +178,8 @@ void JavaScript::_placeholder_erased(PlaceHolderScriptInstance *p_placeholder)
 
 bool JavaScript::has_static_method(const StringName &p_method) const
 {
-    const HashMap<StringName, jsb::JavaScriptMethodInfo>::ConstIterator& it = class_info_.methods.find(p_method);
-    return it != class_info_.methods.end() && it->value.is_static();
+    const HashMap<StringName, jsb::JavaScriptMethodInfo>::ConstIterator& it = get_js_class_info().methods.find(p_method);
+    return it != get_js_class_info().methods.end() && it->value.is_static();
 }
 
 bool JavaScript::instance_has(const Object *p_this) const

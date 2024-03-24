@@ -1,7 +1,8 @@
 #ifndef JAVASCRIPT_PRIVATE_DATA_TYPE_H
 #define JAVASCRIPT_PRIVATE_DATA_TYPE_H
+
+#include "jsb_class_info.h"
 #include "jsb_pch.h"
-#include "../internal/jsb_sindex.h"
 
 namespace jsb
 {
@@ -13,7 +14,7 @@ namespace jsb
 
     struct ObjectHandle
     {
-        internal::Index32 class_id;
+        NativeClassID class_id;
 
         // primitive pointer to the native object.
         // must be a real pointer which implies that different objects have different addresses.

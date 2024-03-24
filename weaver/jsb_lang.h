@@ -18,7 +18,7 @@ private:
 public:
     jsb_force_inline static JavaScriptLanguage* get_singleton() { return singleton_; }
 
-    void bind_script_instance(Object* p_object, class JavaScript* p_script, class JavaScriptInstance* p_instance);
+    jsb_force_inline jsb::JavaScriptContext* get_context() const { return context_.get(); }
 
     JavaScriptLanguage();
     virtual ~JavaScriptLanguage() override;
