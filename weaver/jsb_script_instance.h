@@ -7,11 +7,17 @@
 class JavaScriptInstance : public ScriptInstance
 {
 private:
-	Ref<JavaScript> script;
+    friend class JavaScript;
+
+    Object* owner_ = nullptr;
+    Ref<JavaScript> script_;
+    // object handle id
+    jsb::internal::Index64 object_id_;
+    HashMap<StringName, jsb::JavaScriptFunction> cached_methods_;
 
 public:
 #pragma region ScriptIntance Implementation
-    virtual Object* get_owner() override;
+    virtual Object* get_owner() override { return owner_; }
 
     virtual bool set(const StringName &p_name, const Variant &p_value) override;
     virtual bool get(const StringName &p_name, Variant &r_ret) const override;
@@ -28,13 +34,15 @@ public:
 
     virtual void notification(int p_notification, bool p_reversed = false) override;
 
-    virtual Ref<Script> get_script() const override;
+    virtual Ref<Script> get_script() const override { return script_; }
 
     virtual ScriptLanguage *get_language() override;
 
-    virtual const Variant get_rpc_config() const override;
+    virtual const Variant get_rpc_config() const override { return script_->get_rpc_config(); }
 #pragma endregion
 
+private:
+    JavaScriptInstance() {}
 };
 
 #endif

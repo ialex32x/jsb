@@ -155,6 +155,12 @@ namespace jsb
             return class_info;
         }
 
+        jsb_force_inline const NativeClassInfo* find_godot_class(const StringName& p_name) const
+        {
+            const HashMap<StringName, internal::Index32>::ConstIterator it = godot_classes_index_.find(p_name);
+            return it != godot_classes_index_.end() ? &classes_[it->value] : nullptr;
+        }
+
         // [unsafe]
         jsb_force_inline NativeClassInfo& get_class(internal::Index32 p_class_id) { return classes_.get_value(p_class_id); }
         jsb_force_inline const NativeClassInfo& get_class(internal::Index32 p_class_id) const { return classes_.get_value(p_class_id); }

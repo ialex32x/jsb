@@ -2,6 +2,7 @@
 #include <iterator>
 
 #include "jsb_script.h"
+#include "jsb_script_instance.h"
 #include "../internal/jsb_path_util.h"
 
 JavaScriptLanguage *JavaScriptLanguage::singleton_ = nullptr;
@@ -176,4 +177,13 @@ void JavaScriptLanguage::reload_tool_script(const Ref<Script> &p_script, bool p_
 void JavaScriptLanguage::get_recognized_extensions(List<String>* p_extensions) const
 {
     p_extensions->push_back(JSB_RES_EXT);
+}
+
+void JavaScriptLanguage::bind_script_instance(Object *p_object, JavaScript* p_script, JavaScriptInstance *p_instance)
+{
+    //TODO multi-thread scripting not supported for now
+    const jsb::JavaScriptClassInfo& class_info = p_script->get_class_info();
+    const jsb::NativeClassInfo* native_class_info = runtime_->find_godot_class(class_info.native);
+    jsb_check(native_class_info);
+    // native_class_info.
 }

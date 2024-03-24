@@ -1,12 +1,6 @@
 #include "jsb_script_instance.h"
 #include "jsb_lang.h"
 
-Object* JavaScriptInstance::get_owner()
-{
-    //TODO
-    return nullptr;
-}
-
 bool JavaScriptInstance::set(const StringName &p_name, const Variant &p_value)
 {
     //TODO
@@ -63,32 +57,32 @@ bool JavaScriptInstance::has_method(const StringName &p_method) const
 
 Variant JavaScriptInstance::callp(const StringName &p_method, const Variant **p_args, int p_argcount, Callable::CallError &r_error)
 {
-    //TODO
+
+    if (const HashMap<StringName, jsb::JavaScriptFunction>::Iterator& it = cached_methods_.find(p_method))
+    {
+        // it->value.Get()
+    }
+    else
+    {
+        //TODO find and cache
+
+    }
+
+    r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;
     return {};
 }
-
 
 void JavaScriptInstance::notification(int p_notification, bool p_reversed)
 {
-    //TODO
-
+    //TODO find the method named `_notification`, cal it with `p_notification` as `argv`
+    //TODO call it at all type levels? @seealso `GDScriptInstance::notification`
+    Variant value = p_notification;
+    const Variant* argv[] = { &value };
+    Callable::CallError error;
+    callp(SNAME("_notification"), argv, 1, error);
 }
-
-
-Ref<Script> JavaScriptInstance::get_script() const
-{
-    //TODO
-    return {};
-}
-
 
 ScriptLanguage *JavaScriptInstance::get_language()
 {
     return JavaScriptLanguage::get_singleton();
-}
-
-const Variant JavaScriptInstance::get_rpc_config() const
-{
-    //TODO
-    return script->get_rpc_config();
 }

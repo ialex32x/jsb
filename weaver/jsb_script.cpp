@@ -1,5 +1,6 @@
 #include "jsb_script.h"
 #include "jsb_lang.h"
+#include "jsb_script_instance.h"
 
 bool JavaScript::can_instantiate() const {
 #ifdef TOOLS_ENABLED
@@ -62,6 +63,12 @@ ScriptInstance* JavaScript::instance_create(Object *p_this)
 {
     //TODO
     return nullptr;
+    // JavaScriptInstance* instance = memnew(JavaScriptInstance);
+    // instance->owner_ = p_this;
+    // instance->owner_->set_script_instance(instance);
+    // instance->script_ = Ref(this);
+    // JavaScriptLanguage::get_singleton()->bind_script_instance(p_this, this, instance);
+    // return instance;
 }
 
 Error JavaScript::reload(bool p_keep_state)

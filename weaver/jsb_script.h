@@ -3,7 +3,7 @@
 
 #include "core/object/script_language.h"
 #include "jsb_weaver_consts.h"
-#include "modules/jsb/bridge-v8/jsb_class_info.h"
+#include "jsb_bridge.h"
 
 class JavaScript : public Script
 {
@@ -24,6 +24,8 @@ private:
     jsb::JavaScriptClassInfo class_info_;
 
 public:
+    jsb_force_inline const jsb::JavaScriptClassInfo& get_class_info() const { return class_info_; }
+
 #pragma region Script Implementation
 	virtual bool can_instantiate() const override;
 
