@@ -173,6 +173,10 @@ namespace jsb
                 return false;
             }
         }
+        else
+        {
+            normalized_id = p_module_id;
+        }
 
         // init source module
         String asset_path;

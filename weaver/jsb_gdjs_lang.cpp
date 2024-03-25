@@ -8,20 +8,8 @@
 
 GodotJSScriptLanguage *GodotJSScriptLanguage::singleton_ = nullptr;
 
-// static void check_string(const String& source, const String& expected)
-// {
-//     String output;
-//     Error err = jsb::internal::PathUtil::extract(source, output);
-//     jsb_check(err == OK);
-//     jsb_check(expected == output);
-// }
-
 GodotJSScriptLanguage::GodotJSScriptLanguage()
 {
-    // check_string("res://./test.js", "res://test.js");
-    // check_string("res://a/b/c/../../../test.js", "res://test.js");
-    // check_string("res://a/b/c/../test.js", "res://a/b/test.js");
-    // check_string("res://a/b/c/./test.js", "res://a/b/c/test.js");
     jsb_check(!singleton_);
     singleton_ = this;
 }
