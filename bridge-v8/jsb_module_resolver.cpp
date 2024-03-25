@@ -97,10 +97,15 @@ namespace jsb
         const String extended = p_module_id.ends_with(ext) ? p_module_id : p_module_id + ext;
 
         // directly inspect it at first if it's an explicit path
-        if (extended.contains(":/") && get_file_access()->file_exists(extended))
+        if (extended.contains(":/"))
         {
-            r_asset_path = extended;
-            return true;
+            if(get_file_access()->file_exists(extended))
+            {
+                r_asset_path = extended;
+                return true;
+            }
+            r_asset_path.clear();
+            return false;
         }
 
         for (const String& search_path : search_paths_)
