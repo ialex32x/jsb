@@ -9,9 +9,11 @@ namespace jsb
     {
         StringName id;
 
+        // asset path
+        String path;
+
         v8::Global<v8::Object> module;
         v8::Global<v8::Object> exports;
-
     };
 
     struct JavaScriptModuleCache

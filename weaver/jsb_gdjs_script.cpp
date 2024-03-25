@@ -2,6 +2,26 @@
 #include "jsb_gdjs_lang.h"
 #include "jsb_gdjs_script_instance.h"
 
+GodotJSScript::GodotJSScript(): script_list_(this)
+{
+    {
+        GodotJSScriptLanguage* lang = GodotJSScriptLanguage::get_singleton();
+        MutexLock lock(lang->mutex_);
+
+        lang->script_list_.add(&script_list_);
+    }
+}
+
+GodotJSScript::~GodotJSScript()
+{
+    {
+        GodotJSScriptLanguage* lang = GodotJSScriptLanguage::get_singleton();
+        MutexLock lock(lang->mutex_);
+
+        script_list_.remove_from_list();
+    }
+}
+
 bool GodotJSScript::can_instantiate() const {
 #ifdef TOOLS_ENABLED
     return valid_ && (tool_ || ScriptServer::is_scripting_enabled());
@@ -63,15 +83,12 @@ ScriptInstance* GodotJSScript::instance_create(Object *p_this)
 {
     //TODO multi-thread scripting not supported for now
     GodotJSScriptLanguage* lang = GodotJSScriptLanguage::get_singleton();
-    jsb::JavaScriptContext* ccontext = lang->get_context();
-
     GodotJSScriptInstance* instance = memnew(GodotJSScriptInstance);
+
     instance->owner_ = p_this;
     instance->owner_->set_script_instance(instance);
     instance->script_ = Ref(this);
-
-    // class_info_.
-    // ccontext->create_script_instance_binding(instance);
+    lang->get_context()->crossbind(p_this, gdjs_class_id_);
     return instance;
 }
 

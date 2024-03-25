@@ -71,6 +71,8 @@ namespace jsb
         //TODO is there a simple way to compile (validate) the script without any side effect?
         bool validate(const String& p_name, struct JavaScriptExceptionInfo* r_err = nullptr);
 
+        void crossbind(Object* p_this, GodotJSClassID p_class_id);
+
         jsb_force_inline v8::Isolate* get_isolate() const { jsb_check(runtime_); return runtime_->isolate_; }
 
         //NOTE handle scope is required to call this method

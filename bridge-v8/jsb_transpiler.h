@@ -20,7 +20,7 @@
 #define JSB_CLASS_BOILERPLATE() \
     jsb_force_inline static v8::Local<v8::FunctionTemplate> create(v8::Isolate* isolate, internal::Index32 class_id, NativeClassInfo& class_info)\
     {\
-        v8::Local<v8::FunctionTemplate> template_ =  v8::FunctionTemplate::New(isolate, &constructor, v8::Uint32::NewFromUnsigned(isolate, class_id));\
+        v8::Local<v8::FunctionTemplate> template_ = v8::FunctionTemplate::New(isolate, &constructor, v8::Uint32::NewFromUnsigned(isolate, class_id));\
         template_->InstanceTemplate()->SetInternalFieldCount(kObjectFieldCount);\
         class_info.finalizer = &finalizer;\
         class_info.template_.Reset(isolate, template_);\
@@ -96,8 +96,8 @@ namespace jsb
         static bool return_(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::FunctionCallbackInfo<v8::Value>& info, T val)
         {
             JavaScriptRuntime* cruntime =JavaScriptRuntime::wrap(isolate);
-            const internal::Index32 class_id = cruntime->get_class_id(VariantCaster<T>::Type);
-            const NativeClassInfo& class_info = cruntime->get_class(class_id);
+            const internal::Index32 class_id = cruntime->get_native_class_id(VariantCaster<T>::Type);
+            const NativeClassInfo& class_info = cruntime->get_native_class(class_id);
 
             v8::Local<v8::FunctionTemplate> jtemplate = class_info.template_.Get(isolate);
             v8::Local<v8::Object> r_jval = jtemplate->InstanceTemplate()->NewInstance(context).ToLocalChecked();
@@ -424,7 +424,7 @@ namespace jsb
             Variant* self = (Variant*) pointer;
             if (!p_persistent)
             {
-                JSB_LOG(Verbose, "deleting object %s", itos((uintptr_t) self));
+                JSB_LOG(Verbose, "deleting object %s", uitos((uintptr_t) self));
                 memdelete(self);
             }
         }
@@ -441,19 +441,30 @@ namespace jsb
             v8::HandleScope handle_scope(isolate);
             v8::Isolate::Scope isolate_scope(isolate);
             v8::Local<v8::Object> self = info.This();
+            v8::Local<v8::Context> context = isolate->GetCurrentContext();
             const internal::Index32 class_id(v8::Local<v8::Uint32>::Cast(info.Data())->Value());
 
+            jsb_checkf(info.IsConstructCall(), "call constructor as a regular function is not allowed");
             JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
-            const NativeClassInfo& jclass_info = cruntime->get_class(class_id);
+            const NativeClassInfo& jclass_info = cruntime->get_native_class(class_id);
             jsb_check(jclass_info.type == NativeClassInfo::GodotObject);
-            const HashMap<StringName, ClassDB::ClassInfo>::Iterator it = ClassDB::classes.find(jclass_info.name);
-            jsb_check(it != ClassDB::classes.end());
-            const ClassDB::ClassInfo& gd_class_info = it->value;
 
-            Object* gd_object = gd_class_info.creation_func();
-            //NOTE IS IT A TRUTH that ref_count==1 after creation_func??
-            jsb_check(!gd_object->is_ref_counted() || !((RefCounted*) gd_object)->is_referenced());
-            cruntime->bind_object(class_id, gd_object, self, false);
+            v8::Local<v8::Function> constructor = jclass_info.template_.Get(isolate)->GetFunction(context).ToLocalChecked();
+            if (constructor == info.NewTarget())
+            {
+                const HashMap<StringName, ClassDB::ClassInfo>::Iterator it = ClassDB::classes.find(jclass_info.name);
+                jsb_check(it != ClassDB::classes.end());
+                const ClassDB::ClassInfo& gd_class_info = it->value;
+
+                Object* gd_object = gd_class_info.creation_func();
+                //NOTE IS IT A TRUTH that ref_count==1 after creation_func??
+                jsb_check(!gd_object->is_ref_counted() || !((RefCounted*) gd_object)->is_referenced());
+                cruntime->bind_object(class_id, gd_object, self, false);
+            }
+            else
+            {
+                JSB_LOG(Warning, "[experimental] constructing from subclass");
+            }
         }
 
         static void finalizer(JavaScriptRuntime* runtime, void* pointer, bool p_persistent)
@@ -461,14 +472,14 @@ namespace jsb
             Object* self = (Object*) pointer;
             if (self->is_ref_counted())
             {
-                // if we do not `free_instance_binding`, an error will be report on `reference_object`.
+                // if we do not `free_instance_binding`, an error will be report on `reference_object (deref)`.
                 // self->free_instance_binding(runtime);
 
                 if (((RefCounted*) self)->unreference())
                 {
                     if (!p_persistent)
                     {
-                        JSB_LOG(Verbose, "deleting gd ref_counted object %s", itos((uintptr_t) self));
+                        JSB_LOG(Verbose, "deleting gd ref_counted object %s", uitos((uintptr_t) self));
                         memdelete(self);
                     }
                 }
@@ -478,7 +489,7 @@ namespace jsb
                 //TODO only delete when the object's lifecycle is fully managed by javascript
                 if (!p_persistent)
                 {
-                    JSB_LOG(Verbose, "deleting gd object %s", itos((uintptr_t) self));
+                    JSB_LOG(Verbose, "deleting gd object %s", uitos((uintptr_t) self));
                     memdelete(self);
                 }
             }

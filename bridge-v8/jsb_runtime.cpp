@@ -165,9 +165,12 @@ namespace jsb
         isolate_->SetData(kIsolateEmbedderData, this);
         isolate_->SetPromiseRejectCallback(PromiseRejectCallback_);
 
-        for (int index = 0; index < Symbols::kNum; ++index)
         {
-            symbols_[index].Reset(isolate_, v8::Symbol::New(isolate_));
+            v8::HandleScope handle_scope(isolate_);
+            for (int index = 0; index < Symbols::kNum; ++index)
+            {
+                symbols_[index].Reset(isolate_, v8::Symbol::New(isolate_));
+            }
         }
         module_loaders_.insert("godot", memnew(GodotModuleLoader));
         JavaScriptRuntimeStore::get_shared().add(this);
@@ -275,6 +278,7 @@ namespace jsb
 
     void JavaScriptRuntime::bind_object(NativeClassID p_class_id, void* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
     {
+        jsb_checkf(Thread::get_caller_id() == thread_id_, "multi-threaded call not supported yet");
         jsb_checkf(native_classes_.is_valid_index(p_class_id), "bad class_id");
         jsb_checkf(!objects_index_.has(p_pointer), "duplicated bindings");
 
@@ -295,7 +299,7 @@ namespace jsb
         {
             handle.ref_.SetWeak(p_pointer, &object_gc_callback, v8::WeakCallbackType::kInternalFields);
         }
-        JSB_LOG(Verbose, "bind object %s class_id %d", itos((int64_t) object_id), (int32_t) p_class_id);
+        JSB_LOG(Verbose, "bind object %s class_id %d", itos((int64_t) object_id), (uint32_t) p_class_id);
     }
 
     void JavaScriptRuntime::unbind_object(void* p_pointer)
@@ -317,7 +321,8 @@ namespace jsb
         const HashMap<void*, internal::Index64>::Iterator it = objects_index_.find(p_pointer);
         if (it == objects_index_.end())
         {
-            ERR_FAIL_V_MSG(true, "bad pointer");
+            WARN_PRINT(vformat("bad pointer %s", uitos((uintptr_t) p_pointer)));
+            return true;
         }
         const internal::Index64 object_id = it->value;
 

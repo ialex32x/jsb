@@ -230,9 +230,7 @@ namespace jsb::internal
 		    return true;
 		}
 
-		jsb_force_inline IndexType add(const T& value) { return append(value); }
 		jsb_force_inline IndexType add(T&& value) { return append(std::forward<T>(value)); }
-		jsb_force_inline IndexType push_back(const T& value) { return append(value); }
 		jsb_force_inline IndexType push_back(T&& value) { return append(std::forward<T>(value)); }
 
 		IndexType append(T&& value)
@@ -245,35 +243,6 @@ namespace jsb::internal
 			// recreate `value` before assignment
 		    construct_element(slot);
 			slot.set_value(std::forward<T>(value));
-			_free_index = slot.next;
-			slot.next = INDEX_NONE;
-			slot.previous = _last_index;
-			++_used_size;
-			if (_last_index != INDEX_NONE)
-			{
-				Slot& last_slot = get_data()[_last_index];
-				last_slot.next = new_index;
-			}
-			if (_first_index == INDEX_NONE)
-			{
-				_first_index = new_index;
-			}
-			_last_index = new_index;
-			++_version;
-			jsb_check(is_consistent());
-			return IndexType(new_index, slot.revision);
-		}
-
-		IndexType append(const T& value)
-		{
-			grow_if_needed(1);
-			const int new_index = _free_index;
-			Slot& slot = get_data()[new_index];
-
-			increase_revision(slot.revision);
-			// recreate `value` before assignment
-		    construct_element(slot);
-			slot.set_value(value);
 			_free_index = slot.next;
 			slot.next = INDEX_NONE;
 			slot.previous = _last_index;

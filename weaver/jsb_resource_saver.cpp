@@ -12,7 +12,8 @@ Error ResourceFormatSaverGodotJSScript::save(const Ref<Resource> &p_resource, co
 
         ERR_FAIL_COND_V_MSG(err, err, "Cannot save " JSB_RES_TYPE " file '" + p_path + "'.");
         file->store_string(sqscr->get_source_code());
-        if (file->get_error() != OK && file->get_error() != ERR_FILE_EOF) {
+        if (file->get_error() != OK && file->get_error() != ERR_FILE_EOF)
+        {
             return ERR_CANT_CREATE;
         }
     }

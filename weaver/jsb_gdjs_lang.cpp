@@ -8,8 +8,20 @@
 
 GodotJSScriptLanguage *GodotJSScriptLanguage::singleton_ = nullptr;
 
+// static void check_string(const String& source, const String& expected)
+// {
+//     String output;
+//     Error err = jsb::internal::PathUtil::extract(source, output);
+//     jsb_check(err == OK);
+//     jsb_check(expected == output);
+// }
+
 GodotJSScriptLanguage::GodotJSScriptLanguage()
 {
+    // check_string("res://./test.js", "res://test.js");
+    // check_string("res://a/b/c/../../../test.js", "res://test.js");
+    // check_string("res://a/b/c/../test.js", "res://a/b/test.js");
+    // check_string("res://a/b/c/./test.js", "res://a/b/c/test.js");
     jsb_check(!singleton_);
     singleton_ = this;
 }
@@ -28,6 +40,7 @@ void GodotJSScriptLanguage::init()
         runtime_ = std::make_shared<jsb::JavaScriptRuntime>();
         context_ = std::make_shared<jsb::JavaScriptContext>(runtime_);
 
+        //TODO add GodotJSScriptLanguage itself as a module resolver which load source directly from GodotJSScript.get_source_code()
         runtime_->add_module_resolver<jsb::DefaultModuleResolver>()
             .add_search_path("res://")
             // search path for editor only scripts

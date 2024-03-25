@@ -237,12 +237,17 @@ namespace jsb
         }
 
         // [unsafe]
-        jsb_force_inline NativeClassInfo& get_class(NativeClassID p_class_id) { return native_classes_.get_value(p_class_id); }
-        jsb_force_inline const NativeClassInfo& get_class(NativeClassID p_class_id) const { return native_classes_.get_value(p_class_id); }
+        jsb_force_inline NativeClassInfo& get_native_class(NativeClassID p_class_id) { return native_classes_.get_value(p_class_id); }
+        jsb_force_inline const NativeClassInfo& get_native_class(NativeClassID p_class_id) const { return native_classes_.get_value(p_class_id); }
 
         // [EXPERIMENTAL] get class id of primitive type (all of them are actually based on godot Variant)
-        jsb_force_inline NativeClassID get_class_id(Variant::Type p_type) const { return godot_primitives_index_[p_type]; }
+        jsb_force_inline NativeClassID get_native_class_id(Variant::Type p_type) const { return godot_primitives_index_[p_type]; }
 
+        jsb_force_inline GodotJSClassInfo& add_gdjs_class()
+        {
+            GodotJSClassID class_id = gdjs_classes_.add({});
+            return gdjs_classes_[class_id];
+        }
         jsb_force_inline GodotJSClassInfo& get_gdjs_class(GodotJSClassID p_class_id) { return gdjs_classes_[p_class_id]; }
         jsb_force_inline const GodotJSClassInfo& get_gdjs_class(GodotJSClassID p_class_id) const { return gdjs_classes_[p_class_id]; }
         jsb_force_inline const GodotJSClassInfo* find_gdjs_class(const StringName& p_name, GodotJSClassID* r_class_id) const

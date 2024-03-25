@@ -9,6 +9,9 @@
 #include "../internal/jsb_path_util.h"
 #include "core/core_constants.h"
 
+//TODO remove it
+#include "scene/main/node.h"
+
 namespace jsb
 {
     template<typename T>
@@ -160,12 +163,15 @@ namespace jsb
         }
 
         // try resolve the module id
-        const String combined_id = internal::PathUtil::combine(internal::PathUtil::dirname(p_parent_id), p_module_id);
         String normalized_id;
-        if (internal::PathUtil::extract(combined_id, normalized_id) != OK || normalized_id.is_empty())
+        if (p_module_id.begins_with("./") || p_module_id.begins_with("../"))
         {
-            isolate->ThrowError("bad path");
-            return false;
+            const String combined_id = internal::PathUtil::combine(internal::PathUtil::dirname(p_parent_id), p_module_id);
+            if (internal::PathUtil::extract(combined_id, normalized_id) != OK || normalized_id.is_empty())
+            {
+                isolate->ThrowError("bad path");
+                return false;
+            }
         }
 
         // init source module
@@ -187,10 +193,11 @@ namespace jsb
             // init the new module obj
             module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, false)).Check();
             module_obj->Set(context, v8::String::NewFromUtf8Literal(isolate, "id"), jmodule_id).Check();
-            module_obj->Set(context, v8::String::NewFromUtf8Literal(isolate, "cache"), jmodule_cache).Check();
             module_obj->Set(context, propkey_children, v8::Array::New(isolate)).Check();
             module.id = normalized_id;
+            module.path = asset_path;
             module.module.Reset(isolate, module_obj);
+            JSB_LOG(Verbose, "resolving module %s from %s", normalized_id, asset_path);
 
             //NOTE the resolver should throw error if failed
             //NOTE module.filename should be set in `resolve.load`
@@ -216,7 +223,6 @@ namespace jsb
                     {
                         JSB_LOG(Error, "can not access children on '%s'", p_parent_id);
                     }
-                    module_obj->Set(context, v8::String::NewFromUtf8Literal(isolate, "parent"), jparent_module).Check();
                 }
                 else
                 {
@@ -234,8 +240,14 @@ namespace jsb
         return false;
     }
 
-    void JavaScriptContext::_parse_script_class(v8::Isolate* p_isolate, const v8::Local<v8::Context>& p_context, JavaScriptModule &p_module)
+    void JavaScriptContext::_parse_script_class(v8::Isolate* p_isolate, const v8::Local<v8::Context>& p_context, JavaScriptModule& p_module)
     {
+        // only classes in files of godot package system could be used as godot js script
+        if (!p_module.path.begins_with("res://"))
+        {
+            return;
+        }
+
         //TODO just a temp test trying to read javascript class info from module
         //TODO `module_id` is not file path based for now, will it be better to directly use the path as `module_id`??
         v8::Local<v8::Object> exports = p_module.exports.Get(p_isolate);
@@ -258,18 +270,31 @@ namespace jsb
 
         // unsafe
         const NativeClassID native_class_id = (NativeClassID) class_id_val->Uint32Value(p_context).ToChecked();
-        const NativeClassInfo& native_class_info = runtime_->get_class(native_class_id);
+        const NativeClassInfo& native_class_info = runtime_->get_native_class(native_class_id);
 
-        // JavaScriptClassInfo& js_class_info = runtime->add_godotjs_class();
-        GodotJSClassInfo js_class_info;
+        GodotJSClassInfo& js_class_info = runtime_->add_gdjs_class();
+        // GodotJSClassInfo js_class_info;
         js_class_info.module_id = p_module.id;
         js_class_info.js_class_name = String(*name, name.length());
         js_class_info.native_class_id = native_class_id;
         js_class_info.native_class_name = native_class_info.name;
         js_class_info.js_class.Reset(p_isolate, default_obj);
 
-        JSB_LOG(Verbose, "class name %s (native %s)", js_class_info.js_class_name, js_class_info.native_class_name);
+        JSB_LOG(Verbose, "godot js class name %s (native: %s)", js_class_info.js_class_name, js_class_info.native_class_name);
         //TODO collect methods/signals/properties
+    }
+
+    void JavaScriptContext::crossbind(Object* p_this, GodotJSClassID p_class_id)
+    {
+        v8::Isolate* isolate = get_isolate();
+        v8::HandleScope handle_scope(isolate);
+        v8::Local<v8::Context> context = context_.Get(isolate);
+
+        GodotJSClassInfo& class_info = runtime_->get_gdjs_class(p_class_id);
+        v8::Local<v8::Object> constructor = class_info.js_class.Get(isolate);
+        v8::Local<v8::Object> instance = constructor->CallAsConstructor(context, 0, nullptr).ToLocalChecked().As<v8::Object>();
+        runtime_->bind_object(class_info.native_class_id, p_this, instance, false);
+        JSB_LOG(Warning, "[experimental] crossbinding %s", uitos((uintptr_t) p_this));
     }
 
     void JavaScriptContext::_register_builtins(const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& self)
@@ -590,7 +615,7 @@ namespace jsb
             {
                 *r_class_id = found->value;
             }
-            return &runtime_->get_class(found->value);
+            return &runtime_->get_native_class(found->value);
         }
 
         NativeClassID class_id;
@@ -873,9 +898,9 @@ namespace jsb
             {
                 //TODO TEMP SOLUTION
                 JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
-                if (const NativeClassID class_id = cruntime->get_class_id(var_type))
+                if (const NativeClassID class_id = cruntime->get_native_class_id(var_type))
                 {
-                    const NativeClassInfo& class_info = cruntime->get_class(class_id);
+                    const NativeClassInfo& class_info = cruntime->get_native_class(class_id);
                     v8::Local<v8::FunctionTemplate> jtemplate = class_info.template_.Get(isolate);
                     r_jval = jtemplate->InstanceTemplate()->NewInstance(context).ToLocalChecked();
                     jsb_check(r_jval.As<v8::Object>()->InternalFieldCount() == kObjectFieldCount);

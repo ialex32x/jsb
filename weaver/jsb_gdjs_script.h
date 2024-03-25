@@ -16,6 +16,8 @@ private:
     bool valid_ = false;
     bool reloading_ = false;
 
+    SelfList<GodotJSScript> script_list_;
+
     String source_;
     String path_;
     GodotJSScript* base_ = nullptr;
@@ -23,8 +25,14 @@ private:
     jsb::GodotJSClassID gdjs_class_id_;
 
 public:
+    GodotJSScript();
+    virtual ~GodotJSScript() override;
+
     jsb_force_inline const jsb::GodotJSClassInfo& get_js_class_info() const
     {
+        //TODO load module before use
+        JSB_LOG(Verbose, "godot js script %s", path_);
+
         return runtime_->get_gdjs_class(gdjs_class_id_);
     }
 

@@ -9,7 +9,11 @@
 class GodotJSScriptLanguage : public ScriptLanguage
 {
 private:
+    friend class GodotJSScript;
 	static GodotJSScriptLanguage* singleton_;
+
+    Mutex mutex_;
+    SelfList<GodotJSScript>::List script_list_;
 
     bool once_inited_ = false;
     std::shared_ptr<jsb::JavaScriptRuntime> runtime_;

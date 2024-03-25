@@ -33,6 +33,8 @@ namespace jsb
 
         // strong reference
         // the counterpart of exposed C++ class.
+        //NOTE template_.GetFunction() returns the `constructor`,
+        //NOTE `constructor == info.NewTarget()` only if directly creating a class instance
         v8::Global<v8::FunctionTemplate> template_;
     };
 
@@ -71,7 +73,7 @@ namespace jsb
 
         // js class name
         StringName js_class_name;
-         v8::Global<v8::Object> js_class;
+        v8::Global<v8::Object> js_class;
 
         NativeClassID native_class_id;
         StringName native_class_name;
