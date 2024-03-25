@@ -182,9 +182,10 @@ namespace jsb
         String asset_path;
         if (IModuleResolver* resolver = runtime_->find_module_resolver(normalized_id, asset_path))
         {
+            const String& module_id = asset_path;
             // supported module properties: id, filename, cache, loaded, exports, children
-            JavaScriptModule& module = module_cache_.insert(normalized_id, true);
-            const CharString cmodule_id = normalized_id.utf8();
+            JavaScriptModule& module = module_cache_.insert(module_id, true);
+            const CharString cmodule_id = module_id.utf8();
             v8::Local<v8::Object> module_obj = v8::Object::New(isolate);
             v8::Local<v8::String> propkey_loaded = v8::String::NewFromUtf8Literal(isolate, "loaded");
             v8::Local<v8::String> propkey_children = v8::String::NewFromUtf8Literal(isolate, "children");
@@ -198,10 +199,10 @@ namespace jsb
             module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, false)).Check();
             module_obj->Set(context, v8::String::NewFromUtf8Literal(isolate, "id"), jmodule_id).Check();
             module_obj->Set(context, propkey_children, v8::Array::New(isolate)).Check();
-            module.id = normalized_id;
+            module.id = module_id;
             module.path = asset_path;
             module.module.Reset(isolate, module_obj);
-            JSB_LOG(Verbose, "resolving module %s from %s", normalized_id, asset_path);
+            JSB_LOG(Verbose, "loading module %s", module_id);
 
             //NOTE the resolver should throw error if failed
             //NOTE module.filename should be set in `resolve.load`

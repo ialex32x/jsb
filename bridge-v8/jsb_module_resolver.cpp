@@ -97,7 +97,7 @@ namespace jsb
         const String extended = p_module_id.ends_with(ext) ? p_module_id : p_module_id + ext;
 
         // directly inspect it at first if it's an explicit path
-        if (extended.begins_with("res://") && get_file_access()->file_exists(extended))
+        if (extended.contains(":/") && get_file_access()->file_exists(extended))
         {
             r_asset_path = extended;
             return true;
