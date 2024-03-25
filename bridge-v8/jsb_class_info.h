@@ -36,7 +36,7 @@ namespace jsb
         v8::Global<v8::FunctionTemplate> template_;
     };
 
-    struct JavaScriptMethodInfo
+    struct GodotJSMethodInfo
     {
         enum Flags : uint8_t
         {
@@ -49,7 +49,7 @@ namespace jsb
         jsb_force_inline bool is_static() const { return flags & Static; }
     };
 
-    struct JavaScriptPropertyInfo
+    struct GodotJSPropertyInfo
     {
         //TODO
     };
@@ -57,7 +57,7 @@ namespace jsb
     // exchanging internal javascript class (object) information with `JavaScript` class.
     // DO NOT expose javascript runtime detail types with involved external classes
     // since these info structs will be replaced deps on the actual runtime selected.
-    struct JavaScriptClassInfo
+    struct GodotJSClassInfo
     {
         enum Flags : uint8_t
         {
@@ -67,18 +67,20 @@ namespace jsb
             Abstract = 1,
         };
 
+        StringName module_id;
+
         // js class name
         StringName js_class_name;
-        // v8::Global<v8::Object> js_class;
+         v8::Global<v8::Object> js_class;
 
         NativeClassID native_class_id;
         StringName native_class_name;
 
         Flags flags = None;
 
-        HashMap<StringName, JavaScriptMethodInfo> methods;
-        HashMap<StringName, JavaScriptMethodInfo> signals;
-        HashMap<StringName, JavaScriptPropertyInfo> properties;
+        HashMap<StringName, GodotJSMethodInfo> methods;
+        HashMap<StringName, GodotJSMethodInfo> signals;
+        HashMap<StringName, GodotJSPropertyInfo> properties;
 
         //TODO whether the internal class object alive or not
         bool is_valid() const { return true; }

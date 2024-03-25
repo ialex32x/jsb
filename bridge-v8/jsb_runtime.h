@@ -63,7 +63,7 @@ namespace jsb
 
         //TODO all exported default classes inherit native godot class (directly or indirectly)
         // they're only collected on a module loaded
-        internal::SArray<JavaScriptClassInfo, GodotJSClassID> gdjs_classes_;
+        internal::SArray<GodotJSClassInfo, GodotJSClassID> gdjs_classes_;
         // gdjs class name => js class id
         HashMap<StringName, GodotJSClassID> gdjs_classes_index_;
 
@@ -243,9 +243,9 @@ namespace jsb
         // [EXPERIMENTAL] get class id of primitive type (all of them are actually based on godot Variant)
         jsb_force_inline NativeClassID get_class_id(Variant::Type p_type) const { return godot_primitives_index_[p_type]; }
 
-        jsb_force_inline JavaScriptClassInfo& get_gdjs_class(GodotJSClassID p_class_id) { return gdjs_classes_[p_class_id]; }
-        jsb_force_inline const JavaScriptClassInfo& get_gdjs_class(GodotJSClassID p_class_id) const { return gdjs_classes_[p_class_id]; }
-        jsb_force_inline const JavaScriptClassInfo* find_gdjs_class(const StringName& p_name, GodotJSClassID* r_class_id) const
+        jsb_force_inline GodotJSClassInfo& get_gdjs_class(GodotJSClassID p_class_id) { return gdjs_classes_[p_class_id]; }
+        jsb_force_inline const GodotJSClassInfo& get_gdjs_class(GodotJSClassID p_class_id) const { return gdjs_classes_[p_class_id]; }
+        jsb_force_inline const GodotJSClassInfo* find_gdjs_class(const StringName& p_name, GodotJSClassID* r_class_id) const
         {
             const HashMap<StringName, GodotJSClassID>::ConstIterator it = gdjs_classes_index_.find(p_name);
             if (it != gdjs_classes_index_.end())

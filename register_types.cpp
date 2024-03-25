@@ -1,11 +1,11 @@
 #include "register_types.h"
 
-#include "weaver/jsb_lang.h"
+#include "weaver/jsb_gdjs_lang.h"
 #include "weaver/jsb_resource_loader.h"
 #include "weaver/jsb_resource_saver.h"
 
-Ref<ResourceFormatLoaderJavaScript> resource_loader_js;
-Ref<ResourceFormatSaverJavaScript> resource_saver_js;
+Ref<ResourceFormatLoaderGodotJSScript> resource_loader_js;
+Ref<ResourceFormatSaverGodotJSScript> resource_saver_js;
 
 void initialize_jsb_module(ModuleInitializationLevel p_level)
 {
@@ -16,7 +16,7 @@ void initialize_jsb_module(ModuleInitializationLevel p_level)
     if (p_level == MODULE_INITIALIZATION_LEVEL_CORE)
     {
         // register javascript language
-        JavaScriptLanguage* script_language_js = memnew(JavaScriptLanguage());
+        GodotJSScriptLanguage* script_language_js = memnew(GodotJSScriptLanguage());
 	    ScriptServer::register_language(script_language_js);
 
 		resource_loader_js.instantiate();
@@ -38,7 +38,7 @@ void uninitialize_jsb_module(ModuleInitializationLevel p_level)
 		ResourceSaver::remove_resource_format_saver(resource_saver_js);
 		resource_saver_js.unref();
 
-        JavaScriptLanguage *script_language_js = JavaScriptLanguage::get_singleton();
+        GodotJSScriptLanguage *script_language_js = GodotJSScriptLanguage::get_singleton();
         jsb_check(script_language_js);
         ScriptServer::unregister_language(script_language_js);
         memdelete(script_language_js);

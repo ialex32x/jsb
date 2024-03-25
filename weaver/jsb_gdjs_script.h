@@ -5,10 +5,10 @@
 #include "jsb_weaver_consts.h"
 #include "jsb_bridge.h"
 
-class JavaScript : public Script
+class GodotJSScript : public Script
 {
     typedef Script super;
-    GDCLASS(JavaScript, Script)
+    GDCLASS(GodotJSScript, Script)
 
 private:
     // fields
@@ -18,12 +18,12 @@ private:
 
     String source_;
     String path_;
-    JavaScript* base_ = nullptr;
+    GodotJSScript* base_ = nullptr;
     std::shared_ptr<jsb::JavaScriptRuntime> runtime_;
     jsb::GodotJSClassID gdjs_class_id_;
 
 public:
-    jsb_force_inline const jsb::JavaScriptClassInfo& get_js_class_info() const
+    jsb_force_inline const jsb::GodotJSClassInfo& get_js_class_info() const
     {
         return runtime_->get_gdjs_class(gdjs_class_id_);
     }

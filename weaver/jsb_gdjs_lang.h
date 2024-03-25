@@ -6,22 +6,22 @@
 #include "jsb_weaver_consts.h"
 #include "jsb_bridge.h"
 
-class JavaScriptLanguage : public ScriptLanguage
+class GodotJSScriptLanguage : public ScriptLanguage
 {
 private:
-	static JavaScriptLanguage* singleton_;
+	static GodotJSScriptLanguage* singleton_;
 
     bool once_inited_ = false;
     std::shared_ptr<jsb::JavaScriptRuntime> runtime_;
     std::shared_ptr<jsb::JavaScriptContext> context_;
 
 public:
-    jsb_force_inline static JavaScriptLanguage* get_singleton() { return singleton_; }
+    jsb_force_inline static GodotJSScriptLanguage* get_singleton() { return singleton_; }
 
     jsb_force_inline jsb::JavaScriptContext* get_context() const { return context_.get(); }
 
-    JavaScriptLanguage();
-    virtual ~JavaScriptLanguage() override;
+    GodotJSScriptLanguage();
+    virtual ~GodotJSScriptLanguage() override;
 
     virtual void init() override;
     virtual void finish() override;

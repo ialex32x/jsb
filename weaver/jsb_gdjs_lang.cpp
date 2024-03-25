@@ -1,25 +1,26 @@
-#include "jsb_lang.h"
+#include "jsb_gdjs_lang.h"
+
 #include <iterator>
 
-#include "jsb_script.h"
-#include "jsb_script_instance.h"
 #include "../internal/jsb_path_util.h"
+#include "jsb_gdjs_script_instance.h"
+#include "jsb_gdjs_script.h"
 
-JavaScriptLanguage *JavaScriptLanguage::singleton_ = nullptr;
+GodotJSScriptLanguage *GodotJSScriptLanguage::singleton_ = nullptr;
 
-JavaScriptLanguage::JavaScriptLanguage()
+GodotJSScriptLanguage::GodotJSScriptLanguage()
 {
     jsb_check(!singleton_);
     singleton_ = this;
 }
 
-JavaScriptLanguage::~JavaScriptLanguage()
+GodotJSScriptLanguage::~GodotJSScriptLanguage()
 {
     jsb_check(singleton_ == this);
     singleton_ = nullptr;
 }
 
-void JavaScriptLanguage::init()
+void GodotJSScriptLanguage::init()
 {
     if (!once_inited_)
     {
@@ -44,7 +45,7 @@ void JavaScriptLanguage::init()
     JSB_LOG(Verbose, "jsb lang init");
 }
 
-void JavaScriptLanguage::finish()
+void GodotJSScriptLanguage::finish()
 {
     jsb_check(once_inited_);
     once_inited_ = false;
@@ -53,13 +54,13 @@ void JavaScriptLanguage::finish()
     JSB_LOG(Verbose, "jsb lang finish");
 }
 
-void JavaScriptLanguage::frame()
+void GodotJSScriptLanguage::frame()
 {
     runtime_->update();
     // runtime_->gc();
 }
 
-void JavaScriptLanguage::get_reserved_words(List<String>* p_words) const
+void GodotJSScriptLanguage::get_reserved_words(List<String>* p_words) const
 {
     static const char* keywords[] = {
         "return", "function", "interface", "class", "let", "break", "as", "any", "switch", "case", "if", "enum",
@@ -91,36 +92,36 @@ struct JavaScriptControlFlowKeywords
     }
 };
 
-bool JavaScriptLanguage::is_control_flow_keyword(String p_keyword) const
+bool GodotJSScriptLanguage::is_control_flow_keyword(String p_keyword) const
 {
     static JavaScriptControlFlowKeywords collection;
     return collection.values.has(p_keyword);
 }
 
-void JavaScriptLanguage::get_doc_comment_delimiters(List<String>* p_delimiters) const
+void GodotJSScriptLanguage::get_doc_comment_delimiters(List<String>* p_delimiters) const
 {
     p_delimiters->push_back("///");
 }
 
-void JavaScriptLanguage::get_comment_delimiters(List<String> *p_delimiters) const
+void GodotJSScriptLanguage::get_comment_delimiters(List<String> *p_delimiters) const
 {
     p_delimiters->push_back("//");
     p_delimiters->push_back("/* */");
 }
 
-void JavaScriptLanguage::get_string_delimiters(List<String> *p_delimiters) const
+void GodotJSScriptLanguage::get_string_delimiters(List<String> *p_delimiters) const
 {
     p_delimiters->push_back("' '");
     p_delimiters->push_back("\" \"");
     p_delimiters->push_back("` `");
 }
 
-Script* JavaScriptLanguage::create_script() const
+Script* GodotJSScriptLanguage::create_script() const
 {
-    return memnew(JavaScript);
+    return memnew(GodotJSScript);
 }
 
-bool JavaScriptLanguage::validate(const String& p_script, const String& p_path, List<String>* r_functions, List<ScriptError>* r_errors, List<Warning>* r_warnings, HashSet<int>* r_safe_lines) const
+bool GodotJSScriptLanguage::validate(const String& p_script, const String& p_path, List<String>* r_functions, List<ScriptError>* r_errors, List<Warning>* r_warnings, HashSet<int>* r_safe_lines) const
 {
     jsb::JavaScriptExceptionInfo exception_info;
     if (context_->validate(p_path, &exception_info))
@@ -137,15 +138,15 @@ bool JavaScriptLanguage::validate(const String& p_script, const String& p_path, 
     return false;
 }
 
-Ref<Script> JavaScriptLanguage::make_template(const String& p_template, const String& p_class_name, const String& p_base_class_name) const
+Ref<Script> GodotJSScriptLanguage::make_template(const String& p_template, const String& p_class_name, const String& p_base_class_name) const
 {
-    Ref<JavaScript> spt;
+    Ref<GodotJSScript> spt;
     spt.instantiate();
     spt->set_source_code(p_template);
     return spt;
 }
 
-Vector<ScriptLanguage::ScriptTemplate> JavaScriptLanguage::get_built_in_templates(StringName p_object)
+Vector<ScriptLanguage::ScriptTemplate> GodotJSScriptLanguage::get_built_in_templates(StringName p_object)
 {
     Vector<ScriptTemplate> templates;
 #ifdef TOOLS_ENABLED
@@ -160,19 +161,19 @@ Vector<ScriptLanguage::ScriptTemplate> JavaScriptLanguage::get_built_in_template
     return templates;
 }
 
-void JavaScriptLanguage::reload_all_scripts()
+void GodotJSScriptLanguage::reload_all_scripts()
 {
     //TODO
     JSB_LOG(Verbose, "TODO");
 }
 
-void JavaScriptLanguage::reload_tool_script(const Ref<Script> &p_script, bool p_soft_reload)
+void GodotJSScriptLanguage::reload_tool_script(const Ref<Script> &p_script, bool p_soft_reload)
 {
     //TODO
     JSB_LOG(Verbose, "TODO");
 }
 
-void JavaScriptLanguage::get_recognized_extensions(List<String>* p_extensions) const
+void GodotJSScriptLanguage::get_recognized_extensions(List<String>* p_extensions) const
 {
     p_extensions->push_back(JSB_RES_EXT);
 }

@@ -105,7 +105,7 @@ namespace jsb
             return false;
         }
 
-        const CharString cmodule_id = p_module.id.utf8();
+        const CharString cmodule_id = String(p_module.id).utf8();
         const CharString cfilename = filename_abs.utf8();
         const CharString cdirname = internal::PathUtil::dirname(filename_abs).utf8();
 

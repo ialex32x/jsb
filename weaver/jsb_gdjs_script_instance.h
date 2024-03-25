@@ -2,15 +2,15 @@
 #define JAVASCRIPT_SCRIPT_INSTANCE_H
 
 #include "core/object/script_language.h"
-#include "jsb_script.h"
+#include "jsb_gdjs_script.h"
 
-class JavaScriptInstance : public ScriptInstance
+class GodotJSScriptInstance : public ScriptInstance
 {
 private:
-    friend class JavaScript;
+    friend class GodotJSScript;
 
     Object* owner_ = nullptr;
-    Ref<JavaScript> script_;
+    Ref<GodotJSScript> script_;
     // object handle id
     jsb::internal::Index64 object_id_;
     HashMap<StringName, jsb::JavaScriptFunction> cached_methods_;
@@ -42,7 +42,7 @@ public:
 #pragma endregion
 
 private:
-    JavaScriptInstance() {}
+    GodotJSScriptInstance() {}
 };
 
 #endif

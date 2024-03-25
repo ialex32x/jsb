@@ -78,6 +78,16 @@ namespace jsb
         }
     }
 
+    static jsb_force_inline String to_string(v8::Isolate* isolate, const v8::Local<v8::Value>& p_value)
+    {
+        if (p_value->IsString())
+        {
+            v8::String::Utf8Value decode(isolate, p_value);
+            return StringName(String(*decode, decode.length()));
+        }
+        return StringName();
+    }
+
     void JavaScriptContext::_require(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
         v8::Isolate* isolate = info.GetIsolate();
@@ -98,9 +108,8 @@ namespace jsb
         }
 
         // read parent module id from magic data
-        String parent_id = JavaScriptModuleCache::get_name(isolate, info.Data());
-        String module_id = JavaScriptModuleCache::get_name(isolate, arg0);
-
+        const String parent_id = to_string(isolate, info.Data());
+        const String module_id = to_string(isolate, arg0);
         JavaScriptContext* ccontext = JavaScriptContext::wrap(context);
         JavaScriptModule* module;
         if (ccontext->_load_module(parent_id, module_id, module))
@@ -252,10 +261,12 @@ namespace jsb
         const NativeClassInfo& native_class_info = runtime_->get_class(native_class_id);
 
         // JavaScriptClassInfo& js_class_info = runtime->add_godotjs_class();
-        JavaScriptClassInfo js_class_info;
+        GodotJSClassInfo js_class_info;
+        js_class_info.module_id = p_module.id;
         js_class_info.js_class_name = String(*name, name.length());
         js_class_info.native_class_id = native_class_id;
         js_class_info.native_class_name = native_class_info.name;
+        js_class_info.js_class.Reset(p_isolate, default_obj);
 
         JSB_LOG(Verbose, "class name %s (native %s)", js_class_info.js_class_name, js_class_info.native_class_name);
         //TODO collect methods/signals/properties
