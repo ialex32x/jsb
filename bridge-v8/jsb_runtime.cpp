@@ -188,7 +188,6 @@ namespace jsb
             // class_info.xxx.Reset();
             gdjs_classes_.remove_at(id);
         }
-        gdjs_classes_index_.clear();
 
         for (int index = 0; index < Symbols::kNum; ++index)
         {

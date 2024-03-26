@@ -202,7 +202,6 @@ namespace jsb
             module.id = module_id;
             module.path = asset_path;
             module.module.Reset(isolate, module_obj);
-            JSB_LOG(Verbose, "loading module %s", module_id);
 
             //NOTE the resolver should throw error if failed
             //NOTE module.filename should be set in `resolve.load`
@@ -277,8 +276,9 @@ namespace jsb
         const NativeClassID native_class_id = (NativeClassID) class_id_val->Uint32Value(p_context).ToChecked();
         const NativeClassInfo& native_class_info = runtime_->get_native_class(native_class_id);
 
-        GodotJSClassInfo& js_class_info = runtime_->add_gdjs_class();
-        // GodotJSClassInfo js_class_info;
+        GodotJSClassID gdjs_class_id;
+        GodotJSClassInfo& js_class_info = runtime_->add_gdjs_class(gdjs_class_id);
+        p_module.default_class_id = gdjs_class_id;
         js_class_info.module_id = p_module.id;
         js_class_info.js_class_name = String(*name, name.length());
         js_class_info.native_class_id = native_class_id;
@@ -286,7 +286,27 @@ namespace jsb
         js_class_info.js_class.Reset(p_isolate, default_obj);
 
         JSB_LOG(Verbose, "godot js class name %s (native: %s)", js_class_info.js_class_name, js_class_info.native_class_name);
+
+        struct Payload { v8::Isolate* isolate; GodotJSClassInfo& class_info; }
+        payload = { p_isolate, js_class_info, };
         //TODO collect methods/signals/properties
+        // v8::Local<v8::Object> prototype = default_obj->GetPrototype().As<v8::Object>();
+        v8::Local<v8::Object> prototype = default_obj->Get(p_context, v8::String::NewFromUtf8Literal(p_isolate, "prototype")).ToLocalChecked().As<v8::Object>();
+        v8::Local<v8::Array> property_names = prototype->GetPropertyNames(p_context, v8::KeyCollectionMode::kOwnOnly, v8::PropertyFilter::ALL_PROPERTIES, v8::IndexFilter::kSkipIndices, v8::KeyConversionMode::kNoNumbers).ToLocalChecked();
+        property_names->Iterate(p_context, [](uint32_t index, v8::Local<v8::Value> element, void* data)
+        {
+            const Payload& payload = *(Payload*) data;
+            const v8::String::Utf8Value name_t(payload.isolate, element);
+            const String name = String(*name_t, name_t.length());
+            if (name != "constructor")
+            {
+                GodotJSMethodInfo method_info = {};
+                payload.class_info.methods.insert(name, method_info);
+                JSB_LOG(Verbose, "... property: %s", name);
+            }
+            return v8::Array::CallbackResult::kContinue;
+        }, &payload);
+
     }
 
     void JavaScriptContext::crossbind(Object* p_this, GodotJSClassID p_class_id)
@@ -494,7 +514,7 @@ namespace jsb
 
         if (JavaScriptExceptionInfo exception_info = JavaScriptExceptionInfo(isolate, try_catch_run))
         {
-            ERR_FAIL_V_MSG(ERR_COMPILATION_FAILED, (String) exception_info);
+            ERR_FAIL_V_MSG(ERR_COMPILATION_FAILED, vformat("%s (%s)", (String) exception_info, p_name));
         }
         ERR_FAIL_V_MSG(ERR_COMPILATION_FAILED, "something wrong");
     }

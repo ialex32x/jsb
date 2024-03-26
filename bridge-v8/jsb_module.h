@@ -2,6 +2,7 @@
 #define JAVASCRIPT_MODULE_H
 
 #include "jsb_pch.h"
+#include "jsb_typealias.h"
 
 namespace jsb
 {
@@ -11,6 +12,9 @@ namespace jsb
 
         // asset path
         String path;
+
+        //
+        GodotJSClassID default_class_id;
 
         v8::Global<v8::Object> module;
         v8::Global<v8::Object> exports;

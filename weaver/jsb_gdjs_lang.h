@@ -22,6 +22,7 @@ private:
 public:
     jsb_force_inline static GodotJSScriptLanguage* get_singleton() { return singleton_; }
 
+    // main context
     jsb_force_inline jsb::JavaScriptContext* get_context() const { return context_.get(); }
 
     GodotJSScriptLanguage();

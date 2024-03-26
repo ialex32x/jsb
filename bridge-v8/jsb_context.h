@@ -60,6 +60,8 @@ namespace jsb
             return wrap(p_context)->function_pointers_[p_offset];
         }
 
+        jsb_force_inline const JavaScriptModuleCache& get_module_cache() const { return module_cache_; }
+
         //NOTE AVOID USING THIS CALL, CONSIDERING REMOVING IT.
         //     eval from source
         jsb_deprecated

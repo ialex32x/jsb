@@ -28,6 +28,8 @@ public:
     GodotJSScript();
     virtual ~GodotJSScript() override;
 
+    void attach_source(const String& p_path, const String& p_source, jsb::GodotJSClassID p_class_id);
+
     jsb_force_inline const jsb::GodotJSClassInfo& get_js_class_info() const
     {
         //TODO load module before use

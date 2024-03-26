@@ -1,15 +1,13 @@
 #ifndef JAVASCRIPT_CLASS_INFO_H
 #define JAVASCRIPT_CLASS_INFO_H
-#include "jsb_function.h"
+
 #include "jsb_pch.h"
+#include "jsb_typealias.h"
 
 namespace jsb
 {
     typedef void (*ConstructorFunc)(const v8::FunctionCallbackInfo<v8::Value>&);
     typedef void (*FinalizerFunc)(class JavaScriptRuntime*, void*, bool /* p_persistent */);
-
-    typedef internal::Index32 NativeClassID;
-    typedef internal::Index32 GodotJSClassID;
 
     struct NativeClassInfo
     {

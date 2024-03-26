@@ -204,3 +204,10 @@ bool GodotJSScript::instance_has(const Object *p_this) const
     //TODO
     return false;
 }
+
+void GodotJSScript::attach_source(const String& p_path, const String& p_source, jsb::GodotJSClassID p_class_id)
+{
+    gdjs_class_id_ = p_class_id;
+    set_path(p_path);
+    set_source_code(p_source);
+}

@@ -41,6 +41,7 @@ void GodotJSScriptLanguage::init()
 
         // editor entry script
         context_->load("main_entry");
+        // context_->load("res://src/main.js");
         // runtime_->find_gdjs_class("TestClass");
     }
     JSB_LOG(Verbose, "jsb lang init");

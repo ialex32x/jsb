@@ -64,8 +64,6 @@ namespace jsb
         //TODO all exported default classes inherit native godot class (directly or indirectly)
         // they're only collected on a module loaded
         internal::SArray<GodotJSClassInfo, GodotJSClassID> gdjs_classes_;
-        // gdjs class name => js class id
-        HashMap<StringName, GodotJSClassID> gdjs_classes_index_;
 
         // cpp objects should be added here since the gc callback is not guaranteed by v8
         // we need to delete them on finally releasing JavaScriptRuntime
@@ -243,23 +241,13 @@ namespace jsb
         // [EXPERIMENTAL] get class id of primitive type (all of them are actually based on godot Variant)
         jsb_force_inline NativeClassID get_native_class_id(Variant::Type p_type) const { return godot_primitives_index_[p_type]; }
 
-        jsb_force_inline GodotJSClassInfo& add_gdjs_class()
+        jsb_force_inline GodotJSClassInfo& add_gdjs_class(GodotJSClassID& r_class_id)
         {
-            GodotJSClassID class_id = gdjs_classes_.add({});
-            return gdjs_classes_[class_id];
+            r_class_id = gdjs_classes_.add({});
+            return gdjs_classes_[r_class_id];
         }
         jsb_force_inline GodotJSClassInfo& get_gdjs_class(GodotJSClassID p_class_id) { return gdjs_classes_[p_class_id]; }
         jsb_force_inline const GodotJSClassInfo& get_gdjs_class(GodotJSClassID p_class_id) const { return gdjs_classes_[p_class_id]; }
-        jsb_force_inline const GodotJSClassInfo* find_gdjs_class(const StringName& p_name, GodotJSClassID* r_class_id) const
-        {
-            const HashMap<StringName, GodotJSClassID>::ConstIterator it = gdjs_classes_index_.find(p_name);
-            if (it != gdjs_classes_index_.end())
-            {
-                if (r_class_id) *r_class_id = it->value;
-                return &gdjs_classes_[it->value];
-            }
-            return nullptr;
-        }
 
     private:
         void on_context_created(const v8::Local<v8::Context>& p_context);

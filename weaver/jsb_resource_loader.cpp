@@ -15,11 +15,23 @@ Ref<Resource> ResourceFormatLoaderGodotJSScript::load(const String &p_path, cons
         if (r_error) *r_error = err;
         return {};
     }
-    Ref<GodotJSScript> spt;
-    spt.instantiate();
-    spt->set_path(p_path);
-    spt->set_source_code(code);
-    return spt;
+    GodotJSScriptLanguage* lang = GodotJSScriptLanguage::get_singleton();
+    jsb::JavaScriptContext* ccontext = lang->get_context();
+    ccontext->load(p_path);
+    const jsb::JavaScriptModuleCache& module_cache = ccontext->get_module_cache();
+    if (jsb::JavaScriptModule* module = module_cache.find(p_path))
+    {
+        if (module->default_class_id)
+        {
+            Ref<GodotJSScript> spt;
+            spt.instantiate();
+            spt->attach_source(p_path, code, module->default_class_id);
+            return spt;
+        }
+    }
+
+    if (r_error) *r_error = FAILED;
+    return {};
 }
 
 void ResourceFormatLoaderGodotJSScript::get_recognized_extensions(List<String> *p_extensions) const
