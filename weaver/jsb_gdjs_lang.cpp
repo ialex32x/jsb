@@ -154,7 +154,7 @@ Vector<ScriptLanguage::ScriptTemplate> GodotJSScriptLanguage::get_built_in_templ
 #ifdef TOOLS_ENABLED
     //TODO load templates from disc
     ScriptTemplate st;
-    st.content = "// template\nexport default class _CLASS_ {\n}\n";
+    st.content = "// template\nexport default class {\n}\n";
     st.description = "a javascript boilerplate";
     st.inherit = p_object;
     st.name = "Basic Class Template";
@@ -178,9 +178,4 @@ void GodotJSScriptLanguage::reload_tool_script(const Ref<Script> &p_script, bool
 void GodotJSScriptLanguage::get_recognized_extensions(List<String>* p_extensions) const
 {
     p_extensions->push_back(JSB_RES_EXT);
-}
-
-const jsb::GodotJSClassInfo& GodotJSScriptLanguage::get_gdjs_class_info(jsb::GodotJSClassID p_class_id) const
-{
-    return runtime_->get_gdjs_class(p_class_id);
 }

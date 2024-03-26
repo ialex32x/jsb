@@ -45,7 +45,7 @@
     v8::HandleScope handle_scope(isolate);\
     v8::Isolate::Scope isolate_scope(isolate);\
     v8::Local<v8::Context> context = isolate->GetCurrentContext();\
-    Functor& func = *(Functor*) JavaScriptContext::get_function(context, info.Data()->Uint32Value(context).ToChecked());\
+    Functor& func = *(Functor*) JavaScriptContext::get_function_pointer(context, info.Data()->Uint32Value(context).ToChecked());\
     (void) 0
 
 namespace jsb

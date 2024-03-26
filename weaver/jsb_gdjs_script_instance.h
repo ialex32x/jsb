@@ -13,7 +13,6 @@ private:
     Ref<GodotJSScript> script_;
     // object handle id
     jsb::NativeObjectID object_id_;
-    HashMap<StringName, jsb::JavaScriptFunction> cached_methods_;
 
 public:
 #pragma region ScriptIntance Implementation

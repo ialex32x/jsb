@@ -9,6 +9,9 @@
 
 #include <cstdint>
 
+#include "core/core_constants.h"
+#include "core/string/string_builder.h"
+
 #include "core/math/vector2.h"
 #include "core/math/vector3.h"
 #include "core/math/vector4.h"

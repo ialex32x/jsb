@@ -1,6 +1,7 @@
 #ifndef JAVASCRIPT_CONTEXT_H
 #define JAVASCRIPT_CONTEXT_H
 
+#include "jsb_function.h"
 #include "jsb_pch.h"
 #include "jsb_runtime.h"
 #include "jsb_module.h"
@@ -28,6 +29,9 @@ namespace jsb
         JavaScriptModuleCache module_cache_;
         v8::Global<v8::Object> jmodule_cache_;
 
+        //TODO shit
+        internal::SArray<JavaScriptFunction> js_functions_;
+
         // main context
         v8::Global<v8::Context> context_;
 
@@ -54,11 +58,18 @@ namespace jsb
         jsb_deleteme
         void expose_temp();
 
-        // jsb_force_inline uint8_t* get_function_pointer(uint32_t p_offset) { return function_pointers_[p_offset]; }
-        jsb_force_inline static uint8_t* get_function(const v8::Local<v8::Context>& p_context, uint32_t p_offset)
+        //TODO temp
+        jsb_force_inline const GodotJSClassInfo& get_gdjs_class_info(GodotJSClassID p_class_id) const { return runtime_->get_gdjs_class(p_class_id); }
+
+        jsb_force_inline static uint8_t* get_function_pointer(const v8::Local<v8::Context>& p_context, uint32_t p_offset)
         {
             return wrap(p_context)->function_pointers_[p_offset];
         }
+
+        //TODO temp
+        GodotJSFunctionID get_function(NativeObjectID p_object_id, const StringName& p_method);
+        bool remove_function(GodotJSFunctionID p_func_id);
+        Variant call_function(NativeObjectID p_object_id, GodotJSFunctionID p_func_id, const Variant **p_args, int p_argcount, Callable::CallError &r_error);
 
         jsb_force_inline const JavaScriptModuleCache& get_module_cache() const { return module_cache_; }
 

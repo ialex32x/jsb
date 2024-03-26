@@ -52,24 +52,12 @@ void GodotJSScriptInstance::get_method_list(List<MethodInfo> *p_list) const
 bool GodotJSScriptInstance::has_method(const StringName &p_method) const
 {
     //TODO
-    return false;
+    return true;
 }
 
 Variant GodotJSScriptInstance::callp(const StringName &p_method, const Variant **p_args, int p_argcount, Callable::CallError &r_error)
 {
-
-    if (const HashMap<StringName, jsb::JavaScriptFunction>::Iterator& it = cached_methods_.find(p_method))
-    {
-        // it->value.Get()
-    }
-    else
-    {
-        //TODO find and cache
-        //GodotJSScriptLanguage::get_singleton()->get_func_handle(object_id_, p_method);
-    }
-
-    r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;
-    return {};
+    return script_->call_js(object_id_, p_method, p_args, p_argcount, r_error);
 }
 
 void GodotJSScriptInstance::notification(int p_notification, bool p_reversed)

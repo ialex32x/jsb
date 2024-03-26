@@ -16,7 +16,7 @@ Ref<Resource> ResourceFormatLoaderGodotJSScript::load(const String &p_path, cons
         return {};
     }
     GodotJSScriptLanguage* lang = GodotJSScriptLanguage::get_singleton();
-    jsb::JavaScriptContext* ccontext = lang->get_context();
+    std::shared_ptr<jsb::JavaScriptContext> ccontext = lang->get_context();
     ccontext->load(p_path);
     const jsb::JavaScriptModuleCache& module_cache = ccontext->get_module_cache();
     if (jsb::JavaScriptModule* module = module_cache.find(p_path))
@@ -25,7 +25,7 @@ Ref<Resource> ResourceFormatLoaderGodotJSScript::load(const String &p_path, cons
         {
             Ref<GodotJSScript> spt;
             spt.instantiate();
-            spt->attach_source(p_path, code, module->default_class_id);
+            spt->attach_source(ccontext, p_path, code, module->default_class_id);
             return spt;
         }
     }

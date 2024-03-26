@@ -24,10 +24,7 @@ public:
     jsb_force_inline static GodotJSScriptLanguage* get_singleton() { return singleton_; }
 
     // main context
-    jsb_force_inline jsb::JavaScriptContext* get_context() const { return context_.get(); }
-
-    //TODO temp
-    const jsb::GodotJSClassInfo& get_gdjs_class_info(jsb::GodotJSClassID p_class_id) const;
+    jsb_force_inline std::shared_ptr<jsb::JavaScriptContext> get_context() const { return context_; }
 
     GodotJSScriptLanguage();
     virtual ~GodotJSScriptLanguage() override;

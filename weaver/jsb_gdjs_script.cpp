@@ -14,6 +14,11 @@ GodotJSScript::GodotJSScript(): script_list_(this)
 
 GodotJSScript::~GodotJSScript()
 {
+    for (const KeyValue<StringName, jsb::GodotJSFunctionID>& kv : cached_methods_)
+    {
+        context_->remove_function(kv.value);
+    }
+
     {
         GodotJSScriptLanguage* lang = GodotJSScriptLanguage::get_singleton();
         MutexLock lock(lang->mutex_);
@@ -82,13 +87,12 @@ StringName GodotJSScript::get_instance_base_type() const
 ScriptInstance* GodotJSScript::instance_create(Object *p_this)
 {
     //TODO multi-thread scripting not supported for now
-    GodotJSScriptLanguage* lang = GodotJSScriptLanguage::get_singleton();
     GodotJSScriptInstance* instance = memnew(GodotJSScriptInstance);
 
     instance->owner_ = p_this;
     instance->owner_->set_script_instance(instance);
     instance->script_ = Ref(this);
-    instance->object_id_ = lang->get_context()->crossbind(p_this, gdjs_class_id_);
+    instance->object_id_ = context_->crossbind(p_this, gdjs_class_id_);
     return instance;
 }
 
@@ -205,8 +209,9 @@ bool GodotJSScript::instance_has(const Object *p_this) const
     return instances_.has(const_cast<Object*>(p_this));
 }
 
-void GodotJSScript::attach_source(const String& p_path, const String& p_source, jsb::GodotJSClassID p_class_id)
+void GodotJSScript::attach_source(const std::shared_ptr<jsb::JavaScriptContext>& p_context, const String& p_path, const String& p_source, jsb::GodotJSClassID p_class_id)
 {
+    context_ = p_context;
     gdjs_class_id_ = p_class_id;
     set_path(p_path);
     set_source_code(p_source);
@@ -214,5 +219,20 @@ void GodotJSScript::attach_source(const String& p_path, const String& p_source, 
 
 const jsb::GodotJSClassInfo& GodotJSScript::get_js_class_info() const
 {
-    return GodotJSScriptLanguage::get_singleton()->get_gdjs_class_info(gdjs_class_id_);
+    return context_->get_gdjs_class_info(gdjs_class_id_);
+}
+
+Variant GodotJSScript::call_js(jsb::NativeObjectID p_object_id, const StringName& p_method, const Variant** p_argv, int p_argc, Callable::CallError& r_error)
+{
+    jsb::GodotJSFunctionID func_id;
+    if (const HashMap<StringName, jsb::GodotJSFunctionID>::Iterator& it = cached_methods_.find(p_method))
+    {
+        func_id = it->value;
+    }
+    else
+    {
+        func_id = context_->get_function(p_object_id, p_method);
+        cached_methods_.insert(p_method, func_id);
+    }
+    return context_->call_function(p_object_id, func_id, p_argv, p_argc, r_error);
 }

@@ -2,15 +2,10 @@
 
 #include "jsb_editor_utility.h"
 #include "jsb_exception_info.h"
-#include "core/string/string_builder.h"
-
 #include "jsb_module_loader.h"
 #include "jsb_transpiler.h"
+#include "jsb_function.h"
 #include "../internal/jsb_path_util.h"
-#include "core/core_constants.h"
-
-//TODO remove it
-#include "scene/main/node.h"
 
 namespace jsb
 {
@@ -489,6 +484,7 @@ namespace jsb
         v8::HandleScope handle_scope(isolate);
         v8::Local<v8::Context> context = context_.Get(get_isolate());
 
+        js_functions_.clear();
         runtime_->on_context_destroyed(context);
         context->SetAlignedPointerInEmbedderData(kContextEmbedderData, nullptr);
 
@@ -711,6 +707,14 @@ namespace jsb
         return &jclass_info;
     }
 
+    // translate js val into gd variant without any type hint
+    jsb_force_inline bool js_to_gd_var(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_jval, Variant& r_cvar)
+    {
+        //TODO not implemented
+        return false;
+    }
+
+    // translate js val into gd variant with an expected type
     jsb_force_inline bool js_to_gd_var(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_jval, Variant::Type p_type, Variant& r_cvar)
     {
         switch (p_type)
@@ -1211,6 +1215,81 @@ namespace jsb
 
         JSB_LOG(Verbose, "script compiled %s", p_filename);
         return maybe_value;
+    }
+
+    bool JavaScriptContext::remove_function(GodotJSFunctionID p_func_id)
+    {
+        return js_functions_.remove_at(p_func_id);
+    }
+
+    GodotJSFunctionID JavaScriptContext::get_function(NativeObjectID p_object_id, const StringName& p_method)
+    {
+        ObjectHandle* handle;
+        if (runtime_->objects_.try_get_value_pointer(p_object_id, handle))
+        {
+            v8::Isolate* isolate = runtime_->isolate_;
+            v8::HandleScope handle_scope(isolate);
+            v8::Local<v8::Context> context = context_.Get(isolate);
+            v8::Local<v8::Object> obj = handle->ref_.Get(isolate).As<v8::Object>();
+            const CharString name = ((String) p_method).utf8();
+            v8::Local<v8::Value> find;
+            if (obj->Get(context, v8::String::NewFromOneByte(isolate, (const uint8_t* ) name.ptr(), v8::NewStringType::kNormal, name.length()).ToLocalChecked()).ToLocal(&find) && find->IsFunction())
+            {
+                return js_functions_.add(JavaScriptFunction {v8::Global<v8::Function>(isolate, find.As<v8::Function>()) });
+            }
+        }
+        return {};
+    }
+
+    Variant JavaScriptContext::call_function(NativeObjectID p_object_id, GodotJSFunctionID p_func_id, const Variant** p_args, int p_argcount, Callable::CallError& r_error)
+    {
+        if (!p_func_id.is_valid())
+        {
+            r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;
+            return {};
+        }
+
+        JavaScriptFunction& js_func = js_functions_.get_value(p_func_id);
+        jsb_check(!!js_func);
+
+        v8::Isolate* isolate = runtime_->isolate_;
+        v8::HandleScope handle_scope(isolate);
+        v8::Local<v8::Context> context = context_.Get(isolate);
+        v8::Context::Scope context_scope(context);
+        v8::Local<v8::Function> func = js_func.function_.Get(isolate);
+        ObjectHandle& object_handle = runtime_->objects_.get_value(p_object_id);
+        v8::Local<v8::Value> self = object_handle.ref_.Get(isolate);
+
+        v8::TryCatch try_catch_run(isolate);
+        v8::Local<v8::Value>* argv = memnew_arr(v8::Local<v8::Value>, p_argcount);
+        for (int index = 0; index < p_argcount; ++index)
+        {
+            if (!gd_var_to_js(isolate, context, *p_args[index], argv[index]))
+            {
+                r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;
+                return {};
+            }
+        }
+        v8::MaybeLocal<v8::Value> rval = func->Call(context, self, p_argcount, argv);
+        memdelete_arr(argv);
+        if (JavaScriptExceptionInfo exception_info = JavaScriptExceptionInfo(isolate, try_catch_run))
+        {
+            r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;
+            return {};
+        }
+
+        if (rval.IsEmpty())
+        {
+            return {};
+        }
+
+        Variant rvar;
+        if (!js_to_gd_var(isolate, context, rval.ToLocalChecked(), rvar))
+        {
+            r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;
+            return {};
+        }
+        return rvar;
     }
 
 }
