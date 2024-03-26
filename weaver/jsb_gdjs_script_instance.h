@@ -12,7 +12,7 @@ private:
     Object* owner_ = nullptr;
     Ref<GodotJSScript> script_;
     // object handle id
-    jsb::internal::Index64 object_id_;
+    jsb::NativeObjectID object_id_;
     HashMap<StringName, jsb::JavaScriptFunction> cached_methods_;
 
 public:
@@ -41,6 +41,7 @@ public:
     virtual const Variant get_rpc_config() const override { return script_->get_rpc_config(); }
 #pragma endregion
 
+    virtual ~GodotJSScriptInstance() override;
 private:
     GodotJSScriptInstance() {}
 };

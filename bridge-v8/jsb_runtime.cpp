@@ -269,19 +269,20 @@ namespace jsb
 #endif
     }
 
-    void JavaScriptRuntime::bind_object(NativeClassID p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
+    NativeObjectID JavaScriptRuntime::bind_object(NativeClassID p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
     {
-        bind_object(p_class_id, (void*) p_pointer, p_object, p_persistent);
+        const NativeObjectID object_id = bind_object(p_class_id, (void*) p_pointer, p_object, p_persistent);
         p_pointer->set_instance_binding(this, p_pointer, gd_instance_binding_callbacks);
+        return object_id;
     }
 
-    void JavaScriptRuntime::bind_object(NativeClassID p_class_id, void* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
+    NativeObjectID JavaScriptRuntime::bind_object(NativeClassID p_class_id, void* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
     {
         jsb_checkf(Thread::get_caller_id() == thread_id_, "multi-threaded call not supported yet");
         jsb_checkf(native_classes_.is_valid_index(p_class_id), "bad class_id");
         jsb_checkf(!objects_index_.has(p_pointer), "duplicated bindings");
 
-        const internal::Index64 object_id = objects_.add({});
+        const NativeObjectID object_id = objects_.add({});
         ObjectHandle& handle = objects_.get_value(object_id);
 
         handle.class_id = p_class_id;
@@ -299,6 +300,7 @@ namespace jsb
             handle.ref_.SetWeak(p_pointer, &object_gc_callback, v8::WeakCallbackType::kInternalFields);
         }
         JSB_LOG(Verbose, "bind object %s class_id %d", itos((int64_t) object_id), (uint32_t) p_class_id);
+        return object_id;
     }
 
     void JavaScriptRuntime::unbind_object(void* p_pointer)

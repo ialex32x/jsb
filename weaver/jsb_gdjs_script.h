@@ -4,10 +4,13 @@
 #include "core/object/script_language.h"
 #include "jsb_weaver_consts.h"
 #include "jsb_bridge.h"
+#include "core/templates/rb_set.h"
 
 class GodotJSScript : public Script
 {
+    friend class GodotJSScriptInstance;
     typedef Script super;
+
     GDCLASS(GodotJSScript, Script)
 
 private:
@@ -17,11 +20,11 @@ private:
     bool reloading_ = false;
 
     SelfList<GodotJSScript> script_list_;
+	RBSet<Object *> instances_;
 
     String source_;
     String path_;
     GodotJSScript* base_ = nullptr;
-    std::shared_ptr<jsb::JavaScriptRuntime> runtime_;
     jsb::GodotJSClassID gdjs_class_id_;
 
 public:
@@ -30,13 +33,7 @@ public:
 
     void attach_source(const String& p_path, const String& p_source, jsb::GodotJSClassID p_class_id);
 
-    jsb_force_inline const jsb::GodotJSClassInfo& get_js_class_info() const
-    {
-        //TODO load module before use
-        JSB_LOG(Verbose, "godot js script %s", path_);
-
-        return runtime_->get_gdjs_class(gdjs_class_id_);
-    }
+    const jsb::GodotJSClassInfo& get_js_class_info() const;
 
 #pragma region Script Implementation
 	virtual bool can_instantiate() const override;

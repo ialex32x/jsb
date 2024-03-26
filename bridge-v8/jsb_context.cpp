@@ -309,7 +309,7 @@ namespace jsb
 
     }
 
-    void JavaScriptContext::crossbind(Object* p_this, GodotJSClassID p_class_id)
+    NativeObjectID JavaScriptContext::crossbind(Object* p_this, GodotJSClassID p_class_id)
     {
         v8::Isolate* isolate = get_isolate();
         v8::HandleScope handle_scope(isolate);
@@ -318,8 +318,9 @@ namespace jsb
         GodotJSClassInfo& class_info = runtime_->get_gdjs_class(p_class_id);
         v8::Local<v8::Object> constructor = class_info.js_class.Get(isolate);
         v8::Local<v8::Object> instance = constructor->CallAsConstructor(context, 0, nullptr).ToLocalChecked().As<v8::Object>();
-        runtime_->bind_object(class_info.native_class_id, p_this, instance, false);
+        const NativeObjectID object_id = runtime_->bind_object(class_info.native_class_id, p_this, instance, false);
         JSB_LOG(Warning, "[experimental] crossbinding %s", uitos((uintptr_t) p_this));
+        return object_id;
     }
 
     void JavaScriptContext::_register_builtins(const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& self)

@@ -179,3 +179,8 @@ void GodotJSScriptLanguage::get_recognized_extensions(List<String>* p_extensions
 {
     p_extensions->push_back(JSB_RES_EXT);
 }
+
+const jsb::GodotJSClassInfo& GodotJSScriptLanguage::get_gdjs_class_info(jsb::GodotJSClassID p_class_id) const
+{
+    return runtime_->get_gdjs_class(p_class_id);
+}

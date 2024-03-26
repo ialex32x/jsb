@@ -67,10 +67,10 @@ namespace jsb
 
         // cpp objects should be added here since the gc callback is not guaranteed by v8
         // we need to delete them on finally releasing JavaScriptRuntime
-        internal::SArray<ObjectHandle> objects_;
+        internal::SArray<ObjectHandle, NativeObjectID> objects_;
 
         // (unsafe) mapping object pointer to object_id
-        HashMap<void*, internal::Index64> objects_index_;
+        HashMap<void*, NativeObjectID> objects_index_;
         HashSet<void*> persistent_objects_;
 
         // module_id => loader
@@ -119,8 +119,8 @@ namespace jsb
          * \param p_class_id
          * \param p_persistent keep a strong reference on pointer, usually used on binding singleton objects which are manually managed by native codes.
          */
-        void bind_object(NativeClassID p_class_id, void* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent);
-        void bind_object(NativeClassID p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent);
+        NativeObjectID bind_object(NativeClassID p_class_id, void* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent);
+        NativeObjectID bind_object(NativeClassID p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent);
         void unbind_object(void* p_pointer);
 
         // whether the pointer registered in the object binding map

@@ -10,6 +10,7 @@ class GodotJSScriptLanguage : public ScriptLanguage
 {
 private:
     friend class GodotJSScript;
+    friend class GodotJSScriptInstance;
 	static GodotJSScriptLanguage* singleton_;
 
     Mutex mutex_;
@@ -24,6 +25,9 @@ public:
 
     // main context
     jsb_force_inline jsb::JavaScriptContext* get_context() const { return context_.get(); }
+
+    //TODO temp
+    const jsb::GodotJSClassInfo& get_gdjs_class_info(jsb::GodotJSClassID p_class_id) const;
 
     GodotJSScriptLanguage();
     virtual ~GodotJSScriptLanguage() override;

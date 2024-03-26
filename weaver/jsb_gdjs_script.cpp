@@ -88,7 +88,7 @@ ScriptInstance* GodotJSScript::instance_create(Object *p_this)
     instance->owner_ = p_this;
     instance->owner_->set_script_instance(instance);
     instance->script_ = Ref(this);
-    lang->get_context()->crossbind(p_this, gdjs_class_id_);
+    instance->object_id_ = lang->get_context()->crossbind(p_this, gdjs_class_id_);
     return instance;
 }
 
@@ -201,8 +201,8 @@ bool GodotJSScript::has_static_method(const StringName &p_method) const
 
 bool GodotJSScript::instance_has(const Object *p_this) const
 {
-    //TODO
-    return false;
+    MutexLock lock(GodotJSScriptLanguage::singleton_->mutex_);
+    return instances_.has(const_cast<Object*>(p_this));
 }
 
 void GodotJSScript::attach_source(const String& p_path, const String& p_source, jsb::GodotJSClassID p_class_id)
@@ -210,4 +210,9 @@ void GodotJSScript::attach_source(const String& p_path, const String& p_source, 
     gdjs_class_id_ = p_class_id;
     set_path(p_path);
     set_source_code(p_source);
+}
+
+const jsb::GodotJSClassInfo& GodotJSScript::get_js_class_info() const
+{
+    return GodotJSScriptLanguage::get_singleton()->get_gdjs_class_info(gdjs_class_id_);
 }

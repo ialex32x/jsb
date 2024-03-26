@@ -65,7 +65,7 @@ Variant GodotJSScriptInstance::callp(const StringName &p_method, const Variant *
     else
     {
         //TODO find and cache
-
+        //GodotJSScriptLanguage::get_singleton()->get_func_handle(object_id_, p_method);
     }
 
     r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;
@@ -85,4 +85,11 @@ void GodotJSScriptInstance::notification(int p_notification, bool p_reversed)
 ScriptLanguage *GodotJSScriptInstance::get_language()
 {
     return GodotJSScriptLanguage::get_singleton();
+}
+
+GodotJSScriptInstance::~GodotJSScriptInstance()
+{
+    MutexLock lock(GodotJSScriptLanguage::singleton_->mutex_);
+    jsb_check(script_.is_valid() && owner_);
+    script_->instances_.erase(owner_);
 }
