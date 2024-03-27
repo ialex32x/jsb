@@ -123,11 +123,27 @@ namespace jsb
             set_field(isolate, context, object, "is_static", method_bind->is_static());
             set_field(isolate, context, object, "is_const", method_bind->is_const());
             set_field(isolate, context, object, "is_vararg", method_bind->is_vararg());
-            set_field(isolate, context, object, "has_return", method_bind->has_return());
+            // set_field(isolate, context, object, "has_return", method_bind->has_return());
             set_field(isolate, context, object, "argument_count", method_bind->get_argument_count());
-            //TODO
-            // get_argument_info
-            // get_return_info
+
+            if (method_bind->has_return())
+            {
+                const PropertyInfo& return_info = method_bind->get_return_info();
+                v8::Local<v8::Object> property_info_obj = v8::Object::New(isolate);
+                build_property_info(isolate, context, return_info, property_info_obj);
+                set_field(isolate, context, object, "return_", property_info_obj);
+            }
+
+            const int argc = method_bind->get_argument_count();
+            v8::Local<v8::Array> args_obj = v8::Array::New(isolate, argc);
+            for (int index = 0; index < argc; ++index)
+            {
+                const PropertyInfo& arg_info = method_bind->get_argument_info(index);
+                v8::Local<v8::Object> property_info_obj = v8::Object::New(isolate);
+                build_property_info(isolate, context, arg_info, property_info_obj);
+                args_obj->Set(context, index, property_info_obj);
+            }
+            set_field(isolate, context, object, "args_", args_obj);
         }
 
         void build_enum_info(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const ClassDB::ClassInfo::EnumInfo& enum_info, const v8::Local<v8::Object>& object)

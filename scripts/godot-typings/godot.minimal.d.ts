@@ -166,27 +166,19 @@ declare namespace jsb {
             is_static: boolean;
             is_const: boolean;
             is_vararg: boolean;
-            has_return: boolean;
             argument_count: number; /** int32_t */
 
-            // arguments: Array<PropertyInfo>;
-            // return_: PropertyInfo;
+            args_: Array<PropertyInfo>;
+            return_: PropertyInfo | undefined;
         }
 
-        interface FieldInfo {
+        interface PropertyInfo {
             name: string;
             type: Type;
             class_name: string;
             hint: PropertyHint;
             hint_string: string;
             usage: PropertyUsageFlags;
-        }
-
-        interface PropertyInfo {
-            name: string;
-            type: Type;
-            getter: string;
-            setter: string;
         }
 
         interface SignalInfo {
@@ -202,8 +194,8 @@ declare namespace jsb {
             name: string;
             super: string;
 
-            fields: Array<FieldInfo>;
-            properties: Array<PropertyInfo>;
+            // fields: Array<FieldInfo>;
+            // properties: Array<PropertyInfo>;
             methods: Array<MethodInfo>;
             constants: Array<ConstantInfo>;
             enums: Array<EnumInfo>;

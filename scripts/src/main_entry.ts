@@ -72,6 +72,7 @@ test_async();
 if (jsb.TOOLS_ENABLED) {
     let tsd = new TSDCodeGen("./hello.txt");
     tsd.emit();
+    tsd.finish();
     let dm = new DeleteMe();
 }
 

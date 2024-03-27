@@ -339,6 +339,14 @@ namespace jsb
                 editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "get_classes"), v8::Function::New(context, JavaScriptEditorUtility::_get_classes).ToLocalChecked()).Check();
                 editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "get_global_constants"), v8::Function::New(context, JavaScriptEditorUtility::_get_global_constants).ToLocalChecked()).Check();
                 editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "get_singletons"), v8::Function::New(context, JavaScriptEditorUtility::_get_singletons).ToLocalChecked()).Check();
+
+                v8::Local<v8::Object> ptypes = v8::Object::New(isolate);
+#pragma push_macro("DEF")
+#undef DEF
+#define DEF(FieldName) ptypes->Set(context, v8::String::NewFromUtf8Literal(isolate, #FieldName), v8::Int32::New(isolate, Variant::FieldName)).Check();
+#include "jsb_variant_types.h"
+#pragma pop_macro("DEF")
+                editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "Type"), ptypes).Check();
             }
 #endif
         }
@@ -1109,6 +1117,8 @@ namespace jsb
         StringName type_name(*str_utf8);
         v8::Local<v8::Context> context = isolate->GetCurrentContext();
         JavaScriptContext* ccontext = JavaScriptContext::wrap(context);
+
+        //TODO put all singletons into another module 'godot-globals' for better readability (and avoid naming conflicts, like the `class IP` and the `singleton IP`)
 
         //NOTE keep the same order with `GDScriptLanguage::init()`
         // firstly, singletons have the top priority (in GDScriptLanguage::init, singletons will overwrite the globals slot even if a type/const has the same name)
