@@ -55,7 +55,12 @@ class ModuleWriter extends IndentWriter {
         if (info.editor_only) {
             this.line_comment(`@editor`);
         }
-        this.line(`const ${info.name}: godot.${info.class_name}`);
+        if (info.class_name.length != 0) {
+            this.line(`const ${info.name}: godot.${info.class_name}`);
+        }
+        else {
+            this.line(`const ${info.name}: any /*unknown*/`);
+        }
     }
 }
 class NamespaceWriter extends IndentWriter {
