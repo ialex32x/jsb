@@ -1029,6 +1029,7 @@ namespace jsb
         v8::Local<v8::Context> context = isolate->GetCurrentContext();
         v8::Local<v8::External> data = info.Data().As<v8::External>();
         MethodBind* method_bind = (MethodBind*) data->Value();
+        const int argc = info.Length();
 
         jsb_check(method_bind);
         Callable::CallError error;
@@ -1051,23 +1052,33 @@ namespace jsb
             gd_object = (Object*) pointer;
         }
 
-        GodotArguments arguments;
-        int failed_arg_index;
-        if (!arguments.translate(*method_bind, isolate, context, info, failed_arg_index))
+        // prepare argv
+        const Variant** argv = jsb_stackalloc(const Variant*, argc);
+        Variant* args = jsb_stackalloc(Variant, argc);
+        for (int index = 0; index < argc; ++index)
         {
-            const CharString raw_string = vformat("bad argument: %d", failed_arg_index).ascii();
-            v8::Local<v8::String> error_message = v8::String::NewFromOneByte(isolate, (const uint8_t*) raw_string.ptr(), v8::NewStringType::kNormal, raw_string.length()).ToLocalChecked();
-            isolate->ThrowError(error_message);
-            return;
+            memnew_placement(&args[index], Variant);
+            argv[index] = &args[index];
+            Variant::Type type = method_bind->get_argument_type(index);
+            if (!js_to_gd_var(isolate, context, info[index], type, args[index]))
+            {
+                // revert all constructors
+                while (index >= 0) { args[index--].~Variant(); }
+                const CharString raw_string = vformat("bad argument: %d", index).ascii();
+                v8::Local<v8::String> error_message = v8::String::NewFromOneByte(isolate, (const uint8_t*) raw_string.ptr(), v8::NewStringType::kNormal, raw_string.length()).ToLocalChecked();
+                isolate->ThrowError(error_message);
+                return;
+            }
         }
 
-        //NOTE (unsafe) DO NOT FORGET TO free argv (if it's not stack allocated)
-        const int argc = arguments.argc();
-        const Variant** argv = (const Variant**)jsb_stackalloc(argc * sizeof(Variant*));
-
-        arguments.fill(argv);
+        // call godot method
         Variant crval = method_bind->call(gd_object, argv, argc, error);
-        jsb_stackfree(argv);
+
+        // don't forget to destruct all stack allocated variants
+        for (int index = 0; index < argc; ++index)
+        {
+            args[index].~Variant();
+        }
 
         if (error.error != Callable::CallError::CALL_OK)
         {
@@ -1275,17 +1286,24 @@ namespace jsb
         v8::Local<v8::Value> self = object_handle.ref_.Get(isolate);
 
         v8::TryCatch try_catch_run(isolate);
-        v8::Local<v8::Value>* argv = memnew_arr(v8::Local<v8::Value>, p_argcount);
+        using LocalValue = v8::Local<v8::Value>;
+        LocalValue* argv = jsb_stackalloc(LocalValue, p_argcount);
         for (int index = 0; index < p_argcount; ++index)
         {
+            memnew_placement(&argv[index], LocalValue);
             if (!gd_var_to_js(isolate, context, *p_args[index], argv[index]))
             {
+                // revert constructed values if error occured
+                while (index >= 0) argv[index--].~LocalValue();
                 r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;
                 return {};
             }
         }
         v8::MaybeLocal<v8::Value> rval = func->Call(context, self, p_argcount, argv);
-        memdelete_arr(argv);
+        for (int index = 0; index < p_argcount; ++index)
+        {
+            argv[index].~LocalValue();
+        }
         if (JavaScriptExceptionInfo exception_info = JavaScriptExceptionInfo(isolate, try_catch_run))
         {
             r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;

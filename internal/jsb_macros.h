@@ -44,16 +44,9 @@
 #define jsb_deprecated
 #define jsb_deleteme
 #define jsb_experimental
-
 #define jsb_no_discard [[nodiscard]]
 
-#if !defined(JSB_DISABLE_STACKALLOC)
-#   define jsb_stackalloc(size) alloca(size)
-#   define jsb_stackfree(ptr)
-#else
-#   define jsb_stackalloc(size) memalloc(size)
-#   define jsb_stackfree(ptr) memfree(ptr)
-#endif
+#define jsb_stackalloc(type, size) (type*) alloca(sizeof(type) * size)
 
 namespace jsb::internal
 {

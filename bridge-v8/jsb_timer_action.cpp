@@ -21,11 +21,11 @@ namespace jsb
         if (argc_ > 0)
         {
             using LocalValue = v8::Local<v8::Value>;
-            LocalValue* argv = (LocalValue*)jsb_stackalloc(sizeof(LocalValue) * argc_);
-            memset((void*) argv, 0, sizeof(LocalValue) * argc_);
 
+            LocalValue* argv = jsb_stackalloc(LocalValue, argc_);
             for (int index = 0; index < argc_; ++index)
             {
+                memnew_placement(&argv[index], LocalValue);
                 argv[index] = argv_[index].Get(isolate);
             }
             func->Call(context, v8::Undefined(isolate), argc_, argv);
@@ -33,7 +33,6 @@ namespace jsb
             {
                 argv[index].~LocalValue();
             }
-            jsb_stackfree(argv);
         }
         else
         {
