@@ -12,9 +12,10 @@ const PrimitiveTypes = {
     [jsb.editor.Type.INT]: "number /*i64*/",
     [jsb.editor.Type.FLOAT]: "number /*f64*/",
     [jsb.editor.Type.STRING]: "string",
-    [jsb.editor.Type.VECTOR2]: "any /*Vector2*/",
     //TODO
     //...
+    [jsb.editor.Type.DICTIONARY]: "{ [name: string]: GodotVariant } | GodotDictionary",
+    [jsb.editor.Type.ARRAY]: "GodotArray | Array<GodotVariant>",
 }
 
 class IndentWriter implements CodeWriter {
@@ -67,15 +68,16 @@ class ModuleWriter extends IndentWriter {
     class_(name: string, super_: string): ClassWriter {
         return new ClassWriter(this, name, super_);
     }
-    singleton_(info: jsb.editor.SingletonInfo): void {
-        if (info.editor_only) {
-            this.line_comment(`@editor`)
-        }
-        if (info.class_name.length != 0) {
-            this.line(`const ${info.name}: godot.${info.class_name}`)
-        } else {
-            this.line(`const ${info.name}: any /*unknown*/`)
-        }
+    singleton_(info: jsb.editor.SingletonInfo) {
+        return new SingletonWriter(this, info);
+        // if (info.editor_only) {
+        //     this.line_comment(`@editor`)
+        // }
+        // if (info.class_name.length != 0) {
+        //     this.line(`const ${info.name}: godot.${info.class_name}`)
+        // } else {
+        //     this.line(`const ${info.name}: any /*unknown*/`)
+        // }
 
     }
 }
@@ -111,14 +113,16 @@ class ClassWriter extends IndentWriter {
         this._name = name;
         this._super = super_;
     }
-    finish() {
+    protected head() {
         if (typeof this._super !== "string" || this._super.length == 0) {
-            this._base.line(`class ${this._name} {`);
-        } else {
-            this._base.line(`class ${this._name} extends ${this._super} {`);
+            return `class ${this._name}`
         }
-        super.finish();
-        this._base.line('}');
+        return `class ${this._name} extends ${this._super}`
+    }
+    finish() {
+        this._base.line(`${this.head()} {`)
+        super.finish()
+        this._base.line('}')
     }
     constant_(constant: jsb.editor.ConstantInfo) {
         this.line(`static readonly ${constant.name} = ${constant.value}`);
@@ -141,7 +145,7 @@ class ClassWriter extends IndentWriter {
         if (method_info.args_.length == 0) {
             return ""
         }
-        return method_info.args_.map(it => this.make_arg(it)).join(",");
+        return method_info.args_.map(it => this.make_arg(it)).join(", ");
     }
     private make_return(method_info: jsb.editor.MethodInfo): string {
         //TODO
@@ -161,6 +165,17 @@ class ClassWriter extends IndentWriter {
     }
     signal_(signal_info: jsb.editor.SignalInfo) {
         this.line_comment(`SIGNAL: ${signal_info.name}`)
+    }
+}
+
+class SingletonWriter extends ClassWriter {
+    protected _info: jsb.editor.SingletonInfo
+    constructor(base: CodeWriter, info: jsb.editor.SingletonInfo) {
+        super(base, info.name, "");
+        this._info = info;
+    }
+    protected head() {
+        return `const ${this._name} :`
     }
 }
 
@@ -223,16 +238,30 @@ export default class TSDCodeGen implements CodeWriter {
     }
 
     emit() {
+        this.line('/// <reference no-default-lib="true"/>')
         this.emit_singletons();
         this.emit_godot();
     }
 
     private emit_singletons() {
-        const module_cg = new ModuleWriter(this, "godot-globals");
+        const module_cg = new ModuleWriter(this, "godot");
         for (let singleton_name in this._singletons) {
             const singleton = this._singletons[singleton_name];
-
-            module_cg.singleton_(singleton);
+            const cls = this._classes[singleton.class_name];
+            if (typeof cls !== "undefined") {
+                const class_cg = module_cg.singleton_(singleton);
+                // for (let constant of cls.constants) {
+                //     if (!ignored_consts.has(constant.name)) {
+                //         class_cg.constant_(constant);
+                //     }
+                // }
+                for (let method_info of cls.methods) {
+                    class_cg.method_(method_info);
+                }
+                class_cg.finish();
+            } else {
+                module_cg.line_comment(`singleton ${singleton.name} without class info ${singleton.class_name}`)
+            }
         }
         module_cg.finish();
     }
