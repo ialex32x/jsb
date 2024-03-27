@@ -96,8 +96,14 @@ namespace jsb
         static const String ext = "." JSB_RES_EXT;
         const String extended = p_module_id.ends_with(ext) ? p_module_id : p_module_id + ext;
 
+        JSB_LOG(Verbose, "resolving path %s", extended);
         // directly inspect it at first if it's an explicit path
-        if (extended.contains(":/"))
+        if (
+#if !WINDOWS_ENABLED
+            extended.begins_with("/") ||
+#endif
+            extended.contains(":/")
+            )
         {
             if(get_file_access()->file_exists(extended))
             {
