@@ -711,6 +711,20 @@ namespace jsb
     jsb_force_inline bool js_to_gd_var(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_jval, Variant& r_cvar)
     {
         //TODO not implemented
+        if (p_jval.IsEmpty() || p_jval->IsNullOrUndefined())
+        {
+            r_cvar = {};
+            return true;
+        }
+        if (p_jval->IsUint32())
+        {
+            uint32_t val;
+            if (p_jval->Uint32Value(context).To(&val))
+            {
+                r_cvar = (int64_t) val;
+                return true;
+            }
+        }
         return false;
     }
 
@@ -1250,7 +1264,7 @@ namespace jsb
         }
 
         JavaScriptFunction& js_func = js_functions_.get_value(p_func_id);
-        jsb_check(!!js_func);
+        jsb_check(js_func);
 
         v8::Isolate* isolate = runtime_->isolate_;
         v8::HandleScope handle_scope(isolate);

@@ -21,7 +21,7 @@ namespace jsb
         jsb_force_inline JavaScriptFunction(JavaScriptFunction&& p_other) noexcept = default;
         jsb_force_inline JavaScriptFunction& operator=(JavaScriptFunction&& p_other) = default;
 
-        jsb_force_inline bool operator!() const { return !function_.IsEmpty(); }
+        jsb_force_inline operator bool() const { return !function_.IsEmpty(); }
 
     };
 }

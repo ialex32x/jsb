@@ -213,6 +213,7 @@ void GodotJSScript::attach_source(const std::shared_ptr<jsb::JavaScriptContext>&
 {
     context_ = p_context;
     gdjs_class_id_ = p_class_id;
+    valid_ = gdjs_class_id_.is_valid();
     set_path(p_path);
     set_source_code(p_source);
 }
