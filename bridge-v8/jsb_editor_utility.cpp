@@ -4,13 +4,10 @@
 #if TOOLS_ENABLED
 
 #if WINDOWS_ENABLED
-#pragma push_macro("WIN32_LEAN_AND_MEAN")
-#undef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#pragma pop_macro("WIN32_LEAN_AND_MEAN")
+#   define WIN32_LEAN_AND_MEAN
+#   include <windows.h>
 #else
-#include <cstdio>
+#   include <cstdio>
 #endif
 
 #define JSB_STRINGIFY_2(a) #a
