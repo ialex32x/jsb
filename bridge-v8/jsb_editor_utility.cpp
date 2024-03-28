@@ -7,7 +7,7 @@
 #   define WIN32_LEAN_AND_MEAN
 #   include <windows.h>
 #else
-#   include <cstdio>
+#   include <unistd.h>
 #endif
 
 #define JSB_STRINGIFY_2(a) #a
