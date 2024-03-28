@@ -47,6 +47,20 @@ namespace jsb
             return S(isolate, (String) name);
         }
 
+        v8::Local<v8::Value> build_int64(v8::Isolate* isolate, const String& field_name,  int64_t field_value)
+        {
+            const int32_t scaled_value = (int32_t) field_value;
+            if (field_value != (int64_t) scaled_value)
+            {
+                JSB_LOG(Warning, "integer overflowed %s (%s) [reversible? %c]", field_name, itos(field_value), (int64_t)(double) field_value == field_value ? 'T' : 'F');
+                return v8::Number::New(isolate, (double) field_value);
+            }
+            else
+            {
+                return v8::Int32::New(isolate, scaled_value);
+            }
+        }
+
         template<int N>
         void set_field(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& obj, const char (&field_name)[N], const v8::Local<v8::Value>& field_value)
         {
@@ -92,16 +106,7 @@ namespace jsb
         template<int N>
         void set_field(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& obj, const char (&field_name)[N], int64_t field_value)
         {
-            const int32_t scaled_value = (int32_t) field_value;
-            if (field_value != (int64_t) scaled_value)
-            {
-                JSB_LOG(Warning, "integer overflowed %s (%s) [reversible? %c]", field_name, itos(field_value), (int64_t)(double) field_value == field_value ? 'T' : 'F');
-                set_field(isolate, context, obj, field_name, v8::Number::New(isolate, (double) field_value));
-            }
-            else
-            {
-                set_field(isolate, context, obj, field_name, v8::Int32::New(isolate, scaled_value));
-            }
+            set_field(isolate, context, obj, field_name, build_int64(isolate, field_name, field_value));
         }
 
         void build_property_info(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const PropertyInfo& property_info, const v8::Local<v8::Object>& object)
@@ -292,15 +297,31 @@ namespace jsb
         v8::Local<v8::Context> context = isolate->GetCurrentContext();
 
         const int num = CoreConstants::get_global_constant_count();
-        v8::Local<v8::Array> array = v8::Array::New(isolate, num);
+        HashSet<StringName> enum_packs;
+        v8::Local<v8::Array> array = v8::Array::New(isolate);
+        int array_index = 0;
         for (int index = 0; index < num; ++index)
         {
-            const char* name = CoreConstants::get_global_constant_name(index);
-            const int64_t value = CoreConstants::get_global_constant_value(index);
-            v8::Local<v8::Object> constant_obj = v8::Object::New(isolate);
-            set_field(isolate, context, constant_obj, "name", name);
-            set_field(isolate, context, constant_obj, "value", value);
-            array->Set(context, index, constant_obj);
+            const StringName enum_name = CoreConstants::get_global_constant_enum(index);
+            if (enum_packs.has(enum_name))
+            {
+                continue;
+            }
+
+            enum_packs.insert(enum_name);
+            v8::Local<v8::Object> enum_obj = v8::Object::New(isolate);
+            v8::Local<v8::Object> values_obj = v8::Object::New(isolate);
+            HashMap<StringName, int64_t> map;
+            set_field(isolate, context, enum_obj, "name", enum_name);
+            set_field(isolate, context, enum_obj, "values", values_obj);
+            CoreConstants::get_enum_values(enum_name, &map);
+            for (const KeyValue<StringName, int64_t>& kv : map)
+            {
+                values_obj->Set(context,
+                    S(isolate, kv.key).ToLocalChecked(),
+                    build_int64(isolate, kv.key, kv.value));
+            }
+            array->Set(context, array_index++, enum_obj);
         }
         info.GetReturnValue().Set(array);
     }

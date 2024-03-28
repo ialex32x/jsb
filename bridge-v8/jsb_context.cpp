@@ -330,6 +330,15 @@ namespace jsb
             jhost->Set(context, v8::String::NewFromUtf8Literal(isolate, "DEV_ENABLED"), v8::Boolean::New(isolate, DEV_ENABLED)).Check();
             jhost->Set(context, v8::String::NewFromUtf8Literal(isolate, "TOOLS_ENABLED"), v8::Boolean::New(isolate, TOOLS_ENABLED)).Check();
 
+            {
+                v8::Local<v8::Object> ptypes = v8::Object::New(isolate);
+#pragma push_macro("DEF")
+#undef DEF
+#define DEF(FieldName) ptypes->Set(context, v8::String::NewFromUtf8Literal(isolate, #FieldName), v8::Int32::New(isolate, Variant::FieldName)).Check();
+#include "jsb_variant_types.h"
+#pragma pop_macro("DEF")
+                jhost->Set(context, v8::String::NewFromUtf8Literal(isolate, "GodotVariantType"), ptypes).Check();
+            }
 #if TOOLS_ENABLED
             // internal 'jsb.editor'
             {
@@ -341,13 +350,6 @@ namespace jsb
                 editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "get_singletons"), v8::Function::New(context, JavaScriptEditorUtility::_get_singletons).ToLocalChecked()).Check();
                 editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "delete_file"), v8::Function::New(context, JavaScriptEditorUtility::_delete_file).ToLocalChecked()).Check();
 
-                v8::Local<v8::Object> ptypes = v8::Object::New(isolate);
-#pragma push_macro("DEF")
-#undef DEF
-#define DEF(FieldName) ptypes->Set(context, v8::String::NewFromUtf8Literal(isolate, #FieldName), v8::Int32::New(isolate, Variant::FieldName)).Check();
-#include "jsb_variant_types.h"
-#pragma pop_macro("DEF")
-                editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "Type"), ptypes).Check();
             }
 #endif
         }
@@ -681,6 +683,7 @@ namespace jsb
                 }
             }
 
+            //TODO parse and translate into enum with namespace hierarchy (if dots in the name)
             // expose class constants
             for (const KeyValue<StringName, int64_t>& pair : p_class_info->constant_map)
             {
