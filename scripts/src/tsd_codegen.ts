@@ -2,7 +2,18 @@
 import { FileAccess } from "godot";
 
 interface CodeWriter {
-    line(text: string): this;
+    get size(): number;
+    get lineno(): number;
+
+    line(text: string): void;
+
+    namespace_(name: string): NamespaceWriter;
+    class_(name: string, super_: string): ClassWriter;
+    singleton_(info: jsb.editor.SingletonInfo): SingletonWriter;
+    line_comment_(text: string): void;
+}
+
+interface ScopeWriter extends CodeWriter {
     finish(): void;
 }
 
@@ -14,40 +25,64 @@ const PrimitiveTypes = {
     [jsb.editor.Type.STRING]: "string",
     //TODO
     //...
-    [jsb.editor.Type.DICTIONARY]: "{ [name: string]: GodotVariant } | GodotDictionary",
-    [jsb.editor.Type.ARRAY]: "GodotArray | Array<GodotVariant>",
+    [jsb.editor.Type.DICTIONARY]: "GodotDictionary",
+    [jsb.editor.Type.ARRAY]: "GodotArray",
 }
 
-class IndentWriter implements CodeWriter {
-    protected _base: CodeWriter;
-    protected _lines: string[];
+abstract class AbstractWriter implements ScopeWriter {
+    abstract line(text: string): void;
+    abstract finish(): void;
+    abstract get size(): number;
+    abstract get lineno(): number;
 
-    constructor(base: CodeWriter) {
+    constructor() { }
+
+    namespace_(name: string): NamespaceWriter {
+        return new NamespaceWriter(this, name)
+    }
+    class_(name: string, super_: string): ClassWriter {
+        return new ClassWriter(this, name, super_);
+    }
+    singleton_(info: jsb.editor.SingletonInfo): SingletonWriter {
+        return new SingletonWriter(this, info);
+    }
+    line_comment_(text: string) {
+        this.line(`// ${text}`);
+    }
+}
+
+const tab = "    ";
+
+class IndentWriter extends AbstractWriter {
+    protected _base: ScopeWriter;
+    protected _lines: string[];
+    protected _size: number = 0;
+
+    constructor(base: ScopeWriter) {
+        super();
         this._base = base;
         this._lines = [];
     }
 
+    get size() { return this._size; }
+    get lineno() { return this._lines.length; }
+
     finish() {
         for (var line of this._lines) {
-            this._base.line("    " + line);
+            this._base.line(tab + line);
         }
     }
 
-    line_comment(text: string): this {
-        this.line(`// ${text}`)
-        return this;
-    }
-
-    line(text: string): this {
+    line(text: string): void {
         this._lines.push(text);
-        return this;
+        this._size += tab.length + text.length;
     }
 }
 
 class ModuleWriter extends IndentWriter {
     protected _name: string;
 
-    constructor(base: CodeWriter, name: string) {
+    constructor(base: ScopeWriter, name: string) {
         super(base);
         this._name = name;
     }
@@ -61,31 +96,12 @@ class ModuleWriter extends IndentWriter {
         super.finish();
         this._base.line('}');
     }
-
-    namespace_(name: string): NamespaceWriter {
-        return new NamespaceWriter(this, name)
-    }
-    class_(name: string, super_: string): ClassWriter {
-        return new ClassWriter(this, name, super_);
-    }
-    singleton_(info: jsb.editor.SingletonInfo) {
-        return new SingletonWriter(this, info);
-        // if (info.editor_only) {
-        //     this.line_comment(`@editor`)
-        // }
-        // if (info.class_name.length != 0) {
-        //     this.line(`const ${info.name}: godot.${info.class_name}`)
-        // } else {
-        //     this.line(`const ${info.name}: any /*unknown*/`)
-        // }
-
-    }
 }
 
 class NamespaceWriter extends IndentWriter {
     protected _name: string;
 
-    constructor(base: CodeWriter, name: string) {
+    constructor(base: ScopeWriter, name: string) {
         super(base);
         this._name = name;
     }
@@ -108,7 +124,7 @@ class ClassWriter extends IndentWriter {
     protected _name: string;
     protected _super: string;
 
-    constructor(base: CodeWriter, name: string, super_: string) {
+    constructor(base: ScopeWriter, name: string, super_: string) {
         super(base);
         this._name = name;
         this._super = super_;
@@ -164,13 +180,13 @@ class ClassWriter extends IndentWriter {
         }
     }
     signal_(signal_info: jsb.editor.SignalInfo) {
-        this.line_comment(`SIGNAL: ${signal_info.name}`)
+        this.line_comment_(`SIGNAL: ${signal_info.name}`)
     }
 }
 
 class SingletonWriter extends ClassWriter {
     protected _info: jsb.editor.SingletonInfo
-    constructor(base: CodeWriter, info: jsb.editor.SingletonInfo) {
+    constructor(base: ScopeWriter, info: jsb.editor.SingletonInfo) {
         super(base, info.name, "");
         this._info = info;
     }
@@ -182,7 +198,7 @@ class SingletonWriter extends ClassWriter {
 class EnumWriter extends IndentWriter {
     protected _name: string;
 
-    constructor(base: CodeWriter, name: string) {
+    constructor(base: ScopeWriter, name: string) {
         super(base);
         this._name = name;
     }
@@ -200,19 +216,69 @@ class EnumWriter extends IndentWriter {
     }
 }
 
-// d.ts generator
-export default class TSDCodeGen implements CodeWriter {
-    // private _filePath: string;
+class FileWriter extends AbstractWriter {
     private _file: FileAccess;
+    private _size = 0;
+    private _lineno = 0;
+
+    constructor(file: FileAccess) {
+        super();
+        this._file = file;
+    }
+
+    get size() { return this._size; }
+    get lineno() { return this._lineno; }
+
+    line(text: string): void {
+        this._file.store_line(text);
+        this._size += text.length;
+        this._lineno += 1;
+    }
+
+    finish(): void {
+        this._file.flush();
+    }
+}
+
+class FileSplitter {
+    private _file: FileAccess;
+    private _toplevel: ScopeWriter;
+
+    constructor(filePath: string) {
+        this._file = FileAccess.open(filePath, FileAccess.WRITE);
+        this._toplevel = new ModuleWriter(new FileWriter(this._file), "godot");
+
+        this._file.store_line("// AUTO-GENERATED");
+        this._file.store_line('/// <reference no-default-lib="true"/>');
+    }
+
+    close() {
+        this._toplevel.finish();
+        this._file.flush();
+        this._file.close();
+    }
+
+    get_writer() {
+        return this._toplevel;
+    }
+
+    get_size() { return this._toplevel.size; }
+    get_lineno() { return this._toplevel.lineno; }
+}
+
+// d.ts generator
+export default class TSDCodeGen {
+    private _split_index: number;
+    private _outDir: string;
+    private _splitter: FileSplitter | undefined;
     private _singletons: { [name: string]: jsb.editor.SingletonInfo };
     private _classes: { [name: string]: jsb.editor.ClassInfo };
 
-    constructor(filePath: string) {
-        // this._filePath = filePath;
-        this._file = FileAccess.open(filePath, FileAccess.WRITE);
+    constructor(outDir: string) {
+        this._split_index = 0;
+        this._outDir = outDir;
         this._singletons = {};
         this._classes = {};
-        this.line("// AUTO-GENERATED");
 
         const classes = jsb.editor.get_classes();
         const singletons = jsb.editor.get_singletons();
@@ -224,13 +290,49 @@ export default class TSDCodeGen implements CodeWriter {
         }
     }
 
-    finish() {
-        this._file.flush();
+    private make_path(index: number) {
+        const filename = `godot${index}.gen.d.ts`;
+        if (typeof this._outDir !== "string" || this._outDir.length == 0) {
+            return filename;
+        }
+        if (this._outDir.endsWith("/")) {
+            return this._outDir + filename;
+        }
+        return this._outDir + "/" + filename;
     }
 
-    line(text: string): this {
-        this._file.store_line(text);
-        return this;
+    private new_splitter() {
+        if (this._splitter !== undefined) {
+            this._splitter.close();
+        }
+        const filename = this.make_path(this._split_index++);
+        console.log("new writer", filename);
+        this._splitter = new FileSplitter(filename);
+        return this._splitter;
+    }
+
+    // the returned writer will be `finished` automatically
+    private split() : CodeWriter {
+        if (this._splitter == undefined) {
+            return this.new_splitter().get_writer();
+        }
+        const len = this._splitter.get_size();
+        const lineno = this._splitter.get_lineno();
+        if (len > 1024 * 900 || lineno > 12000) {
+            return this.new_splitter().get_writer();
+        }
+        return this._splitter.get_writer();
+    }
+
+    private cleanup() {
+        while (true) {
+            const path = this.make_path(this._split_index++);
+            if (!FileAccess.file_exists(path)) {
+                break;
+            }
+            console.warn("delete file", path);
+            jsb.editor.delete_file(path);
+        }
     }
 
     has_class(name: string): boolean {
@@ -238,18 +340,19 @@ export default class TSDCodeGen implements CodeWriter {
     }
 
     emit() {
-        this.line('/// <reference no-default-lib="true"/>')
         this.emit_singletons();
         this.emit_godot();
+        this._splitter?.close();
+        this.cleanup();
     }
 
     private emit_singletons() {
-        const module_cg = new ModuleWriter(this, "godot");
+        const cg = this.split();
         for (let singleton_name in this._singletons) {
             const singleton = this._singletons[singleton_name];
             const cls = this._classes[singleton.class_name];
             if (typeof cls !== "undefined") {
-                const class_cg = module_cg.singleton_(singleton);
+                const class_cg = cg.singleton_(singleton);
                 // for (let constant of cls.constants) {
                 //     if (!ignored_consts.has(constant.name)) {
                 //         class_cg.constant_(constant);
@@ -260,20 +363,18 @@ export default class TSDCodeGen implements CodeWriter {
                 }
                 class_cg.finish();
             } else {
-                module_cg.line_comment(`singleton ${singleton.name} without class info ${singleton.class_name}`)
+                cg.line_comment_(`ERROR: singleton ${singleton.name} without class info ${singleton.class_name}`)
             }
         }
-        module_cg.finish();
     }
 
     private emit_godot() {
-        const module_cg = new ModuleWriter(this, "godot");
-
         for (let class_name in this._classes) {
             const cls = this._classes[class_name];
+            const cg = this.split();
 
             const ignored_consts: Set<string> = new Set();
-            const class_ns_cg = module_cg.namespace_(cls.name);
+            const class_ns_cg = cg.namespace_(cls.name);
             for (let enum_info of cls.enums) {
                 const enum_cg = class_ns_cg.enum_(enum_info.name);
                 for (let name of enum_info.literals) {
@@ -285,7 +386,7 @@ export default class TSDCodeGen implements CodeWriter {
             }
             class_ns_cg.finish();
 
-            const class_cg = module_cg.class_(cls.name, this.has_class(cls.super) ? cls.super : "");
+            const class_cg = cg.class_(cls.name, this.has_class(cls.super) ? cls.super : "");
             for (let constant of cls.constants) {
                 if (!ignored_consts.has(constant.name)) {
                     class_cg.constant_(constant);
@@ -304,14 +405,12 @@ export default class TSDCodeGen implements CodeWriter {
                 class_cg.signal_(signal_info);
             }
             class_cg.finish();
-
         }
 
         // const global_constants = jsb.editor.get_global_constants();
         // for (let global_constant of global_constants) {
         //     this.line(`[GlobalConstant] ${global_constant.name} = ${global_constant.value}`);
         // }
-        module_cg.finish();
     }
 }
 

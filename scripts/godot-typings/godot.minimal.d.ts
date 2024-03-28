@@ -222,6 +222,8 @@ declare namespace jsb {
         function get_singletons(): Array<SingletonInfo>;
 
         function get_global_constants(): Array<GlobalConstantInfo>;
+
+        function delete_file(filepath: string): void;
     }
 }
 

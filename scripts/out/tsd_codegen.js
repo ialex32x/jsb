@@ -9,26 +9,42 @@ const PrimitiveTypes = {
     [jsb.editor.Type.STRING]: "string",
     //TODO
     //...
-    [jsb.editor.Type.DICTIONARY]: "{ [name: string]: GodotVariant } | GodotDictionary",
-    [jsb.editor.Type.ARRAY]: "GodotArray | Array<GodotVariant>",
+    [jsb.editor.Type.DICTIONARY]: "GodotDictionary",
+    [jsb.editor.Type.ARRAY]: "GodotArray",
 };
-class IndentWriter {
+class AbstractWriter {
+    constructor() { }
+    namespace_(name) {
+        return new NamespaceWriter(this, name);
+    }
+    class_(name, super_) {
+        return new ClassWriter(this, name, super_);
+    }
+    singleton_(info) {
+        return new SingletonWriter(this, info);
+    }
+    line_comment_(text) {
+        this.line(`// ${text}`);
+    }
+}
+const tab = "    ";
+class IndentWriter extends AbstractWriter {
     constructor(base) {
+        super();
+        this._size = 0;
         this._base = base;
         this._lines = [];
     }
+    get size() { return this._size; }
+    get lineno() { return this._lines.length; }
     finish() {
         for (var line of this._lines) {
-            this._base.line("    " + line);
+            this._base.line(tab + line);
         }
-    }
-    line_comment(text) {
-        this.line(`// ${text}`);
-        return this;
     }
     line(text) {
         this._lines.push(text);
-        return this;
+        this._size += tab.length + text.length;
     }
 }
 class ModuleWriter extends IndentWriter {
@@ -45,23 +61,6 @@ class ModuleWriter extends IndentWriter {
         }
         super.finish();
         this._base.line('}');
-    }
-    namespace_(name) {
-        return new NamespaceWriter(this, name);
-    }
-    class_(name, super_) {
-        return new ClassWriter(this, name, super_);
-    }
-    singleton_(info) {
-        return new SingletonWriter(this, info);
-        // if (info.editor_only) {
-        //     this.line_comment(`@editor`)
-        // }
-        // if (info.class_name.length != 0) {
-        //     this.line(`const ${info.name}: godot.${info.class_name}`)
-        // } else {
-        //     this.line(`const ${info.name}: any /*unknown*/`)
-        // }
     }
 }
 class NamespaceWriter extends IndentWriter {
@@ -139,7 +138,7 @@ class ClassWriter extends IndentWriter {
         }
     }
     signal_(signal_info) {
-        this.line_comment(`SIGNAL: ${signal_info.name}`);
+        this.line_comment_(`SIGNAL: ${signal_info.name}`);
     }
 }
 class SingletonWriter extends ClassWriter {
@@ -168,14 +167,49 @@ class EnumWriter extends IndentWriter {
         this.line(`${name} = ${value},`);
     }
 }
+class FileWriter extends AbstractWriter {
+    constructor(file) {
+        super();
+        this._size = 0;
+        this._lineno = 0;
+        this._file = file;
+    }
+    get size() { return this._size; }
+    get lineno() { return this._lineno; }
+    line(text) {
+        this._file.store_line(text);
+        this._size += text.length;
+        this._lineno += 1;
+    }
+    finish() {
+        this._file.flush();
+    }
+}
+class FileSplitter {
+    constructor(filePath) {
+        this._file = godot_1.FileAccess.open(filePath, godot_1.FileAccess.WRITE);
+        this._toplevel = new ModuleWriter(new FileWriter(this._file), "godot");
+        this._file.store_line("// AUTO-GENERATED");
+        this._file.store_line('/// <reference no-default-lib="true"/>');
+    }
+    close() {
+        this._toplevel.finish();
+        this._file.flush();
+        this._file.close();
+    }
+    get_writer() {
+        return this._toplevel;
+    }
+    get_size() { return this._toplevel.size; }
+    get_lineno() { return this._toplevel.lineno; }
+}
 // d.ts generator
 class TSDCodeGen {
-    constructor(filePath) {
-        // this._filePath = filePath;
-        this._file = godot_1.FileAccess.open(filePath, godot_1.FileAccess.WRITE);
+    constructor(outDir) {
+        this._split_index = 0;
+        this._outDir = outDir;
         this._singletons = {};
         this._classes = {};
-        this.line("// AUTO-GENERATED");
         const classes = jsb.editor.get_classes();
         const singletons = jsb.editor.get_singletons();
         for (let cls of classes) {
@@ -185,28 +219,64 @@ class TSDCodeGen {
             this._singletons[singleton.name] = singleton;
         }
     }
-    finish() {
-        this._file.flush();
+    make_path(index) {
+        const filename = `godot${index}.gen.d.ts`;
+        if (typeof this._outDir !== "string" || this._outDir.length == 0) {
+            return filename;
+        }
+        if (this._outDir.endsWith("/")) {
+            return this._outDir + filename;
+        }
+        return this._outDir + "/" + filename;
     }
-    line(text) {
-        this._file.store_line(text);
-        return this;
+    new_splitter() {
+        if (this._splitter !== undefined) {
+            this._splitter.close();
+        }
+        const filename = this.make_path(this._split_index++);
+        console.log("new writer", filename);
+        this._splitter = new FileSplitter(filename);
+        return this._splitter;
+    }
+    // the returned writer will be `finished` automatically
+    split() {
+        if (this._splitter == undefined) {
+            return this.new_splitter().get_writer();
+        }
+        const len = this._splitter.get_size();
+        const lineno = this._splitter.get_lineno();
+        if (len > 1024 * 900 || lineno > 12000) {
+            return this.new_splitter().get_writer();
+        }
+        return this._splitter.get_writer();
+    }
+    cleanup() {
+        while (true) {
+            const path = this.make_path(this._split_index++);
+            if (!godot_1.FileAccess.file_exists(path)) {
+                break;
+            }
+            console.warn("delete file", path);
+            jsb.editor.delete_file(path);
+        }
     }
     has_class(name) {
         return typeof this._classes[name] !== "undefined";
     }
     emit() {
-        this.line('/// <reference no-default-lib="true"/>');
+        var _a;
         this.emit_singletons();
         this.emit_godot();
+        (_a = this._splitter) === null || _a === void 0 ? void 0 : _a.close();
+        this.cleanup();
     }
     emit_singletons() {
-        const module_cg = new ModuleWriter(this, "godot");
+        const cg = this.split();
         for (let singleton_name in this._singletons) {
             const singleton = this._singletons[singleton_name];
             const cls = this._classes[singleton.class_name];
             if (typeof cls !== "undefined") {
-                const class_cg = module_cg.singleton_(singleton);
+                const class_cg = cg.singleton_(singleton);
                 // for (let constant of cls.constants) {
                 //     if (!ignored_consts.has(constant.name)) {
                 //         class_cg.constant_(constant);
@@ -218,17 +288,16 @@ class TSDCodeGen {
                 class_cg.finish();
             }
             else {
-                module_cg.line_comment(`singleton ${singleton.name} without class info ${singleton.class_name}`);
+                cg.line_comment_(`ERROR: singleton ${singleton.name} without class info ${singleton.class_name}`);
             }
         }
-        module_cg.finish();
     }
     emit_godot() {
-        const module_cg = new ModuleWriter(this, "godot");
         for (let class_name in this._classes) {
             const cls = this._classes[class_name];
+            const cg = this.split();
             const ignored_consts = new Set();
-            const class_ns_cg = module_cg.namespace_(cls.name);
+            const class_ns_cg = cg.namespace_(cls.name);
             for (let enum_info of cls.enums) {
                 const enum_cg = class_ns_cg.enum_(enum_info.name);
                 for (let name of enum_info.literals) {
@@ -239,7 +308,7 @@ class TSDCodeGen {
                 enum_cg.finish();
             }
             class_ns_cg.finish();
-            const class_cg = module_cg.class_(cls.name, this.has_class(cls.super) ? cls.super : "");
+            const class_cg = cg.class_(cls.name, this.has_class(cls.super) ? cls.super : "");
             for (let constant of cls.constants) {
                 if (!ignored_consts.has(constant.name)) {
                     class_cg.constant_(constant);
@@ -263,7 +332,6 @@ class TSDCodeGen {
         // for (let global_constant of global_constants) {
         //     this.line(`[GlobalConstant] ${global_constant.name} = ${global_constant.value}`);
         // }
-        module_cg.finish();
     }
 }
 exports.default = TSDCodeGen;

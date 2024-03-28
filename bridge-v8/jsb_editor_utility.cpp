@@ -3,6 +3,16 @@
 #include "core/core_constants.h"
 #if TOOLS_ENABLED
 
+#if WINDOWS_ENABLED
+#pragma push_macro("WIN32_LEAN_AND_MEAN")
+#undef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#pragma pop_macro("WIN32_LEAN_AND_MEAN")
+#else
+#include <cstdio>
+#endif
+
 #define JSB_STRINGIFY_2(a) #a
 #define JSB_STRINGIFY(a) JSB_STRINGIFY_2(a)
 namespace jsb_private
@@ -169,8 +179,9 @@ namespace jsb
             // set_field(isolate, context, object, "arguments", method_info.arguments);
         }
 
-        void build_class_info(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const StringName& class_name, v8::Local<v8::Object>& class_info_obj)
+        v8::Local<v8::Object> build_class_info(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const StringName& class_name)
         {
+            v8::Local<v8::Object> class_info_obj = v8::Object::New(isolate);
             const HashMap<StringName, ClassDB::ClassInfo>::Iterator class_it = ClassDB::classes.find(class_name);
 
             jsb_check(class_it != ClassDB::classes.end());
@@ -256,6 +267,7 @@ namespace jsb
                     signals_obj->Set(context, index++, signal_info_obj);
                 }
             }
+            return class_info_obj;
         }
     }
 
@@ -271,10 +283,7 @@ namespace jsb
         v8::Local<v8::Array> array = v8::Array::New(isolate, list.size());
         for (int index = 0, num = list.size(); index < num; ++index)
         {
-            v8::Local<v8::Object> class_info = v8::Object::New(isolate);
-
-            build_class_info(isolate, context, list[index], class_info);
-            array->Set(context, index, class_info);
+            array->Set(context, index, build_class_info(isolate, context, list[index]));
         }
         info.GetReturnValue().Set(array);
     }
@@ -310,8 +319,15 @@ namespace jsb
         v8::Local<v8::Array> array = v8::Array::New(isolate, singletons.size());
         for (int index = 0, num = singletons.size(); index < num; ++index)
         {
-            const Engine::Singleton& singleton = singletons[index];
+            Engine::Singleton singleton = singletons[index];
             v8::Local<v8::Object> constant_obj = v8::Object::New(isolate);
+            const StringName class_name = singleton.ptr->get_class_name();
+            if (! (const void*) singleton.class_name)
+            {
+                singleton.class_name = class_name;
+                JSB_LOG(Warning, "singleton (%s) hides the clas_name, restoring with '%s'", singleton.name, class_name);
+            }
+
             set_field(isolate, context, constant_obj, "name", singleton.name);
             set_field(isolate, context, constant_obj, "class_name", singleton.class_name);
             set_field(isolate, context, constant_obj, "user_created", singleton.user_created);
@@ -319,6 +335,25 @@ namespace jsb
             array->Set(context, index, constant_obj);
         }
         info.GetReturnValue().Set(array);
+    }
+
+    void JavaScriptEditorUtility::_delete_file(const v8::FunctionCallbackInfo<v8::Value>& info)
+    {
+        v8::Isolate* isolate = info.GetIsolate();
+        v8::HandleScope handle_scope(isolate);
+        v8::Local<v8::Context> context = isolate->GetCurrentContext();
+
+        if (info.Length() != 1 || !info[0]->IsString())
+        {
+            isolate->ThrowError("bad path");
+            return;
+        }
+        v8::String::Utf8Value cstr(isolate, info[0]);
+#if WINDOWS_ENABLED
+        DeleteFileW((LPCWSTR) String(*cstr, cstr.length()).utf16().get_data());
+#else
+        unlink(*cstr);
+#endif
     }
 
 }

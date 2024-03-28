@@ -74,9 +74,8 @@ function test_async() {
 }
 test_async();
 if (jsb.TOOLS_ENABLED) {
-    let tsd = new tsd_codegen_1.default("./hello.txt");
+    let tsd = new tsd_codegen_1.default(".");
     tsd.emit();
-    tsd.finish();
     let dm = new scratchpad_1.DeleteMe();
 }
 console.log("c++ binding test");

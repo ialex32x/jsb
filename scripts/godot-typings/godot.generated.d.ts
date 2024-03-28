@@ -16,8 +16,12 @@ declare module "godot" {
 		static readonly READ_WRITE = 3
 		static readonly WRITE_READ = 7
 
-        static open(path: string, flags: number)
+        static open(path: string, flags: number);
+        static file_exists(path: string): boolean;
+
         store_line(str: string);
-        flush();
+        get_position(): number;
+        flush(): void;
+        close() : void;
     }
 }

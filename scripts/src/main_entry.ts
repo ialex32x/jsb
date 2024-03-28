@@ -70,9 +70,8 @@ async function test_async() {
 test_async();
 
 if (jsb.TOOLS_ENABLED) {
-    let tsd = new TSDCodeGen("./hello.txt");
+    let tsd = new TSDCodeGen(".");
     tsd.emit();
-    tsd.finish();
     let dm = new DeleteMe();
 }
 
