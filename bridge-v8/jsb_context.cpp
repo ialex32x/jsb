@@ -28,6 +28,17 @@ namespace jsb
 
     namespace InternalTimerType { enum Type : uint8_t { Interval, Timeout, Immediate, }; }
 
+    static void _generate_stacktrace(v8::Isolate* isolate, StringBuilder& sb)
+    {
+        v8::TryCatch try_catch(isolate);
+        isolate->ThrowError("");
+        if (JavaScriptExceptionInfo exception_info = JavaScriptExceptionInfo(isolate, try_catch))
+        {
+            sb.append("\n");
+            sb.append(exception_info);
+        }
+    }
+
     void JavaScriptContext::_print(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
         v8::Isolate* isolate = info.GetIsolate();
@@ -71,7 +82,7 @@ namespace jsb
         case internal::ELogSeverity::Assert: CRASH_NOW_MSG(sb.as_string()); return;
         case internal::ELogSeverity::Error: ERR_FAIL_MSG(sb.as_string()); return;
         case internal::ELogSeverity::Warning: WARN_PRINT(sb.as_string()); return;
-        case internal::ELogSeverity::Trace: //TODO append stacktrace
+        case internal::ELogSeverity::Trace: _generate_stacktrace(isolate, sb); print_line(sb.as_string()); return;
         default: print_line(sb.as_string()); return;
         }
     }

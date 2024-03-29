@@ -11,6 +11,7 @@
 
 #include "core/core_constants.h"
 #include "core/string/string_builder.h"
+#include "modules/regex/regex.h"
 
 #include "core/math/vector2.h"
 #include "core/math/vector3.h"

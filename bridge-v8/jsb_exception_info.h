@@ -2,6 +2,7 @@
 #define JAVASCRIPT_EXCEPTION_INFO_H
 
 #include "jsb_pch.h"
+#include "jsb_runtime.h"
 
 namespace jsb
 {
@@ -35,7 +36,8 @@ namespace jsb
                 if (stack_trace_utf8.length() != 0)
                 {
                     handled_ = true;
-                    message_ = String(*stack_trace_utf8, stack_trace_utf8.length());
+                    JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
+                    message_ = cruntime->handle_source_map(String(*stack_trace_utf8, stack_trace_utf8.length()));
                     return;
                 }
             }

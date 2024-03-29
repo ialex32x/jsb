@@ -10,6 +10,9 @@
 #include "jsb_timer_action.h"
 #include "../internal/jsb_sarray.h"
 #include "../internal/jsb_timer_manager.h"
+#if DEV_ENABLED
+#include "../internal/jsb_source_map.h"
+#endif
 
 namespace jsb
 {
@@ -83,10 +86,18 @@ namespace jsb
 #if JSB_WITH_DEBUGGER
         std::unique_ptr<class JavaScriptDebugger> debugger_;
 #endif
+#if DEV_ENABLED
+        Ref<RegEx> source_map_match1_;
+        Ref<RegEx> source_map_match2_;
+        HashMap<String, internal::SourceMap> cached_source_maps_;
+#endif
 
     public:
         JavaScriptRuntime();
         ~JavaScriptRuntime();
+
+        // replace position in the stacktrace with source map
+        String handle_source_map(const String& p_stacktrace);
 
         jsb_force_inline v8::Local<v8::Symbol> get_symbol(Symbols::Type p_type) const
         {
@@ -252,6 +263,9 @@ namespace jsb
     private:
         void on_context_created(const v8::Local<v8::Context>& p_context);
         void on_context_destroyed(const v8::Local<v8::Context>& p_context);
+#if DEV_ENABLED
+        internal::SourceMap* find_source_map(const String& p_filename);
+#endif
 
         jsb_force_inline static void object_gc_callback(const v8::WeakCallbackInfo<void>& info)
         {

@@ -7,14 +7,15 @@ JavaScript for Godot with V8
 * [x] Support on-demand binding
 * [x] Essential NodeJS compatibilities (`console` , `timers` and `CommonJS` modules)
 * [ ] Asynchronous module loading support (`import` function)
-* [ ] Godot Object binding
+* [x] Godot Object types binding
+* [ ] Godot Primitive types binding
 * [ ] Godot `ScriptLanguage` integrating
 * [ ] Multiple contexts for sandboxing script environments (not multi-threading)
 * [ ] Support hot-reload
 * [ ] Worker threads implementation
-* [ ] C++ binding (very basically)
 * [ ] Seamlessly switch to QuickJS when targeting web platform
 * [x] Debug with Chrome devtools when using V8
+* [x] Support SourceMap
 
 ## Current State
 
@@ -99,3 +100,6 @@ test_async();
 ## Debugger
 
 ![20240319122550.png](./docs/assets/20240319122550.png)
+
+## Get Started
+TODO

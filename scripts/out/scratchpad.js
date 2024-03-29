@@ -3,6 +3,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ConcreteClass = exports.AbstractClass = exports.deleteMe = exports.DeleteMe = void 0;
 const godot_1 = require("godot");
 class DeleteMe {
+    constructor() {
+        console.trace("test trace");
+    }
 }
 exports.DeleteMe = DeleteMe;
 ;
@@ -14,9 +17,7 @@ class AbstractClass {
 }
 exports.AbstractClass = AbstractClass;
 class ConcreteClass extends AbstractClass {
-    foo() {
-        this.bark();
-    }
+    foo() { this.bark(); }
 }
 exports.ConcreteClass = ConcreteClass;
 (function () {
