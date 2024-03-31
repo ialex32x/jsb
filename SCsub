@@ -8,14 +8,8 @@ Import("env_modules")
 
 def is_v8_available():
     return env["platform"] != "web"
-    # return env["platform"] == "windows" and env.msvc
-
-# def is_platform(expected_value):
-#     return "1" if env["platform"] == expected_value else "0"
 
 javascript_engine = "v8" if is_v8_available() else "quickjs"
-
-# env_jsb.Append(CPPDEFINES=["JSB_LOG_ENABLED=1"])
 
 print("javascript engine:", javascript_engine)
 
@@ -23,7 +17,13 @@ print("javascript engine:", javascript_engine)
 javascript_shared_defines = [
     "JSB_WITH_V8="+         str(1 if javascript_engine == "v8" else 0),
     "JSB_WITH_QUICKJS="+    str(1 if javascript_engine == "quickjs" else 0),
+
+    # enable to debug with Chrome devtools with the following link by default:
+    # devtools://devtools/bundled/inspector.html?experiments=true&v8only=true&ws=127.0.0.1:9229/1
     "JSB_WITH_DEBUGGER=1",
+
+    # translate the js source stacktrace with source map (currectly, the `.map` file must locate at the same filename & directory of the js source)
+    "JSB_WITH_SOURCEMAP=1",
 
     # NOTE
     # JSB_WITH_LWS must be enabled if JSB_WITH_DEBUGGER is used.
@@ -31,6 +31,8 @@ javascript_shared_defines = [
     # `devtools` do not response the upgrade request with a `sec-websocket-protocol` header which does not apply the handshake requirements of `WSLPeer`
     # and the connection will break immediately by `devtools` if `selected_protocol` is assigned manually in `WSLPeer`
     "JSB_WITH_LWS=1",
+
+    # lower log levels are completely skipped (at compile-time)  
     "JSB_MIN_LOG_LEVEL=Verbose",
 ]
 
