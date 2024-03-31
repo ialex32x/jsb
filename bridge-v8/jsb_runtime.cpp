@@ -299,7 +299,7 @@ namespace jsb
         {
             handle.ref_.SetWeak(p_pointer, &object_gc_callback, v8::WeakCallbackType::kInternalFields);
         }
-        JSB_LOG(Verbose, "bind object %s class_id %d", itos((int64_t) object_id), (uint32_t) p_class_id);
+        JSB_LOG(Verbose, "bind object %s class_id %d", uitos((uint64_t) object_id), (uint32_t) p_class_id);
         return object_id;
     }
 
@@ -435,7 +435,7 @@ namespace jsb
 
         it = cached_source_maps_.insert(p_filename, {});
         internal::SourceMap& map = it->value;
-        String json_data = FileAccess::get_file_as_string(p_filename + ".map");
+        const String json_data = FileAccess::get_file_as_string(p_filename + ".map");
         if (json_data.length() != 0)
         {
             map.parse(json_data);

@@ -20,7 +20,7 @@ namespace jsb::internal
 		{
 			int next;
 			int previous;
-			int revision;
+			uint32_t revision;
 			T value;
 
 		    jsb_force_inline void reset_value() { }
@@ -510,7 +510,7 @@ namespace jsb::internal
 		    {
 		        Slot& slot = slots_base[i];
 		        slot.next = _free_index;
-		        slot.revision = 1;
+		        slot.revision = 2;
 		        _free_index = i;
 		    }
 			jsb_check(is_consistent());
@@ -743,9 +743,14 @@ namespace jsb::internal
 			return _first_index == INDEX_NONE && _last_index == INDEX_NONE;
 		}
 
-		jsb_force_inline static void increase_revision(int& p_value)
+		jsb_force_inline static void increase_revision(uint32_t& p_value)
 		{
-			p_value = p_value == -1 ? 1 : p_value + 1;
+#if defined(JSB_NO_OVERFLOW_CHECK) && JSB_NO_OVERFLOW_CHECK
+			p_value += 2;
+#else
+		    p_value = (p_value + 1 & IndexType::kRevisionMask) == 0 ? 1 : p_value + 1;
+#endif
+		    jsb_check(p_value != 0);
 		}
 
 	    jsb_force_inline static void construct_element(Slot& p_slot)
