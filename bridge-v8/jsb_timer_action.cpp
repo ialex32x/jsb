@@ -10,18 +10,13 @@ namespace jsb
         v8::Local<v8::Context> context = func->GetCreationContextChecked();
         JavaScriptContext* ccontext = JavaScriptContext::wrap(context);
 
-        if (!ccontext)
-        {
-            JSB_LOG(Warning, "timer triggered after JavaScriptContext diposed");
-            return;
-        }
+        jsb_checkf(ccontext, "timer triggered after JavaScriptContext diposed");
         v8::Context::Scope context_scope(context);
 
         v8::TryCatch try_catch(isolate);
         if (argc_ > 0)
         {
             using LocalValue = v8::Local<v8::Value>;
-
             LocalValue* argv = jsb_stackalloc(LocalValue, argc_);
             for (int index = 0; index < argc_; ++index)
             {

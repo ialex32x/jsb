@@ -207,6 +207,15 @@ namespace jsb
             return *resolver;
         }
 
+        NativeClassInfo& add_primitive_class(Variant::Type p_type, const StringName& p_class_name, NativeClassID* r_class_id = nullptr)
+        {
+            NativeClassID class_id;
+            NativeClassInfo& class_info = add_class(NativeClassInfo::GodotPrimitive, p_class_name, &class_id);
+            godot_primitives_index_[p_type] = class_id;
+            if (r_class_id) *r_class_id = class_id;
+            return class_info;
+        }
+
         /**
          * \brief
          * \param p_type category of the class, a GodotObject class is also registered in `godot_classes_index` map
@@ -235,8 +244,7 @@ namespace jsb
 
         jsb_force_inline const NativeClassInfo* find_godot_class(const StringName& p_name, NativeClassID& r_class_id) const
         {
-            const HashMap<StringName, NativeClassID>::ConstIterator it = godot_classes_index_.find(p_name);
-            if (it != godot_classes_index_.end())
+            if (const HashMap<StringName, NativeClassID>::ConstIterator it = godot_classes_index_.find(p_name); it != godot_classes_index_.end())
             {
                 r_class_id = it->value;
                 return &native_classes_[r_class_id];

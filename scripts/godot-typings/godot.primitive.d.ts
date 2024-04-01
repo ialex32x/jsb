@@ -1,28 +1,28 @@
 
-declare module globalThis {
-    class Vector2 {
+// declare module globalThis {
+//     class Vector2 {
 
-    }
+//     }
 
-    class Vector3 {
-        x: number;
-        y: number;
-        z: number;
+//     class Vector3 {
+//         x: number;
+//         y: number;
+//         z: number;
 
-        constructor(x: number, y: number, z: number);
-        dot(a: Vector3): number;
-        move_toward(a: Vector3, l: number): Vector3;
-    }
+//         constructor(x: number, y: number, z: number);
+//         dot(a: Vector3): number;
+//         move_toward(a: Vector3, l: number): Vector3;
+//     }
 
-    class GodotDictionary {
+//     class GodotDictionary {
 
-    }
+//     }
 
-    class GodotArray {
+//     class GodotArray {
 
-    }
+//     }
 
-    type GodotVariant = number | string | {
-        // 
-    }
-}
+//     type GodotVariant = number | string | {
+//         // 
+//     }
+// }

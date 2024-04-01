@@ -78,11 +78,4 @@ if (jsb.TOOLS_ENABLED) {
     tsd.emit();
     let dm = new scratchpad_1.DeleteMe();
 }
-console.log("c++ binding test");
-console.log(typeof Vector3);
-const v1 = new Vector3(1, 1, 1);
-const v2 = new Vector3(2, 3, 4);
-console.log("dot", v2.dot(v1));
-const v3 = v1.move_toward(v2, 0.5);
-console.log(v3.x, v3.y, v3.z);
 //# sourceMappingURL=main_entry.js.map

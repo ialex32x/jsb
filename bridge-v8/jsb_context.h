@@ -5,6 +5,7 @@
 #include "jsb_pch.h"
 #include "jsb_runtime.h"
 #include "jsb_module.h"
+#include "jsb_primitive_bindings.h"
 
 namespace jsb
 {
@@ -24,20 +25,23 @@ namespace jsb
 
         // hold a reference to JavaScriptRuntime which ensure runtime being destructed after context
         std::shared_ptr<class JavaScriptRuntime> runtime_;
+        v8::Global<v8::Context> context_;
 
         internal::FunctionPointers function_pointers_;
+
         JavaScriptModuleCache module_cache_;
         v8::Global<v8::Object> jmodule_cache_;
 
-        //TODO shit
+        // cache all js functions accessed by GodotJSScript (GodotJSScriptInstance)
         internal::SArray<JavaScriptFunction> js_functions_;
 
-        // main context
-        v8::Global<v8::Context> context_;
+        HashMap<StringName, PrimitiveTypeRegisterFunc> primitive_regs_;
 
     public:
         JavaScriptContext(const std::shared_ptr<class JavaScriptRuntime>& runtime);
         ~JavaScriptContext();
+
+        void register_primitive_binding(const StringName& p_name, PrimitiveTypeRegisterFunc p_func);
 
         jsb_force_inline static JavaScriptContext* wrap(const v8::Local<v8::Context>& p_context)
         {
@@ -53,10 +57,6 @@ namespace jsb
         {
             return context_ == p_context;
         }
-
-        //TODO temp code
-        jsb_deleteme
-        void expose_temp();
 
         //TODO temp
         jsb_force_inline const GodotJSClassInfo& get_gdjs_class_info(GodotJSClassID p_class_id) const { return runtime_->get_gdjs_class(p_class_id); }
@@ -88,7 +88,11 @@ namespace jsb
 
         jsb_force_inline v8::Isolate* get_isolate() const { jsb_check(runtime_); return runtime_->isolate_; }
 
-        //NOTE handle scope is required to call this method
+        /**
+         * @param p_source utf-8 encoded CharString
+         * @param p_filename a hint for source origin
+         * @note handle scope is required to call this method
+         */
         jsb_force_inline v8::MaybeLocal<v8::Value> _compile_run(const CharString& p_source, const String& p_filename)
         {
             return _compile_run(p_source.ptr(), p_source.length(), p_filename);
@@ -99,7 +103,9 @@ namespace jsb
         bool _get_main_module(v8::Local<v8::Object>* r_main_module) const;
 
         // JS function (type_name: string): type
-        static void _load_type(const v8::FunctionCallbackInfo<v8::Value>& info);
+        // it's called from JS, load godot type with the `type_name` in the `godot` module (it can be type/singleton/constant/etc.)
+        static void _load_godot_mod(const v8::FunctionCallbackInfo<v8::Value>& info);
+
         static void _require(const v8::FunctionCallbackInfo<v8::Value>& info);
         NativeClassInfo* _expose_godot_class(const ClassDB::ClassInfo* p_class_info, NativeClassID* r_class_id = nullptr);
         NativeClassInfo* _expose_godot_class(const StringName& p_class_name, NativeClassID* r_class_id = nullptr)

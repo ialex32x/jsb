@@ -5,6 +5,7 @@
 #include "jsb_module_loader.h"
 #include "jsb_transpiler.h"
 #include "jsb_function.h"
+#include "jsb_v8_helper.h"
 #include "../internal/jsb_path_util.h"
 
 namespace jsb
@@ -274,7 +275,7 @@ namespace jsb
         v8::Local<v8::Value> class_id_val;
         if (!default_obj->Get(p_context, runtime_->get_symbol(Symbols::ClassId)).ToLocal(&class_id_val) || !class_id_val->IsUint32())
         {
-            // ignore a javascript which does not inherit from native class (directly and indirectly both)
+            // ignore a javascript which does not inherit from a native class (directly and indirectly both)
             return;
         }
 
@@ -290,7 +291,6 @@ namespace jsb
         js_class_info.native_class_id = native_class_id;
         js_class_info.native_class_name = native_class_info.name;
         js_class_info.js_class.Reset(p_isolate, default_obj);
-
         JSB_LOG(Verbose, "godot js class name %s (native: %s)", js_class_info.js_class_name, js_class_info.native_class_name);
 
         struct Payload { v8::Isolate* isolate; GodotJSClassInfo& class_info; }
@@ -306,9 +306,12 @@ namespace jsb
             const String name = String(*name_t, name_t.length());
             if (name != "constructor")
             {
-                GodotJSMethodInfo method_info = {};
-                payload.class_info.methods.insert(name, method_info);
-                JSB_LOG(Verbose, "... property: %s", name);
+                if (element->IsFunction())
+                {
+                    GodotJSMethodInfo method_info = {};
+                    payload.class_info.methods.insert(name, method_info);
+                    JSB_LOG(Verbose, "... property: %s", name);
+                }
             }
             return v8::Array::CallbackResult::kContinue;
         }, &payload);
@@ -425,7 +428,7 @@ namespace jsb
         bool loop = false;
         switch ((InternalTimerType::Type) type)
         {
-        // interval & timeout have 2 arguments usually
+        // interval & timeout have 2 arguments (at least)
         case InternalTimerType::Interval: loop = true;
         case InternalTimerType::Timeout:  // NOLINT(clang-diagnostic-implicit-fallthrough)
             if (!info[1]->IsUndefined() && !info[1]->Int32Value(context).To(&rate))
@@ -435,7 +438,7 @@ namespace jsb
             }
             extra_arg_index = 2;
             break;
-        // immediate has 1 argument usually
+        // immediate has 1 argument (at least)
         default: break;
         }
 
@@ -451,7 +454,7 @@ namespace jsb
                 action.store(index - extra_arg_index, v8::Global<v8::Value>(isolate, info[index]));
             }
             cruntime->timer_manager_.set_timer(handle, std::move(action), rate, loop);
-            info.GetReturnValue().Set(v8::Int32::NewFromUnsigned(isolate, (uint32_t) handle));
+            info.GetReturnValue().Set((uint32_t) handle);
         }
         else
         {
@@ -495,6 +498,7 @@ namespace jsb
             v8::Local<v8::Object> global = context->Global();
 
             _register_builtins(context, global);
+            register_primitive_bindings(this);
         }
         runtime_->on_context_created(context);
     }
@@ -538,107 +542,9 @@ namespace jsb
         ERR_FAIL_V_MSG(ERR_COMPILATION_FAILED, "something wrong");
     }
 
-    struct Foo
+    void JavaScriptContext::register_primitive_binding(const StringName& p_name, PrimitiveTypeRegisterFunc p_func)
     {
-        Foo()
-        {
-            print_line("[cpp] Foo constructor");
-        }
-
-        ~Foo()
-        {
-            print_line("[cpp] Foo destructor");
-        }
-
-        int test(int i)
-        {
-            print_line(vformat("[jsb] Foo.test %d", i));
-            return i + 1;
-        }
-    };
-
-    //TODO stub functions for accessing fields of classes
-#define JSB_GENERATE_PROP_ACCESSORS(ClassName, FieldType, FieldName) \
-    jsb_force_inline static FieldType ClassName##_##FieldName##_getter(ClassName* self) { return self->FieldName; } \
-    jsb_force_inline static void ClassName##_##FieldName##_setter(ClassName* self, FieldType FieldName) { self->FieldName = FieldName; }
-
-    JSB_GENERATE_PROP_ACCESSORS(Vector2, real_t, x);
-    JSB_GENERATE_PROP_ACCESSORS(Vector2, real_t, y);
-
-    JSB_GENERATE_PROP_ACCESSORS(Vector3, real_t, x);
-    JSB_GENERATE_PROP_ACCESSORS(Vector3, real_t, y);
-    JSB_GENERATE_PROP_ACCESSORS(Vector3, real_t, z);
-
-    JSB_GENERATE_PROP_ACCESSORS(Vector4, real_t, x);
-    JSB_GENERATE_PROP_ACCESSORS(Vector4, real_t, y);
-    JSB_GENERATE_PROP_ACCESSORS(Vector4, real_t, z);
-    JSB_GENERATE_PROP_ACCESSORS(Vector4, real_t, w);
-
-    void JavaScriptContext::expose_temp()
-    {
-        v8::Isolate* isolate = get_isolate();
-        v8::HandleScope handle_scope(isolate);
-        v8::Isolate::Scope isolate_scope(isolate);
-        v8::Local<v8::Context> context = context_.Get(isolate);
-        v8::Local<v8::Object> global = context->Global();
-
-        {
-            NativeClassID class_id;
-            const StringName class_name = jsb_typename(Vector2);
-            NativeClassInfo& class_info = runtime_->add_class(NativeClassInfo::GodotPrimitive, class_name, &class_id);
-            runtime_->godot_primitives_index_[Variant::VECTOR2] = class_id;
-
-            v8::Local<v8::FunctionTemplate> function_template = VariantClassTemplate<Vector2>::create<real_t, real_t>(isolate, class_id, class_info);
-            v8::Local<v8::ObjectTemplate> prototype_template = function_template->PrototypeTemplate();
-
-            // methods
-            bind::method(isolate, prototype_template, function_pointers_, jsb_methodbind(Vector2, dot));
-            bind::method(isolate, prototype_template, function_pointers_, jsb_methodbind(Vector2, move_toward));
-            bind::property(isolate, prototype_template, function_pointers_, Vector2_x_getter, Vector2_x_setter, jsb_nameof(Vector2, x));
-            bind::property(isolate, prototype_template, function_pointers_, Vector2_y_getter, Vector2_y_setter, jsb_nameof(Vector2, y));
-
-            // type
-            global->Set(context, v8::String::NewFromUtf8Literal(isolate, jsb_typename(Vector2)), function_template->GetFunction(context).ToLocalChecked()).Check();
-        }
-        {
-            NativeClassID class_id;
-            const StringName class_name = jsb_typename(Vector3);
-            NativeClassInfo& class_info = runtime_->add_class(NativeClassInfo::GodotPrimitive, class_name, &class_id);
-            runtime_->godot_primitives_index_[Variant::VECTOR3] = class_id;
-
-            v8::Local<v8::FunctionTemplate> function_template = VariantClassTemplate<Vector3>::create<real_t, real_t, real_t>(isolate, class_id, class_info);
-            v8::Local<v8::ObjectTemplate> prototype_template = function_template->PrototypeTemplate();
-
-            // methods
-            bind::method(isolate, prototype_template, function_pointers_, jsb_methodbind(Vector3, dot));
-            bind::method(isolate, prototype_template, function_pointers_, jsb_methodbind(Vector3, move_toward));
-            bind::method(isolate, prototype_template, function_pointers_, jsb_methodbind(Vector3, octahedron_encode));
-            bind::property(isolate, prototype_template, function_pointers_, Vector3_x_getter, Vector3_x_setter, jsb_nameof(Vector3, x));
-            bind::property(isolate, prototype_template, function_pointers_, Vector3_y_getter, Vector3_y_setter, jsb_nameof(Vector3, y));
-            bind::property(isolate, prototype_template, function_pointers_, Vector3_z_getter, Vector3_z_setter, jsb_nameof(Vector3, z));
-
-            // type
-            global->Set(context, v8::String::NewFromUtf8Literal(isolate, jsb_typename(Vector3)), function_template->GetFunction(context).ToLocalChecked()).Check();
-        }
-        {
-            NativeClassID class_id;
-            const StringName class_name = jsb_typename(Vector4);
-            NativeClassInfo& class_info = runtime_->add_class(NativeClassInfo::GodotPrimitive, class_name, &class_id);
-            runtime_->godot_primitives_index_[Variant::VECTOR4] = class_id;
-
-            v8::Local<v8::FunctionTemplate> function_template = VariantClassTemplate<Vector4>::create<real_t, real_t, real_t, real_t>(isolate, class_id, class_info);
-            v8::Local<v8::ObjectTemplate> prototype_template = function_template->PrototypeTemplate();
-
-            // methods
-            bind::method(isolate, prototype_template, function_pointers_, jsb_methodbind(Vector4, dot));
-            bind::property(isolate, prototype_template, function_pointers_, Vector4_x_getter, Vector4_x_setter, jsb_nameof(Vector4, x));
-            bind::property(isolate, prototype_template, function_pointers_, Vector4_y_getter, Vector4_y_setter, jsb_nameof(Vector4, y));
-            bind::property(isolate, prototype_template, function_pointers_, Vector4_z_getter, Vector4_z_setter, jsb_nameof(Vector4, z));
-            bind::property(isolate, prototype_template, function_pointers_, Vector4_w_getter, Vector4_w_setter, jsb_nameof(Vector4, w));
-
-            // type
-            global->Set(context, v8::String::NewFromUtf8Literal(isolate, jsb_typename(Vector4)), function_template->GetFunction(context).ToLocalChecked()).Check();
-        }
+        primitive_regs_.insert(p_name, p_func);
     }
 
     NativeClassInfo* JavaScriptContext::_expose_godot_class(const ClassDB::ClassInfo* p_class_info, NativeClassID* r_class_id)
@@ -1118,7 +1024,7 @@ namespace jsb
     }
 
     // [JS] function load_type(type_name: string): Class;
-    void JavaScriptContext::_load_type(const v8::FunctionCallbackInfo<v8::Value>& info)
+    void JavaScriptContext::_load_godot_mod(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
         v8::Isolate* isolate = info.GetIsolate();
         v8::Local<v8::Value> arg0 = info[0];
@@ -1128,16 +1034,30 @@ namespace jsb
             return;
         }
 
-        v8::String::Utf8Value str_utf8(isolate, arg0);
-        StringName type_name(*str_utf8);
+        // v8::String::Utf8Value str_utf8(isolate, arg0);
+        StringName type_name(V8Helper::to_string(v8::String::Value(isolate, arg0)));
         v8::Local<v8::Context> context = isolate->GetCurrentContext();
         JavaScriptContext* ccontext = JavaScriptContext::wrap(context);
+
+        if (const auto it = ccontext->primitive_regs_.find(type_name); it != ccontext->primitive_regs_.end())
+        {
+            v8::Local<v8::Value> rval = it->value(FBindingEnv {
+                ccontext->runtime_.get(),
+                ccontext,
+                isolate,
+                context,
+                ccontext->function_pointers_
+            });
+            jsb_check(!rval.IsEmpty());
+            info.GetReturnValue().Set(rval);
+            return;
+        }
 
         //TODO put all singletons into another module 'godot-globals' for better readability (and avoid naming conflicts, like the `class IP` and the `singleton IP`)
 
         //NOTE keep the same order with `GDScriptLanguage::init()`
         // firstly, singletons have the top priority (in GDScriptLanguage::init, singletons will overwrite the globals slot even if a type/const has the same name)
-        // checking before getting to avoid error prints
+        // checking before getting to avoid error prints in `get_singleton_object`
         if (Engine::get_singleton()->has_singleton(type_name))
         if (Object* gd_singleton = Engine::get_singleton()->get_singleton_object(type_name))
         {

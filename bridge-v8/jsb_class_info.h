@@ -55,8 +55,8 @@ namespace jsb
     };
 
     // exchanging internal javascript class (object) information with `JavaScript` class.
-    // DO NOT expose javascript runtime detail types with involved external classes
-    // since these info structs will be replaced deps on the actual runtime selected.
+    // DO NOT expose javascript runtime detail types with involved external classes,
+    // since these info structs will be replaced deps on the runtime used.
     struct GodotJSClassInfo
     {
         enum Flags : uint8_t

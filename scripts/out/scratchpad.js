@@ -35,4 +35,11 @@ class TestClass extends SubLocalNode {
     }
 }
 exports.default = TestClass;
+console.log("c++ binding test");
+console.log(typeof godot_1.Vector3);
+const v1 = new godot_1.Vector3(1, 1, 1);
+const v2 = new godot_1.Vector3(2, 3, 4);
+console.log("dot", v2.dot(v1));
+const v3 = v1.move_toward(v2, 0.5);
+console.log(v3.x, v3.y, v3.z);
 //# sourceMappingURL=scratchpad.js.map

@@ -46,7 +46,6 @@ namespace jsb
 
         jsb_check(p_ccontext->check(context));
         v8::MaybeLocal<v8::Value> func_maybe_local = p_ccontext->_compile_run(on_demand_loader_source, "on_demand_loader_source");
-
         if (func_maybe_local.IsEmpty())
         {
             return false;
@@ -58,11 +57,10 @@ namespace jsb
             isolate->ThrowError("not a function");
             return false;
         }
+
+        // load_type_impl: function(name)
+        v8::Local<v8::Value> argv[] = { v8::Function::New(context, JavaScriptContext::_load_godot_mod).ToLocalChecked() };
         v8::Local<v8::Function> loader = func_local.As<v8::Function>();
-        v8::Local<v8::Value> argv[] = {
-            // load_type_impl: function(name)
-            v8::Function::New(context, JavaScriptContext::_load_type).ToLocalChecked(),
-        };
         v8::MaybeLocal<v8::Value> type_maybe_local = loader->Call(context, v8::Undefined(isolate), std::size(argv), argv);
         if (type_maybe_local.IsEmpty())
         {

@@ -36,9 +36,6 @@ void GodotJSScriptLanguage::init()
                 jsb::internal::PathUtil::dirname(::OS::get_singleton()->get_executable_path()),
                 "../modules/jsb/scripts/out"));
 
-        //TODO experimental codes about handling native class binding
-        context_->expose_temp();
-
         // editor entry script
         context_->load("main_entry");
         // context_->load("res://src/main.js");
