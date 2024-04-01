@@ -76,11 +76,21 @@ namespace jsb
 
     template<> struct VariantCaster<Vector4>
     {
-        enum { Type = Variant::VECTOR4 };
+        constexpr static Variant::Type Type = Variant::VECTOR4;
         static Vector4* from(const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_val)
         {
             Variant* variant = (Variant*) p_val.As<v8::Object>()->GetAlignedPointerFromInternalField(kObjectFieldPointer);
             return VariantInternal::get_vector4(variant);
+        }
+    };
+
+    template<> struct VariantCaster<Basis>
+    {
+        constexpr static Variant::Type Type = Variant::BASIS;
+        static Basis* from(const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_val)
+        {
+            Variant* variant = (Variant*) p_val.As<v8::Object>()->GetAlignedPointerFromInternalField(kObjectFieldPointer);
+            return VariantInternal::get_basis(variant);
         }
     };
 
@@ -114,6 +124,11 @@ namespace jsb
     template<> struct PrimitiveAccess<Vector2> : PrimitiveAccessBoilerplate<Vector2> {};
     template<> struct PrimitiveAccess<Vector3> : PrimitiveAccessBoilerplate<Vector3> {};
     template<> struct PrimitiveAccess<Vector4> : PrimitiveAccessBoilerplate<Vector4> {};
+    template<> struct PrimitiveAccess<Basis> : PrimitiveAccessBoilerplate<Basis> {};
+
+    // template<> struct PrimitiveAccess<const Vector2> : PrimitiveAccessBoilerplate<Vector2> {};
+    // template<> struct PrimitiveAccess<const Vector3> : PrimitiveAccessBoilerplate<Vector3> {};
+    // template<> struct PrimitiveAccess<const Vector4> : PrimitiveAccessBoilerplate<Vector4> {};
 
     template<> struct PrimitiveAccess<const Vector2&> : PrimitiveAccessBoilerplate<Vector2> {};
     template<> struct PrimitiveAccess<const Vector3&> : PrimitiveAccessBoilerplate<Vector3> {};
@@ -131,6 +146,8 @@ namespace jsb
             return true;
         }
     };
+    // template<> struct PrimitiveAccess<const real_t> : PrimitiveAccess<real_t> {};
+    template<> struct PrimitiveAccess<const real_t&> : PrimitiveAccess<real_t> {};
 
     template<> struct PrimitiveAccess<int32_t>
     {
@@ -139,6 +156,23 @@ namespace jsb
             return p_val->Int32Value(context).ToChecked();
         }
         static bool return_(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::FunctionCallbackInfo<v8::Value>& info, int32_t val)
+        {
+            info.GetReturnValue().Set(val);
+            return true;
+        }
+    };
+    template<> struct PrimitiveAccess<const int32_t> : PrimitiveAccess<int32_t> {};
+    template<> struct PrimitiveAccess<Vector2::Axis> : PrimitiveAccess<int32_t> {};
+    template<> struct PrimitiveAccess<Vector3::Axis> : PrimitiveAccess<int32_t> {};
+    template<> struct PrimitiveAccess<Vector4::Axis> : PrimitiveAccess<int32_t> {};
+
+    template<> struct PrimitiveAccess<bool>
+    {
+        static bool from(const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_val)
+        {
+            return p_val->BooleanValue(context->GetIsolate());
+        }
+        static bool return_(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::FunctionCallbackInfo<v8::Value>& info, bool val)
         {
             info.GetReturnValue().Set(val);
             return true;
@@ -194,6 +228,101 @@ namespace jsb
             }
         }
 
+        template<typename TSelf, typename P0, typename P1, typename P2>
+        static void method(const v8::FunctionCallbackInfo<v8::Value>& info)
+        {
+            typedef TReturn (TSelf::*Functor)(P0, P1, P2);
+            JSB_CONTEXT_BOILERPLATE();
+
+            TSelf* p_self = VariantCaster<TSelf>::from(context, info.This());
+            P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
+            P1 p1 = PrimitiveAccess<P1>::from(context, info[1]);
+            P2 p2 = PrimitiveAccess<P2>::from(context, info[2]);
+            TReturn result = (p_self->*func)(p0, p1, p2);
+            if (!PrimitiveAccess<TReturn>::return_(isolate, context, info, result))
+            {
+                isolate->ThrowError("failed to translate return value");
+            }
+        }
+
+        template<typename TSelf, typename P0, typename P1, typename P2, typename P3>
+        static void method(const v8::FunctionCallbackInfo<v8::Value>& info)
+        {
+            typedef TReturn (TSelf::*Functor)(P0, P1, P2, P3);
+            JSB_CONTEXT_BOILERPLATE();
+
+            TSelf* p_self = VariantCaster<TSelf>::from(context, info.This());
+            P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
+            P1 p1 = PrimitiveAccess<P1>::from(context, info[1]);
+            P2 p2 = PrimitiveAccess<P2>::from(context, info[2]);
+            P3 p3 = PrimitiveAccess<P3>::from(context, info[3]);
+            TReturn result = (p_self->*func)(p0, p1, p2, p3);
+            if (!PrimitiveAccess<TReturn>::return_(isolate, context, info, result))
+            {
+                isolate->ThrowError("failed to translate return value");
+            }
+        }
+
+        template<typename TSelf, typename P0, typename P1, typename P2, typename P3, typename P4>
+        static void method(const v8::FunctionCallbackInfo<v8::Value>& info)
+        {
+            typedef TReturn (TSelf::*Functor)(P0, P1, P2, P3, P4);
+            JSB_CONTEXT_BOILERPLATE();
+
+            TSelf* p_self = VariantCaster<TSelf>::from(context, info.This());
+            P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
+            P1 p1 = PrimitiveAccess<P1>::from(context, info[1]);
+            P2 p2 = PrimitiveAccess<P2>::from(context, info[2]);
+            P3 p3 = PrimitiveAccess<P3>::from(context, info[3]);
+            P4 p4 = PrimitiveAccess<P4>::from(context, info[4]);
+            TReturn result = (p_self->*func)(p0, p1, p2, p3, p4);
+            if (!PrimitiveAccess<TReturn>::return_(isolate, context, info, result))
+            {
+                isolate->ThrowError("failed to translate return value");
+            }
+        }
+
+        template<typename TSelf, typename P0, typename P1, typename P2, typename P3, typename P4, typename P5>
+        static void method(const v8::FunctionCallbackInfo<v8::Value>& info)
+        {
+            typedef TReturn (TSelf::*Functor)(P0, P1, P2, P3, P4, P5);
+            JSB_CONTEXT_BOILERPLATE();
+
+            TSelf* p_self = VariantCaster<TSelf>::from(context, info.This());
+            P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
+            P1 p1 = PrimitiveAccess<P1>::from(context, info[1]);
+            P2 p2 = PrimitiveAccess<P2>::from(context, info[2]);
+            P3 p3 = PrimitiveAccess<P3>::from(context, info[3]);
+            P4 p4 = PrimitiveAccess<P4>::from(context, info[4]);
+            P5 p5 = PrimitiveAccess<P5>::from(context, info[5]);
+            TReturn result = (p_self->*func)(p0, p1, p2, p3, p4, p5);
+            if (!PrimitiveAccess<TReturn>::return_(isolate, context, info, result))
+            {
+                isolate->ThrowError("failed to translate return value");
+            }
+        }
+
+        template<typename TSelf, typename P0, typename P1, typename P2, typename P3, typename P4, typename P5, typename P6>
+        static void method(const v8::FunctionCallbackInfo<v8::Value>& info)
+        {
+            typedef TReturn (TSelf::*Functor)(P0, P1, P2, P3, P4, P5, P6);
+            JSB_CONTEXT_BOILERPLATE();
+
+            TSelf* p_self = VariantCaster<TSelf>::from(context, info.This());
+            P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
+            P1 p1 = PrimitiveAccess<P1>::from(context, info[1]);
+            P2 p2 = PrimitiveAccess<P2>::from(context, info[2]);
+            P3 p3 = PrimitiveAccess<P3>::from(context, info[3]);
+            P4 p4 = PrimitiveAccess<P4>::from(context, info[4]);
+            P5 p5 = PrimitiveAccess<P5>::from(context, info[5]);
+            P6 p6 = PrimitiveAccess<P6>::from(context, info[6]);
+            TReturn result = (p_self->*func)(p0, p1, p2, p3, p4, p5, p6);
+            if (!PrimitiveAccess<TReturn>::return_(isolate, context, info, result))
+            {
+                isolate->ThrowError("failed to translate return value");
+            }
+        }
+
         static void function(const v8::FunctionCallbackInfo<v8::Value>& info)
         {
             typedef TReturn (*Functor)();
@@ -238,6 +367,16 @@ namespace jsb
     template<>
     struct SpecializedReturn<void>
     {
+        template<typename TSelf>
+        static void method(const v8::FunctionCallbackInfo<v8::Value>& info)
+        {
+            typedef void (TSelf::*Functor)();
+            JSB_CONTEXT_BOILERPLATE();
+
+            TSelf* p_self = VariantCaster<TSelf>::from(context, info.This());
+            (p_self->*func)();
+        }
+
         template<typename TSelf, typename P0>
         static void method(const v8::FunctionCallbackInfo<v8::Value>& info)
         {
@@ -247,6 +386,18 @@ namespace jsb
             TSelf* p_self = VariantCaster<TSelf>::from(context, info.This());
             P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
             (p_self->*func)(p0);
+        }
+
+        template<typename TSelf, typename P0, typename P1>
+        static void method(const v8::FunctionCallbackInfo<v8::Value>& info)
+        {
+            typedef void (TSelf::*Functor)(P0, P1);
+            JSB_CONTEXT_BOILERPLATE();
+
+            TSelf* p_self = VariantCaster<TSelf>::from(context, info.This());
+            P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
+            P1 p1 = PrimitiveAccess<P1>::from(context, info[1]);
+            (p_self->*func)(p0, p1);
         }
 
         template<typename TSelf, typename P0>
@@ -499,24 +650,36 @@ namespace jsb
     namespace bind
     {
         template<typename TSelf, typename TReturn, size_t N>
-        static void property(v8::Isolate* isolate, const v8::Local<v8::ObjectTemplate>& prototype, internal::FunctionPointers& fp, TReturn (*getter)(TSelf*), void (*setter)(TSelf*, TReturn), const char (&name)[N])
+        static void property(const FBindingEnv& p_env, const v8::Local<v8::ObjectTemplate>& prototype, TReturn (*getter)(TSelf*), void (*setter)(TSelf*, TReturn), const char (&name)[N])
         {
-            prototype->SetAccessorProperty(v8::String::NewFromUtf8Literal(isolate, name),
-                v8::FunctionTemplate::New(isolate, &SpecializedReturn<TReturn>::template getter<TSelf>, v8::Uint32::NewFromUnsigned(isolate, fp.add(getter))),
-                v8::FunctionTemplate::New(isolate, &SpecializedReturn<void>::template setter<TSelf, TReturn>, v8::Uint32::NewFromUnsigned(isolate, fp.add(setter)))
+            prototype->SetAccessorProperty(v8::String::NewFromUtf8Literal(p_env.isolate, name),
+                v8::FunctionTemplate::New(p_env.isolate, &SpecializedReturn<TReturn>::template getter<TSelf>, v8::Uint32::NewFromUnsigned(p_env.isolate, p_env.function_pointers.add(getter))),
+                v8::FunctionTemplate::New(p_env.isolate, &SpecializedReturn<void>::template setter<TSelf, TReturn>, v8::Uint32::NewFromUnsigned(p_env.isolate, p_env.function_pointers.add(setter)))
                     );
         }
 
         template<typename TSelf, typename TReturn, size_t N>
-        static void method(v8::Isolate* isolate, const v8::Local<v8::ObjectTemplate>& prototype, internal::FunctionPointers& fp, TReturn (TSelf::*func)(), const char (&name)[N])
+        static void method(const FBindingEnv& p_env, const v8::Local<v8::ObjectTemplate>& prototype, TReturn (TSelf::*func)(), const char (&name)[N])
         {
-            prototype->Set(v8::String::NewFromUtf8Literal(isolate, name), v8::FunctionTemplate::New(isolate, &SpecializedReturn<TReturn>::template method<TSelf>, v8::Uint32::NewFromUnsigned(isolate, fp.add(func))));
+            prototype->Set(v8::String::NewFromUtf8Literal(p_env.isolate, name), v8::FunctionTemplate::New(p_env.isolate, &SpecializedReturn<TReturn>::template method<TSelf>, v8::Uint32::NewFromUnsigned(p_env.isolate, p_env.function_pointers.add(func))));
+        }
+
+        template<typename TSelf, typename TReturn, size_t N>
+        static void method(const FBindingEnv& p_env, const v8::Local<v8::ObjectTemplate>& prototype, TReturn (TSelf::*func)() const, const char (&name)[N])
+        {
+            prototype->Set(v8::String::NewFromUtf8Literal(p_env.isolate, name), v8::FunctionTemplate::New(p_env.isolate, &SpecializedReturn<TReturn>::template method<TSelf>, v8::Uint32::NewFromUnsigned(p_env.isolate, p_env.function_pointers.add(func))));
         }
 
         template<typename TSelf, typename TReturn, typename... TArgs, size_t N>
-        static void method(v8::Isolate* isolate, const v8::Local<v8::ObjectTemplate>& prototype, internal::FunctionPointers& fp, TReturn (TSelf::*func)(TArgs...) const, const char (&name)[N])
+        static void method(const FBindingEnv& p_env, const v8::Local<v8::ObjectTemplate>& prototype, TReturn (TSelf::*func)(TArgs...), const char (&name)[N])
         {
-            prototype->Set(v8::String::NewFromUtf8Literal(isolate, name), v8::FunctionTemplate::New(isolate, &SpecializedReturn<TReturn>::template method<TSelf, TArgs...>, v8::Uint32::NewFromUnsigned(isolate, fp.add(func))));
+            prototype->Set(v8::String::NewFromUtf8Literal(p_env.isolate, name), v8::FunctionTemplate::New(p_env.isolate, &SpecializedReturn<TReturn>::template method<TSelf, TArgs...>, v8::Uint32::NewFromUnsigned(p_env.isolate, p_env.function_pointers.add(func))));
+        }
+
+        template<typename TSelf, typename TReturn, typename... TArgs, size_t N>
+        static void method(const FBindingEnv& p_env, const v8::Local<v8::ObjectTemplate>& prototype, TReturn (TSelf::*func)(TArgs...) const, const char (&name)[N])
+        {
+            prototype->Set(v8::String::NewFromUtf8Literal(p_env.isolate, name), v8::FunctionTemplate::New(p_env.isolate, &SpecializedReturn<TReturn>::template method<TSelf, TArgs...>, v8::Uint32::NewFromUnsigned(p_env.isolate, p_env.function_pointers.add(func))));
         }
     }
 
