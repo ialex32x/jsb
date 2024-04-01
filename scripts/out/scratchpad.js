@@ -37,6 +37,7 @@ class TestClass extends SubLocalNode {
 exports.default = TestClass;
 console.log("c++ binding test");
 console.log(typeof godot_1.Vector3);
+console.assert(godot_1.Vector3.Axis.AXIS_X == 0);
 const v1 = new godot_1.Vector3(1, 1, 1);
 const v2 = new godot_1.Vector3(2, 3, 4);
 console.log("dot", v2.dot(v1));

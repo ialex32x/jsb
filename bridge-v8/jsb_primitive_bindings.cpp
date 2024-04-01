@@ -37,6 +37,13 @@ namespace jsb
         bind::property(p_env.isolate, prototype_template, p_env.function_pointers, Vector2_x_getter, Vector2_x_setter, jsb_nameof(Vector2, x));
         bind::property(p_env.isolate, prototype_template, p_env.function_pointers, Vector2_y_getter, Vector2_y_setter, jsb_nameof(Vector2, y));
 
+        //TODO better way to bind constants nested in type
+        // v8::Local<v8::ObjectTemplate> instance_template = function_template->InstanceTemplate();
+        v8::Local<v8::ObjectTemplate> obj_Axis = v8::ObjectTemplate::New(p_env.isolate);
+        obj_Axis->Set(v8::String::NewFromUtf8Literal(p_env.isolate, "AXIS_X"), v8::Int32::New(p_env.isolate, Vector2::AXIS_X));
+        obj_Axis->Set(v8::String::NewFromUtf8Literal(p_env.isolate, "AXIS_Y"), v8::Int32::New(p_env.isolate, Vector2::AXIS_Y));
+        function_template->Set(v8::String::NewFromUtf8Literal(p_env.isolate, "Axis"), obj_Axis);
+
         return function_template->GetFunction(p_env.context).ToLocalChecked();
     }
 
@@ -57,6 +64,14 @@ namespace jsb
         bind::property(p_env.isolate, prototype_template, p_env.function_pointers, Vector3_y_getter, Vector3_y_setter, jsb_nameof(Vector3, y));
         bind::property(p_env.isolate, prototype_template, p_env.function_pointers, Vector3_z_getter, Vector3_z_setter, jsb_nameof(Vector3, z));
 
+        //TODO better way to bind constants nested in type
+        // v8::Local<v8::ObjectTemplate> instance_template = function_template->InstanceTemplate();
+        v8::Local<v8::ObjectTemplate> obj_Axis = v8::ObjectTemplate::New(p_env.isolate);
+        obj_Axis->Set(v8::String::NewFromUtf8Literal(p_env.isolate, "AXIS_X"), v8::Int32::New(p_env.isolate, Vector3::AXIS_X));
+        obj_Axis->Set(v8::String::NewFromUtf8Literal(p_env.isolate, "AXIS_Y"), v8::Int32::New(p_env.isolate, Vector3::AXIS_Y));
+        obj_Axis->Set(v8::String::NewFromUtf8Literal(p_env.isolate, "AXIS_Z"), v8::Int32::New(p_env.isolate, Vector3::AXIS_Z));
+        function_template->Set(v8::String::NewFromUtf8Literal(p_env.isolate, "Axis"), obj_Axis);
+
         return function_template->GetFunction(p_env.context).ToLocalChecked();
     }
 
@@ -75,6 +90,15 @@ namespace jsb
         bind::property(p_env.isolate, prototype_template, p_env.function_pointers, Vector4_y_getter, Vector4_y_setter, jsb_nameof(Vector4, y));
         bind::property(p_env.isolate, prototype_template, p_env.function_pointers, Vector4_z_getter, Vector4_z_setter, jsb_nameof(Vector4, z));
         bind::property(p_env.isolate, prototype_template, p_env.function_pointers, Vector4_w_getter, Vector4_w_setter, jsb_nameof(Vector4, w));
+
+        //TODO better way to bind constants nested in type
+        // v8::Local<v8::ObjectTemplate> instance_template = function_template->InstanceTemplate();
+        v8::Local<v8::ObjectTemplate> obj_Axis = v8::ObjectTemplate::New(p_env.isolate);
+        obj_Axis->Set(v8::String::NewFromUtf8Literal(p_env.isolate, "AXIS_X"), v8::Int32::New(p_env.isolate, Vector4::AXIS_X));
+        obj_Axis->Set(v8::String::NewFromUtf8Literal(p_env.isolate, "AXIS_Y"), v8::Int32::New(p_env.isolate, Vector4::AXIS_Y));
+        obj_Axis->Set(v8::String::NewFromUtf8Literal(p_env.isolate, "AXIS_Z"), v8::Int32::New(p_env.isolate, Vector4::AXIS_Z));
+        obj_Axis->Set(v8::String::NewFromUtf8Literal(p_env.isolate, "AXIS_W"), v8::Int32::New(p_env.isolate, Vector4::AXIS_W));
+        function_template->Set(v8::String::NewFromUtf8Literal(p_env.isolate, "Axis"), obj_Axis);
 
         return function_template->GetFunction(p_env.context).ToLocalChecked();
     }

@@ -33,7 +33,7 @@ namespace jsb
     {
         v8::TryCatch try_catch(isolate);
         isolate->ThrowError("");
-        if (JavaScriptExceptionInfo exception_info = JavaScriptExceptionInfo(isolate, try_catch))
+        if (JavaScriptExceptionInfo exception_info = JavaScriptExceptionInfo(isolate, try_catch, false))
         {
             sb.append("\n");
             sb.append(exception_info);
@@ -537,7 +537,7 @@ namespace jsb
 
         if (JavaScriptExceptionInfo exception_info = JavaScriptExceptionInfo(isolate, try_catch_run))
         {
-            ERR_FAIL_V_MSG(ERR_COMPILATION_FAILED, vformat("%s (%s)", (String) exception_info, p_name));
+            ERR_FAIL_V_MSG(ERR_COMPILATION_FAILED, vformat("failed to load '%s'\n%s", p_name, (String) exception_info));
         }
         ERR_FAIL_V_MSG(ERR_COMPILATION_FAILED, "something wrong");
     }

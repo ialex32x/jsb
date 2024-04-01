@@ -31,6 +31,7 @@ export default class TestClass extends SubLocalNode {
 
 console.log("c++ binding test");
 console.log(typeof Vector3);
+console.assert(Vector3.Axis.AXIS_X == 0);
 const v1 = new Vector3(1, 1, 1);
 const v2 = new Vector3(2, 3, 4);
 console.log("dot", v2.dot(v1));

@@ -18,7 +18,7 @@ namespace jsb
         JavaScriptExceptionInfo(JavaScriptExceptionInfo&&) = default;
         JavaScriptExceptionInfo& operator=(JavaScriptExceptionInfo&&) = default;
 
-        JavaScriptExceptionInfo(v8::Isolate* isolate, const v8::TryCatch& p_catch) : handled_(false)
+        JavaScriptExceptionInfo(v8::Isolate* p_isolate, const v8::TryCatch& p_catch, bool p_accept_message = true) : handled_(false)
         {
             if (!p_catch.HasCaught())
             {
@@ -26,22 +26,27 @@ namespace jsb
             }
 
             handled_ = true;
-            v8::Local<v8::Context> context = isolate->GetCurrentContext();
-            v8::Local<v8::Message> message = p_catch.Message();
+            v8::Local<v8::Context> context = p_isolate->GetCurrentContext();
+            if (p_accept_message)
+            {
+                v8::Local<v8::Message> message = p_catch.Message();
+                const v8::String::Utf8Value message_utf8(p_isolate, message->Get());
+                message_ = String::utf8(*message_utf8, message_utf8.length());
+            }
 
-            const v8::String::Utf8Value message_utf8(isolate, message->Get());
-            message_ = String::utf8(*message_utf8, message_utf8.length());
             v8::Local<v8::Value> stack_trace;
             if (!p_catch.StackTrace(context).ToLocal(&stack_trace))
             {
                 return;
             }
-            v8::String::Utf8Value stack_trace_utf8(isolate, stack_trace);
+
+            v8::String::Utf8Value stack_trace_utf8(p_isolate, stack_trace);
             if (stack_trace_utf8.length() == 0)
             {
                 return;
             }
-            JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
+
+            JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(p_isolate);
             if (!message_.is_empty()) message_ += "\n";
             message_ += cruntime->handle_source_map(String(*stack_trace_utf8, stack_trace_utf8.length()));
         }
