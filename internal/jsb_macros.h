@@ -30,6 +30,7 @@
 #define jsb_typename(TypeName) ((void) sizeof(TypeName), #TypeName)
 #define jsb_nameof(TypeName, MemberName) ((void) sizeof(TypeName::MemberName), #MemberName)
 #define jsb_methodbind(TypeName, MemberName) &TypeName::MemberName, #MemberName
+#define jsb_not_implemented(Condition, Format, ...) CRASH_COND_MSG((Condition), vformat(Format, ##__VA_ARGS__))
 
 #define JSB_CONSOLE(Severity, Message) print_line(Severity, Message)
 
