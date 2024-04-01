@@ -1019,8 +1019,8 @@ namespace jsb
             if (!js_to_gd_var(isolate, context, info[index], type, args[index]))
             {
                 // revert all constructors
-                while (index >= 0) { args[index--].~Variant(); }
                 const CharString raw_string = vformat("bad argument: %d", index).ascii();
+                while (index >= 0) { args[index--].~Variant(); }
                 v8::Local<v8::String> error_message = v8::String::NewFromOneByte(isolate, (const uint8_t*) raw_string.ptr(), v8::NewStringType::kNormal, raw_string.length()).ToLocalChecked();
                 isolate->ThrowError(error_message);
                 return;
