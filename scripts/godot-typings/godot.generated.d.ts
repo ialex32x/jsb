@@ -10,11 +10,16 @@ declare module "godot" {
         function get_time_scale(): number;
     }
 
+    namespace FileAccess {
+        enum ModeFlags {
+            READ = 1,
+            WRITE = 2,
+            READ_WRITE = 3,
+            WRITE_READ = 7,
+        }
+    }
+
     class FileAccess {
-		static readonly READ = 1
-		static readonly WRITE = 2
-		static readonly READ_WRITE = 3
-		static readonly WRITE_READ = 7
 
         static open(path: string, flags: number);
         static file_exists(path: string): boolean;

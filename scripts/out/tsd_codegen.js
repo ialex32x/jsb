@@ -170,12 +170,7 @@ class ModuleWriter extends IndentWriter {
         this._name = name;
     }
     finish() {
-        if (/^[a-zA-Z]+$/.test(this._name)) {
-            this._base.line(`declare module ${this._name} {`);
-        }
-        else {
-            this._base.line(`declare module "${this._name}" {`);
-        }
+        this._base.line(`declare module "${this._name}" {`);
         super.finish();
         this._base.line('}');
     }
@@ -339,7 +334,7 @@ class FileWriter extends AbstractWriter {
 class FileSplitter {
     constructor(types, filePath) {
         this._types = types;
-        this._file = godot_1.FileAccess.open(filePath, godot_1.FileAccess.WRITE);
+        this._file = godot_1.FileAccess.open(filePath, godot_1.FileAccess.ModeFlags.WRITE);
         this._toplevel = new ModuleWriter(new FileWriter(this._types, this._file), "godot");
         this._file.store_line("// AUTO-GENERATED");
         this._file.store_line('/// <reference no-default-lib="true"/>');
