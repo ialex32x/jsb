@@ -11,11 +11,13 @@
 
 #include "core/core_constants.h"
 #include "core/string/string_builder.h"
-#include "modules/regex/regex.h"
-
 #include "core/math/vector2.h"
 #include "core/math/vector3.h"
 #include "core/math/vector4.h"
+#include "core/config/project_settings.h"
+
+//TODO handle module deps in SCSub
+#include "modules/regex/regex.h"
 
 #include "../internal/jsb_macros.h"
 #include "../internal/jsb_sarray.h"

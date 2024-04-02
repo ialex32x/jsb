@@ -12,6 +12,8 @@ GodotJSScriptLanguage::GodotJSScriptLanguage()
 {
     jsb_check(!singleton_);
     singleton_ = this;
+
+    GLOBAL_DEF(PropertyInfo(Variant::INT, "jsb/debugger/port", PROPERTY_HINT_RANGE, "0, 65536, 1"), 9229);
 }
 
 GodotJSScriptLanguage::~GodotJSScriptLanguage()

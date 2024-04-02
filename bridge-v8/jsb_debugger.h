@@ -12,7 +12,7 @@ namespace jsb
 
         virtual void update() = 0;
 
-        static std::unique_ptr<JavaScriptDebugger> create(v8::Isolate* p_isolate, uint16_t p_port = 9229);
+        static std::unique_ptr<JavaScriptDebugger> create(v8::Isolate* p_isolate, uint16_t p_port);
 
     protected:
         virtual void on_context_created(const v8::Local<v8::Context>& p_context) = 0;

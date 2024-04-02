@@ -175,7 +175,7 @@ namespace jsb
         module_loaders_.insert("godot", memnew(GodotModuleLoader));
         JavaScriptRuntimeStore::get_shared().add(this);
 #if JSB_WITH_DEBUGGER
-        debugger_ = JavaScriptDebugger::create(isolate_);
+        debugger_ = JavaScriptDebugger::create(isolate_, GLOBAL_GET("jsb/debugger/port"));
 #endif
     }
 
