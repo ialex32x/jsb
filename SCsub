@@ -2,6 +2,7 @@
 import importlib.util
 import sys
 import os
+import io
 
 Import("env")
 Import("env_modules")
@@ -35,6 +36,28 @@ javascript_shared_defines = [
     # lower log levels are completely skipped (at compile-time)  
     "JSB_MIN_LOG_LEVEL=Verbose",
 ]
+
+def generate_code(filenames):
+    indent = "    "
+    # output = io.StringIO()
+    outfile = "weaver-editor/jsb_ts_project_preset.cpp"
+    with open(outfile, "wt", encoding="utf-8") as output:
+        output.write("// AUTO-GENERATED\n")
+        output.write("#include \"jsb_ts_project_preset.h\"\n")
+        output.write("String GodotJSPorjectPreset::get_source(const String &p_filename)\n")
+        output.write("{\n")
+        for sourcename in filenames:
+            targetname = filenames[sourcename]
+            with open(sourcename, "rt", encoding="utf-8") as input:
+                output.write(f"{indent}if (p_filename == \"{targetname}\")\n")
+                output.write(indent+"{\n")
+                output.write(indent+indent+"return R\"-----(")
+                output.write(input.read())
+                output.write(")-----\";\n")
+                output.write(indent+"}\n")
+
+        output.write(indent+"return String();\n")
+        output.write("}\n")
 
 env_jsb = env_modules.Clone()
 
@@ -94,6 +117,13 @@ env_jsb.add_source_files(module_obj, "weaver/*.cpp")
 
 # editor functionalities
 if env.editor_build:
+    # generate_code({
+    #     "scripts/godot-typings/godot.minimal.d.ts": "godot.minimal.d.ts",
+    #     "scripts/out/editor.bundle.d.ts": "editor.bundle.d.ts",
+    #     "scripts/out/editor.bundle.js": "editor.bundle.js",
+    #     "presets/package.json.txt": "package.json",
+    #     "presets/tsconfig.json.txt": "tsconfig.json",
+    # })
     env_jsb.add_source_files(module_obj, "weaver-editor/*.cpp")
 
 env.modules_sources += module_obj

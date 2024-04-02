@@ -54,7 +54,7 @@ namespace jsb
         }
 
         StringBuilder sb;
-        sb.append("[jsb]");
+        sb.append("[JS]");
         const internal::ELogSeverity::Type severity = (internal::ELogSeverity::Type) magic->Value();
         int index = severity != internal::ELogSeverity::Assert ? 0 : 1;
         if (index == 1)
@@ -98,6 +98,52 @@ namespace jsb
         return StringName();
     }
 
+    void JavaScriptContext::_define(const v8::FunctionCallbackInfo<v8::Value>& info)
+    {
+        v8::Isolate* isolate = info.GetIsolate();
+        v8::HandleScope handle_scope(isolate);
+        v8::Local<v8::Context> context = isolate->GetCurrentContext();
+        JavaScriptContext* ccontext = wrap(context);
+
+        if (info.Length() != 3 || !info[0]->IsString() || !info[1]->IsArray() || !info[2]->IsFunction())
+        {
+            isolate->ThrowError("bad param");
+            return;
+        }
+        const String module_id_str = V8Helper::to_string(v8::String::Value(isolate, info[0]));
+        if (module_id_str.is_empty())
+        {
+            isolate->ThrowError("bad module_id");
+            return;
+        }
+        if (ccontext->module_cache_.find(module_id_str))
+        {
+            isolate->ThrowError("conflicted module_id");
+            return;
+        }
+        v8::Local<v8::Array> deps_val = info[1].As<v8::Array>();
+        Vector<String> deps;
+        for (uint32_t index = 0, len = deps_val->Length(); index < len; ++index)
+        {
+            v8::Local<v8::Value> item;
+            if (!deps_val->Get(context, index).ToLocal(&item) || !item->IsString())
+            {
+                isolate->ThrowError("bad param");
+                return;
+            }
+            const String item_str = V8Helper::to_string(v8::String::Value(isolate, item));
+            if (item_str.is_empty())
+            {
+                isolate->ThrowError("bad param");
+                return;
+            }
+            deps.push_back(item_str);
+        }
+        JSB_LOG(Verbose, "new AMD module loader %s deps: %s", module_id_str, String(", ").join(deps));
+        ccontext->runtime_->add_module_loader<AMDModuleLoader>(module_id_str,
+            deps, v8::Global<v8::Function>(isolate, info[2].As<v8::Function>()));
+    }
+
     void JavaScriptContext::_require(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
         v8::Isolate* isolate = info.GetIsolate();
@@ -106,7 +152,7 @@ namespace jsb
 
         if (info.Length() != 1)
         {
-            isolate->ThrowError("one argument required");
+            isolate->ThrowError("bad argument");
             return;
         }
 
@@ -387,6 +433,7 @@ namespace jsb
             v8::Local<v8::Object> jmodule_cache = v8::Object::New(isolate);
             v8::Local<v8::Function> require_func = v8::Function::New(context, _require).ToLocalChecked();
             self->Set(context, v8::String::NewFromUtf8Literal(isolate, "require"), require_func).Check();
+            self->Set(context, v8::String::NewFromUtf8Literal(isolate, "define"), v8::Function::New(context, _define).ToLocalChecked()).Check();
             require_func->Set(context, v8::String::NewFromUtf8Literal(isolate, "cache"), jmodule_cache).Check();
             require_func->Set(context, v8::String::NewFromUtf8Literal(isolate, "moduleId"), v8::String::Empty(isolate)).Check();
             jmodule_cache_.Reset(isolate, jmodule_cache);
@@ -600,12 +647,12 @@ namespace jsb
                 }
             }
 
-            // expose nested enum 
+            // expose nested enum
             HashSet<StringName> enum_consts;
             for (const KeyValue<StringName, ClassDB::ClassInfo::EnumInfo>& pair : p_class_info->enum_map)
             {
                 v8::Local<v8::ObjectTemplate> enum_obj = v8::ObjectTemplate::New(isolate);
-                for (const StringName& enum_vname : pair.value.constants) 
+                for (const StringName& enum_vname : pair.value.constants)
                 {
                     const String& enum_vname_str = (String) enum_vname;
                     jsb_not_implemented(enum_vname_str.contains("."), "hierarchically nested definition is currently not supported");
@@ -613,14 +660,14 @@ namespace jsb
                     const auto const_it = p_class_info->constant_map.find(enum_vname);
                     const int32_t enum_value = (int32_t) const_it->value;
                     enum_obj->Set(
-                        v8::String::NewFromUtf8(isolate, vname_str.ptr(), v8::NewStringType::kNormal, vname_str.length()).ToLocalChecked(), 
+                        v8::String::NewFromUtf8(isolate, vname_str.ptr(), v8::NewStringType::kNormal, vname_str.length()).ToLocalChecked(),
                         v8::Int32::New(isolate, enum_value)
                     );
                     enum_consts.insert(enum_vname);
                 }
                 const CharString enum_name_str = ((String) pair.key).utf8();
                 function_template->Set(
-                    v8::String::NewFromUtf8(isolate, enum_name_str.ptr(), v8::NewStringType::kNormal, enum_name_str.length()).ToLocalChecked(), 
+                    v8::String::NewFromUtf8(isolate, enum_name_str.ptr(), v8::NewStringType::kNormal, enum_name_str.length()).ToLocalChecked(),
                     enum_obj
                 );
             }

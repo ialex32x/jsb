@@ -39,6 +39,12 @@ void GodotJSScriptLanguage::init()
                 "../modules/jsb/scripts/out"));
 
         // editor entry script
+        String code_path = jsb::internal::PathUtil::combine(
+                jsb::internal::PathUtil::dirname(::OS::get_singleton()->get_executable_path()),
+                "../modules/jsb/scripts/out", "editor.bundle.js");
+        String code = FileAccess::get_file_as_string(code_path);
+
+        context_->eval(code.utf8(), code_path);
         context_->load("main_entry");
         // context_->load("res://src/main.js");
         // runtime_->find_gdjs_class("TestClass");

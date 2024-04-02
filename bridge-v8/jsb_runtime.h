@@ -186,6 +186,15 @@ namespace jsb
             return nullptr;
         }
 
+        template<typename T, typename... ArgumentTypes>
+        T& add_module_loader(const String& p_module_id, ArgumentTypes&&... p_args)
+        {
+            jsb_ensure(!module_loaders_.has(p_module_id));
+            T* loader = memnew(T(std::forward<ArgumentTypes>(p_args)...));
+            module_loaders_.insert(p_module_id, loader);
+            return *loader;
+        }
+
         class IModuleResolver* find_module_resolver(const String& p_module_id, String& r_asset_path) const
         {
             for (IModuleResolver* resolver : module_resolvers_)

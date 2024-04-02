@@ -54,9 +54,8 @@ namespace jsb
         v8::Local<v8::Object> jmodule = p_module.module.Get(isolate);
         //TODO [uncertain] hot-reload support, reuse the existed `exports`
         v8::Local<v8::Object> jexports = v8::Object::New(isolate);
-        v8::Local<v8::String> jmodule_id = v8::String::NewFromUtf8(isolate, cmodule_id.ptr(), v8::NewStringType::kNormal, cmodule_id.length()).ToLocalChecked();
         v8::Local<v8::String> jfilename = v8::String::NewFromUtf8(isolate, cfilename.ptr(), v8::NewStringType::kNormal, cfilename.length()).ToLocalChecked();
-        v8::Local<v8::Function> jrequire = v8::Function::New(context, JavaScriptContext::_require, /* magic: module_id */ jmodule_id).ToLocalChecked();
+        v8::Local<v8::Function> jrequire = p_ccontext->_new_require_func(cmodule_id);
         v8::Local<v8::Function> elevator = func_local.As<v8::Function>();
 
         v8::Local<v8::Value> argv[] = { // exports, require, module, __filename, __dirname
@@ -67,16 +66,6 @@ namespace jsb
             v8::String::NewFromUtf8(isolate, cdirname.ptr(), v8::NewStringType::kNormal, cdirname.length()).ToLocalChecked(),
         };
 
-        v8::Local<v8::Object> jmain_module;
-        if (p_ccontext->_get_main_module(&jmain_module))
-        {
-            jrequire->Set(context, v8::String::NewFromUtf8Literal(isolate, "main"), jmain_module).Check();
-        }
-        else
-        {
-            JSB_LOG(Warning, "invalid main module");
-            jrequire->Set(context, v8::String::NewFromUtf8Literal(isolate, "main"), v8::Undefined(isolate)).Check();
-        }
         //TODO set `require.cache`
         // ...
 

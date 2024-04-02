@@ -99,6 +99,24 @@ namespace jsb
         }
 
         v8::MaybeLocal<v8::Value> _compile_run(const char* p_source, int p_source_len, const String& p_filename);
+        v8::Local<v8::Function> _new_require_func(const CharString& p_module_id)
+        {
+            v8::Isolate* isolate = runtime_->isolate_;
+            v8::Local<v8::Context> context = context_.Get(isolate);
+            v8::Local<v8::String> jmodule_id = v8::String::NewFromUtf8(isolate, p_module_id.ptr(), v8::NewStringType::kNormal, p_module_id.length()).ToLocalChecked();
+            v8::Local<v8::Function> jrequire = v8::Function::New(context, JavaScriptContext::_require, /* magic: module_id */ jmodule_id).ToLocalChecked();
+            v8::Local<v8::Object> jmain_module;
+            if (_get_main_module(&jmain_module))
+            {
+                jrequire->Set(context, v8::String::NewFromUtf8Literal(isolate, "main"), jmain_module).Check();
+            }
+            else
+            {
+                JSB_LOG(Warning, "invalid main module");
+                jrequire->Set(context, v8::String::NewFromUtf8Literal(isolate, "main"), v8::Undefined(isolate)).Check();
+            }
+            return jrequire;
+        }
 
         bool _get_main_module(v8::Local<v8::Object>* r_main_module) const;
 
@@ -114,7 +132,12 @@ namespace jsb
             return it != ClassDB::classes.end() ? _expose_godot_class(&it->value, r_class_id) : nullptr;
         }
 
+        // return false if something wrong with an exception thrown
+        // caller should handle the exception if it's not called from js
+        bool _load_module(const String& p_parent_id, const String& p_module_id, JavaScriptModule*& r_module);
+
     private:
+        static void _define(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void _print(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void _set_timer(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void _clear_timer(const v8::FunctionCallbackInfo<v8::Value>& info);
@@ -123,9 +146,6 @@ namespace jsb
 
         void _register_builtins(const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& self);
 
-        // return false if something wrong with an exception thrown
-        // caller should handle the exception if it's not called from js
-        bool _load_module(const String& p_parent_id, const String& p_module_id, JavaScriptModule*& r_module);
         void _parse_script_class(v8::Isolate* p_isolate, const v8::Local<v8::Context>& p_context, JavaScriptModule& p_module);
     };
 }
