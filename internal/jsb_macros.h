@@ -45,7 +45,7 @@
 #define jsb_experimental
 #define jsb_no_discard [[nodiscard]]
 
-#define jsb_stackalloc(type, size) (type*) alloca(sizeof(type) * size)
+#define jsb_stackalloc(type, size) (type*) alloca(sizeof(type) * (size))
 
 namespace jsb::internal
 {
