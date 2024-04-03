@@ -78,12 +78,18 @@ namespace jsb
             }
         }
 
+#if JSB_WITH_STACKTRACE_ALWAYS
+        _generate_stacktrace(isolate, sb);
+#else
+        if (severity == internal::ELogSeverity::Trace) _generate_stacktrace(isolate, sb);
+#endif
+
         switch (severity)
         {
         case internal::ELogSeverity::Assert: CRASH_NOW_MSG(sb.as_string()); return;
         case internal::ELogSeverity::Error: ERR_FAIL_MSG(sb.as_string()); return;
         case internal::ELogSeverity::Warning: WARN_PRINT(sb.as_string()); return;
-        case internal::ELogSeverity::Trace: _generate_stacktrace(isolate, sb); print_line(sb.as_string()); return;
+        case internal::ELogSeverity::Trace:
         default: print_line(sb.as_string()); return;
         }
     }
