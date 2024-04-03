@@ -16,7 +16,12 @@
 #endif
 
 #if DEV_ENABLED
-#   define JSB_LOG(Severity, Format, ...) if constexpr (jsb::internal::ELogSeverity::Severity >= jsb::internal::ELogSeverity::JSB_MIN_LOG_LEVEL) print_line(vformat("[jsb][%s] " Format, ((void) sizeof(jsb::internal::ELogSeverity::Severity), #Severity), ##__VA_ARGS__))
+#   define JSB_LOG(Severity, Format, ...) \
+    if constexpr (jsb::internal::ELogSeverity::Severity >= jsb::internal::ELogSeverity::JSB_MIN_LOG_LEVEL) \
+    {\
+        if (jsb::internal::ELogSeverity::Severity != jsb::internal::ELogSeverity::Verbose || OS::get_singleton()->is_stdout_verbose()) \
+        print_line(vformat("[jsb][%s] " Format, ((void) sizeof(jsb::internal::ELogSeverity::Severity), #Severity), ##__VA_ARGS__));\
+    } (void) 0
 #   define jsb_check(Condition) CRASH_COND(!(Condition))
 #   define jsb_checkf(Condition, Format, ...) CRASH_COND_MSG(!(Condition), vformat(Format, ##__VA_ARGS__))
 #   define jsb_ensure(Condition) CRASH_COND(!(Condition))
