@@ -78,7 +78,11 @@ namespace jsb
         jsb_deprecated
         Error eval(const CharString& p_source, const String& p_filename);
 
-        // load a script (as module)
+        /**
+         * \brief load a module script
+         * \param p_name module_id
+         * \return OK if compiled and run with no error
+         */
         Error load(const String& p_name);
 
         //TODO is there a simple way to compile (validate) the script without any side effect?

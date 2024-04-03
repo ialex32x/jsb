@@ -17,17 +17,56 @@ JavaScript for Godot with V8
 * [x] Debug with Chrome devtools when using V8
 * [x] Support SourceMap
 
+## Get Started
+
+Download or clone the repo into Godot `modules` directory.
+```sh
+cd YourGodotEngineSource/modules
+git lfs clone https://github.com/ialex32x/jsb.git
+```
+
+Compile and launch the Godot editor.
+
+Install TS project presets with menu item `Project > Tools > GodotJS > Install TS Project`.
+> All `jsb` premade config/scripts will be generated at `res://typescripts` and `res://javascripts` (the location will be configurable in a future version).
+> `d.ts` files of godot classes will also be generated at same time.
+
+> **NOTE** The directory `typescripts` is automatically ignored in godot editor. Edit typescript source from the `typescripts` directory with any code editor (like VSCode).
+
+Install javascript packages:
+```sh
+cd YourGodotProject/typescripts
+npm i
+```
+
+Write and compile your typescript source.
+```sh
+cd YourGodotProject/typescripts
+# remove the option `-w` if no continuous compilation required
+npx tsc -w
+```
+
+## Debugger
+
+A debugger bridge is implemented. 
+Open `devtools://devtools/bundled/inspector.html?experiments=true&v8only=true&ws=127.0.0.1:9229/1` in the `Chrome` to start debugging the javascript sources.
+
+> **NOTE** The listening port can be changed in `Project Settings > jsb > Debugger > Port`. A restart is required for it to take effect.
+
+![20240319122550.png](./docs/assets/20240319122550.png)
+
 ## Current State
 
 | Platform | V8 | QuickJS |
 | --- | --- | --- |
-| Windows x86_64 | INTEGRATING | TODO |
+| Windows x86_64 | WIP | TODO |
 | Windows x86_32 | UNPLANNED | UNPLANNED |
 | UWP | UNPLANNED | UNPLANNED |
 | Windows ARM64 | TODO | TODO |
 | Linux x86_64 | TODO | TODO |
+| Linux ARM64 | WIP | TODO |
 | MacOS x86_64 | TODO | TODO |
-| MacOS ARM64 | INTEGRATING | TODO |
+| MacOS ARM64 | WIP | TODO |
 | WebAssembly | X | TODO |
 
 
@@ -37,69 +76,3 @@ JavaScript for Godot with V8
 | quickjs | 2024-01-13 |
 | godot | 4.2 |
 | libwebsockets | 4.3.3-13-g6901c32a |
-
-## Sample
-
-```ts
-// godot types will be exposed to JS runtime until they are actually used
-import { Node } from "godot";
-
-// entry point (editor only)
-
-// log, warn, error, assert are essentially supported
-console.log("main entry in editor");
-console.assert(typeof Node === "function");
-
-let timer_id : any;
-let times = 5;
-
-// setInterval, setTimeout, setImmediate, clearInterval, clearTimeout are essentially supported
-// NOTE: they return a timer_id which is an integer instead of Timeout object like in NodeJS
-timer_id = setInterval(function () {
-    console.log("tick");
-    --times;
-    if (times == 0) {
-        clearInterval(timer_id);
-        console.log("stop tick");
-    }
-}, 1000);
-
-setImmediate(function(){
-    console.log("immediate");
-});
-
-setTimeout(function(...args){
-    console.log("timeout", ...args);
-
-    if (jsb.debug) {
-        console.log("it's a debug build");
-        // jsb.list_classes();
-    } else {
-        console.log("it's a release build");
-    }
-
-}, 1500, 123, 456.789, "abc");
-
-async function delay(seconds: number) {
-    return new Promise(function (resolve: (value?: any) => void) {
-        setTimeout(function () {
-            resolve();
-        }, seconds * 1000);
-    });
-}
-
-async function test_async() {
-    console.log("async test begin");
-    await delay(3);
-    console.log("async test end");
-}
-
-test_async();
-```
-
-## Debugger
-
-![20240319122550.png](./docs/assets/20240319122550.png)
-
-## Get Started
-TODO

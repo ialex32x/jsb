@@ -50,6 +50,40 @@ def write_file(filename, ostream):
         output.write(content)
         print(f"generate {filename}")
 
+def generate_method_code(output, methodname, indent, filenames):
+    output.write(f"const char* GodotJSPorjectPreset::{methodname}(const String &p_filename, size_t& r_len)\n")
+    output.write("{\n")
+    output.write(indent+"static const char data[] = {\n")
+    positions = {}
+    cursor = 0
+    newline = 0
+    output.write(indent+indent)
+    for sourcename in filenames:
+        targetname = filenames[sourcename]
+        if len(targetname) == 0:
+            targetname = os.path.basename(sourcename)
+        targetstart = cursor
+        with open(sourcename, "rb") as input:
+            bytes = input.read()
+            cursor += len(bytes)
+            positions[targetname] = (targetstart, cursor - targetstart)
+            for byte in bytes:
+                output.write(f"0x{byte:02x}, ")
+                newline += 1
+                if newline >= 64:
+                    newline = 0
+                    output.write("\n")
+                    output.write(indent+indent)
+    output.write("\n")
+    output.write(indent+"};\n")
+    for targetname in positions:
+        start = positions[targetname][0]
+        size = positions[targetname][1]
+        output.write(indent+f"if (p_filename == \"{targetname}\") {{ r_len = {size}; return data+{start}; }}\n")
+    output.write(indent+"r_len = 0;\n")
+    output.write(indent+"return nullptr;\n")
+    output.write("}\n")
+    
 def generate_code(filenames):
     indent = "    "
     output = io.StringIO()
@@ -57,36 +91,9 @@ def generate_code(filenames):
     # with open(outfile, "wt", encoding="utf-8") as output:
     if True:
         output.write("// AUTO-GENERATED\n")
-        output.write("#include \"jsb_project_preset.h\"\n")
-        output.write("String GodotJSPorjectPreset::get_source(const String &p_filename)\n")
-        output.write("{\n")
-        output.write(indent+"constexpr static char data[] = {\n")
-        positions = {}
-        cursor = 0
-        newline = 0
-        output.write(indent+indent)
-        for sourcename in filenames:
-            targetname = filenames[sourcename]
-            targetstart = cursor
-            with open(sourcename, "rb") as input:
-                bytes = input.read()
-                cursor += len(bytes)
-                positions[targetname] = (targetstart, cursor - targetstart)
-                for byte in bytes:
-                    output.write(f"0x{byte:02x}, ")
-                    newline += 1
-                    if newline >= 64:
-                        newline = 0
-                        output.write("\n")
-                        output.write(indent+indent)
         output.write("\n")
-        output.write(indent+"};\n")
-        for targetname in positions:
-            start = positions[targetname][0]
-            size = positions[targetname][1]
-            output.write(indent+f"if (p_filename == \"{targetname}\") return String::utf8(data+{start}, {size});\n")
-        output.write(indent+"return String();\n")
-        output.write("}\n")
+        output.write("#include \"jsb_project_preset.h\"\n")
+        generate_method_code(output, "get_source", indent, filenames)
     write_file(outfile, output)
 
 env_jsb = env_modules.Clone()
@@ -148,11 +155,27 @@ env_jsb.add_source_files(module_obj, "weaver/*.cpp")
 # editor functionalities
 if env.editor_build:
     generate_code({
-        "scripts/godot-typings/godot.minimal.d.ts": "godot.minimal.d.ts",
-        "scripts/out/editor.bundle.d.ts": "editor.bundle.d.ts",
-        "scripts/out/editor.bundle.js": "editor.bundle.js",
-        "presets/package.json.txt": "package.json",
-        "presets/tsconfig.json.txt": "tsconfig.json",
+        # editor presets
+        "scripts/out/jsb.editor.codegen.js": "",
+        "scripts/out/jsb.editor.codegen.js.map": "",
+        "scripts/src/jsb.editor.main.ts": "",
+        
+        "scripts/out/jsb.editor.main.js": "",
+        "scripts/out/jsb.editor.main.js.map": "",
+        "scripts/src/jsb.editor.codegen.ts": "",
+
+
+        "scripts/godot-typings/godot.minimal.d.ts": "",
+        "scripts/godot-typings/godot.primitive.d.ts": "",
+
+        "scripts/presets/package.json.txt": "package.json",
+        "scripts/presets/tsconfig.json.txt": "tsconfig.json",
+        "scripts/presets/gdignore.txt": ".gdignore", 
+
+        # runtime presets
+        "scripts/out/jsb.core.js": "", 
+        "scripts/out/jsb.core.js.map": "", 
+        "scripts/src/jsb.core.ts": "", 
     })
     env_jsb.add_source_files(module_obj, "weaver-editor/*.cpp")
 

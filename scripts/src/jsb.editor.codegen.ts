@@ -1,6 +1,10 @@
 
 import { FileAccess } from "godot";
 
+if (!jsb.TOOLS_ENABLED) {
+    throw new Error("codegen is only allowed in editor mode")
+}
+
 interface CodeWriter {
     get types(): TypeDB;
     get size(): number;
@@ -319,6 +323,13 @@ class ClassWriter extends IndentWriter {
         return "void"
     }
     method_(method_info: jsb.editor.MethodInfo) {
+        if (method_info.name.indexOf('/') >= 0 || method_info.name.indexOf('.') >= 0) {
+            const args = this.make_args(method_info)
+            const rval = this.make_return(method_info)
+            const prefix = this.make_method_prefix(method_info);
+            this.line(`${prefix}["${method_info.name}"]: (${args}) => ${rval}`);
+            return;
+        }
         const args = this.make_args(method_info)
         const rval = this.make_return(method_info)
         const prefix = this.make_method_prefix(method_info);

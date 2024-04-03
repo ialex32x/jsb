@@ -30,24 +30,18 @@ void GodotJSScriptLanguage::init()
         runtime_ = std::make_shared<jsb::JavaScriptRuntime>();
         context_ = std::make_shared<jsb::JavaScriptContext>(runtime_);
 
-        //TODO add GodotJSScriptLanguage itself as a module resolver which load source directly from GodotJSScript.get_source_code()
         runtime_->add_module_resolver<jsb::DefaultModuleResolver>()
-            .add_search_path("res://")
-            // search path for editor only scripts
-            .add_search_path(jsb::internal::PathUtil::combine(
-                jsb::internal::PathUtil::dirname(::OS::get_singleton()->get_executable_path()),
-                "../modules/jsb/scripts/out"));
+            .add_search_path("res://javascripts")
+            // // search path for editor only scripts
+            // .add_search_path(jsb::internal::PathUtil::combine(
+            //     jsb::internal::PathUtil::dirname(::OS::get_singleton()->get_executable_path()),
+            //     "../modules/jsb/scripts/out"));
+        ;
 
-        // editor entry script
-        String code_path = jsb::internal::PathUtil::combine(
-                jsb::internal::PathUtil::dirname(::OS::get_singleton()->get_executable_path()),
-                "../modules/jsb/scripts/out", "editor.bundle.js");
-        String code = FileAccess::get_file_as_string(code_path);
-
-        context_->eval(code.utf8(), code_path);
-        context_->load("main_entry");
-        // context_->load("res://src/main.js");
-        // runtime_->find_gdjs_class("TestClass");
+        if (FileAccess::exists("res://javascripts/jsb/jsb.editor.main.js"))
+        {
+            context_->load("jsb/jsb.editor.main");
+        }
     }
     JSB_LOG(Verbose, "jsb lang init");
 }
@@ -183,4 +177,9 @@ void GodotJSScriptLanguage::reload_tool_script(const Ref<Script> &p_script, bool
 void GodotJSScriptLanguage::get_recognized_extensions(List<String>* p_extensions) const
 {
     p_extensions->push_back(JSB_RES_EXT);
+}
+
+Error GodotJSScriptLanguage::eval_source(const String &p_code)
+{
+    return context_->eval(p_code.utf8(), "eval");
 }

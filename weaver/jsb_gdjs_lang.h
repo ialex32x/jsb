@@ -26,6 +26,8 @@ public:
     // main context
     jsb_force_inline std::shared_ptr<jsb::JavaScriptContext> get_context() const { return context_; }
 
+    Error eval_source(const String& p_code);
+
     GodotJSScriptLanguage();
     virtual ~GodotJSScriptLanguage() override;
 

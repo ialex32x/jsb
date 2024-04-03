@@ -236,6 +236,14 @@ namespace jsb
         if (IModuleResolver* resolver = runtime_->find_module_resolver(normalized_id, asset_path))
         {
             const String& module_id = asset_path;
+
+            // check again with the resolved module_id
+            if (JavaScriptModule* module = module_cache_.find(module_id))
+            {
+                r_module = module;
+                return true;
+            }
+
             // supported module properties: id, filename, cache, loaded, exports, children
             JavaScriptModule& module = module_cache_.insert(module_id, true);
             const CharString cmodule_id = module_id.utf8();
