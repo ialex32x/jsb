@@ -1,7 +1,7 @@
 
 JavaScript for Godot with V8
 
-> THIS PROJECT IS STILL UNDER VERY EARLY DEVELOPMENT.
+> **NOTE** This project is still in the very early stage of development.
 
 ## Features
 * [x] Support on-demand binding
@@ -19,7 +19,7 @@ JavaScript for Godot with V8
 
 ## Get Started
 
-Download or clone the repo into Godot `modules` directory.
+Download or clone the repo into Godot `modules` directory:
 ```sh
 cd YourGodotEngineSource/modules
 git lfs clone https://github.com/ialex32x/jsb.git
@@ -39,12 +39,37 @@ cd YourGodotProject/typescripts
 npm i
 ```
 
-Write and compile your typescript source.
+Write and compile your typescript source:
 ```sh
 cd YourGodotProject/typescripts
 # remove the option `-w` if no continuous compilation required
 npx tsc -w
 ```
+
+## GodotJS Scripts
+A javascript class can extend a Godot Object class (like GDScript):
+
+> This example is written in TypeScript.
+
+```ts
+import { Node } from "godot";
+
+export default class MyJSNode extends Node {
+    constructor() {
+        super();
+        console.log("my js node class");
+    }
+
+    _ready() {
+        console.log("MyJSNode _ready");
+    }
+
+}
+```
+
+Attach the compiled file to a Node:
+
+![attach a script](./docs/assets/attach_script.png)
 
 ## Debugger
 
