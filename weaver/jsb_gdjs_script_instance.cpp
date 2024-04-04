@@ -45,14 +45,12 @@ bool GodotJSScriptInstance::property_get_revert(const StringName &p_name, Varian
 
 void GodotJSScriptInstance::get_method_list(List<MethodInfo> *p_list) const
 {
-    //TODO
-
+    script_->get_script_method_list(p_list);
 }
 
 bool GodotJSScriptInstance::has_method(const StringName &p_method) const
 {
-    //TODO
-    return true;
+    return script_->has_method(p_method);
 }
 
 Variant GodotJSScriptInstance::callp(const StringName &p_method, const Variant **p_args, int p_argcount, Callable::CallError &r_error)

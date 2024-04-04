@@ -352,30 +352,48 @@ namespace jsb
         js_class_info.native_class_name = native_class_info.name;
         js_class_info.js_class.Reset(p_isolate, default_obj);
         JSB_LOG(Verbose, "godot js class name %s (native: %s)", js_class_info.js_class_name, js_class_info.native_class_name);
-
-        struct Payload { v8::Isolate* isolate; GodotJSClassInfo& class_info; }
-        payload = { p_isolate, js_class_info, };
         //TODO collect methods/signals/properties
         // v8::Local<v8::Object> prototype = default_obj->GetPrototype().As<v8::Object>();
         v8::Local<v8::Object> prototype = default_obj->Get(p_context, v8::String::NewFromUtf8Literal(p_isolate, "prototype")).ToLocalChecked().As<v8::Object>();
         v8::Local<v8::Array> property_names = prototype->GetPropertyNames(p_context, v8::KeyCollectionMode::kOwnOnly, v8::PropertyFilter::ALL_PROPERTIES, v8::IndexFilter::kSkipIndices, v8::KeyConversionMode::kNoNumbers).ToLocalChecked();
-        property_names->Iterate(p_context, [](uint32_t index, v8::Local<v8::Value> element, void* data)
+
+        v8::Isolate::Scope isolate_scope(p_isolate);
+        v8::HandleScope handle_scope(p_isolate);
+        v8::Context::Scope context_scope(p_context);
+
+        struct Payload
         {
-            const Payload& payload = *(Payload*) data;
-            const v8::String::Utf8Value name_t(payload.isolate, element);
-            const String name = String(*name_t, name_t.length());
-            if (name != "constructor")
+            v8::Isolate* isolate;
+            const v8::Local<v8::Context>& context;
+            GodotJSClassInfo& class_info;
+            Vector<String> properties;
+        } payload = { p_isolate, p_context, js_class_info, };
+        property_names->Iterate(p_context, [](uint32_t index, v8::Local<v8::Value> prop_name, void* data)
+        {
+            Payload& payload = *(Payload*) data;
+            const v8::String::Utf8Value name_t(payload.isolate, prop_name);
+            const String name_s = String(*name_t, name_t.length());
+            if (name_s != "constructor")
             {
-                if (element->IsFunction())
+                // v8::Local<v8::Value> prop_val = payload.prototype->Get(payload.context, prop_name).ToLocalChecked();
+                JSB_LOG(Verbose, "... property: %s", name_s);
+                payload.properties.push_back(name_s);
+                // if (prop_val->IsFunction())
                 {
+                    //TODO property categories
+                    const StringName sname = name_s;
                     GodotJSMethodInfo method_info = {};
-                    payload.class_info.methods.insert(name, method_info);
-                    JSB_LOG(Verbose, "... property: %s", name);
+                    // method_info.name = sname;
+                    // method_info.function_.Reset(payload.isolate, prop_val.As<v8::Function>());
+                    // const internal::Index32 id = payload.class_info.methods.add(std::move(method_info));
+                    // payload.class_info.methods_map.insert(sname, id);
+                    payload.class_info.methods.insert(sname, method_info);
                 }
             }
             return v8::Array::CallbackResult::kContinue;
         }, &payload);
 
+        //TODO iterator payload.properties to determine the type (func/prop/signal)
     }
 
     NativeObjectID JavaScriptContext::crossbind(Object* p_this, GodotJSClassID p_class_id)
@@ -571,7 +589,6 @@ namespace jsb
         v8::HandleScope handle_scope(isolate);
         v8::Local<v8::Context> context = context_.Get(get_isolate());
 
-        js_functions_.clear();
         runtime_->on_context_destroyed(context);
         context->SetAlignedPointerInEmbedderData(kContextEmbedderData, nullptr);
 
@@ -1314,8 +1331,8 @@ namespace jsb
         v8::HandleScope handle_scope(isolate);
         v8::Local<v8::Context> context = context_.Get(isolate);
         v8::Context::Scope context_scope(context);
-        v8::Local<v8::Function> func = js_func.function_.Get(isolate);
         ObjectHandle& object_handle = runtime_->objects_.get_value(p_object_id);
+        v8::Local<v8::Function> func = js_func.function_.Get(isolate);
         v8::Local<v8::Value> self = object_handle.ref_.Get(isolate);
 
         v8::TryCatch try_catch_run(isolate);

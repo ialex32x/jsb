@@ -51,6 +51,7 @@ namespace jsb
 
     struct GodotJSPropertyInfo
     {
+        StringName name;
         //TODO
     };
 

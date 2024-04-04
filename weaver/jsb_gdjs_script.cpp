@@ -14,13 +14,9 @@ GodotJSScript::GodotJSScript(): script_list_(this)
 
 GodotJSScript::~GodotJSScript()
 {
-    for (const KeyValue<StringName, jsb::GodotJSFunctionID>& kv : cached_methods_)
-    {
-        context_->remove_function(kv.value);
-    }
 
     {
-        GodotJSScriptLanguage* lang = GodotJSScriptLanguage::get_singleton();
+        const GodotJSScriptLanguage* lang = GodotJSScriptLanguage::get_singleton();
         MutexLock lock(lang->mutex_);
 
         script_list_.remove_from_list();
@@ -130,9 +126,9 @@ MethodInfo GodotJSScript::get_method_info(const StringName &p_method) const
 {
     jsb_check(has_method(p_method));
     //TODO details?
-    MethodInfo mi = {};
-    mi.name = p_method;
-    return mi;
+    MethodInfo item = {};
+    item.name = p_method;
+    return item;
 }
 
 bool GodotJSScript::is_abstract() const
@@ -152,29 +148,34 @@ bool GodotJSScript::has_script_signal(const StringName &p_signal) const
 
 void GodotJSScript::get_script_method_list(List<MethodInfo> *p_list) const
 {
-    for (const KeyValue<StringName, jsb::GodotJSMethodInfo>& it : get_js_class_info().methods)
+    for (const auto& it : get_js_class_info().methods)
     {
         //TODO details?
-        MethodInfo mi = {};
-        mi.name = it.key;
-        p_list->push_back(mi);
+        MethodInfo item = {};
+        item.name = it.key;
+        p_list->push_back(item);
     }
 }
 
 void GodotJSScript::get_script_property_list(List<PropertyInfo> *p_list) const
 {
-    //TODO
-    JSB_LOG(Warning, "TODO");
+    for (const auto& it : get_js_class_info().properties)
+    {
+        //TODO details?
+        PropertyInfo item = {};
+        item.name = it.key;
+        p_list->push_back(item);
+    }
 }
 
 void GodotJSScript::get_script_signal_list(List<MethodInfo> *r_signals) const
 {
-    for (const KeyValue<StringName, jsb::GodotJSMethodInfo>& it : get_js_class_info().signals)
+    for (const auto& it : get_js_class_info().signals)
     {
         //TODO details?
-        MethodInfo mi = {};
-        mi.name = it.key;
-        r_signals->push_back(mi);
+        MethodInfo item = {};
+        item.name = it.key;
+        r_signals->push_back(item);
     }
 }
 
@@ -199,8 +200,8 @@ void GodotJSScript::_placeholder_erased(PlaceHolderScriptInstance *p_placeholder
 
 bool GodotJSScript::has_static_method(const StringName &p_method) const
 {
-    const HashMap<StringName, jsb::GodotJSMethodInfo>::ConstIterator& it = get_js_class_info().methods.find(p_method);
-    return it != get_js_class_info().methods.end() && it->value.is_static();
+    //TODO
+    return false;
 }
 
 bool GodotJSScript::instance_has(const Object *p_this) const
