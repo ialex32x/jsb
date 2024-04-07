@@ -17,6 +17,23 @@ namespace jsb
             jsb_check(err == OK);
             return str_gd;
         }
+
+        jsb_force_inline v8::MaybeLocal<v8::Script> compile(v8::Local<v8::Context> context, v8::Local<v8::String> source, const String& p_filename)
+        {
+            v8::Isolate* isolate = context->GetIsolate();
+            if (p_filename.is_empty())
+            {
+                return v8::Script::Compile(context, source);
+            }
+
+#if WINDOWS_ENABLED
+            const CharString filename = p_filename.replace("/", "\\").utf8();
+#else
+            const CharString filename = p_filename.utf8();
+#endif
+            v8::ScriptOrigin origin(isolate, v8::String::NewFromUtf8(isolate, filename, v8::NewStringType::kNormal, filename.length()).ToLocalChecked());
+            return v8::Script::Compile(context, source, &origin);
+        }
     };
 }
 #endif

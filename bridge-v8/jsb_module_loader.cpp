@@ -45,7 +45,7 @@ namespace jsb
         v8::Context::Scope context_scope(context);
 
         jsb_check(p_ccontext->check(context));
-        v8::MaybeLocal<v8::Value> func_maybe_local = p_ccontext->_compile_run(on_demand_loader_source, "on_demand_loader_source");
+        v8::MaybeLocal<v8::Value> func_maybe_local = p_ccontext->_compile_run(on_demand_loader_source, on_demand_loader_source.length(), "on_demand_loader_source");
         if (func_maybe_local.IsEmpty())
         {
             return false;
@@ -111,14 +111,14 @@ namespace jsb
                 dep_vals[index] = self_exports;
                 continue;
             }
-            JavaScriptModule* module;
-            if (!p_ccontext->_load_module(self_module_id, dep_module_id, module))
+            if (JavaScriptModule* module = p_ccontext->_load_module(self_module_id, dep_module_id))
             {
-                succeeded = false;
-                break;
+                JSB_LOG(Verbose, "load dep: %s", dep_module_id);
+                dep_vals[index] = module->exports.Get(isolate);
+                continue;
             }
-            JSB_LOG(Verbose, "load dep: %s", dep_module_id);
-            dep_vals[index] = module->exports.Get(isolate);
+            succeeded = false;
+            break;
         }
 
         if (succeeded)

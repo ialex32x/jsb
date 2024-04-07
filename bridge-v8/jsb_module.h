@@ -17,7 +17,9 @@ namespace jsb
         GodotJSClassID default_class_id;
 
         v8::Global<v8::Object> module;
-        v8::Global<v8::Object> exports;
+        v8::Global<v8::Value> exports;
+
+        bool reload_requested = false;
     };
 
     struct JavaScriptModuleCache

@@ -95,6 +95,7 @@ ScriptInstance* GodotJSScript::instance_create(Object *p_this)
 Error GodotJSScript::reload(bool p_keep_state)
 {
     //TODO
+    context_->_reload_module(get_js_class_info().module_id);
     return OK;
 }
 
@@ -108,7 +109,7 @@ Vector<DocData::ClassDoc> GodotJSScript::get_documentation() const
 String GodotJSScript::get_class_icon_path() const
 {
     //TODO
-    return {};
+    return "res://javascripts/icon/filetype-js.svg";
 }
 
 PropertyInfo GodotJSScript::get_class_category() const

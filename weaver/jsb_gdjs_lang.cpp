@@ -125,7 +125,7 @@ Script* GodotJSScriptLanguage::create_script() const
 bool GodotJSScriptLanguage::validate(const String& p_script, const String& p_path, List<String>* r_functions, List<ScriptError>* r_errors, List<Warning>* r_warnings, HashSet<int>* r_safe_lines) const
 {
     jsb::JavaScriptExceptionInfo exception_info;
-    if (context_->validate(p_path, &exception_info))
+    if (context_->validate_script(p_path, &exception_info))
     {
         return true;
     }
@@ -181,5 +181,5 @@ void GodotJSScriptLanguage::get_recognized_extensions(List<String>* p_extensions
 
 Error GodotJSScriptLanguage::eval_source(const String &p_code)
 {
-    return context_->eval(p_code.utf8(), "eval");
+    return context_->eval_source(p_code.utf8(), "eval");
 }

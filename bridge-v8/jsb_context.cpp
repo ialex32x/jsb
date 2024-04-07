@@ -173,19 +173,31 @@ namespace jsb
         const String parent_id = to_string(isolate, info.Data());
         const String module_id = to_string(isolate, arg0);
         JavaScriptContext* ccontext = JavaScriptContext::wrap(context);
-        JavaScriptModule* module;
-        if (ccontext->_load_module(parent_id, module_id, module))
+        if (JavaScriptModule* module = ccontext->_load_module(parent_id, module_id))
         {
             info.GetReturnValue().Set(module->exports);
         }
     }
 
-    bool JavaScriptContext::_load_module(const String& p_parent_id, const String& p_module_id, JavaScriptModule*& r_module)
+    void JavaScriptContext::_reload_module(const String& p_module_id)
     {
-        if (JavaScriptModule* module = module_cache_.find(p_module_id))
+        if (JavaScriptModule* existed_module = module_cache_.find(p_module_id))
         {
-            r_module = module;
-            return true;
+            if (!existed_module->path.is_empty())
+            {
+                //TODO reload all related
+                existed_module->reload_requested = true;
+                _load_module("", existed_module->id);
+            }
+        }
+    }
+
+    JavaScriptModule* JavaScriptContext::_load_module(const String& p_parent_id, const String& p_module_id)
+    {
+        JavaScriptModule* existed_module = module_cache_.find(p_module_id);
+        if (existed_module && !existed_module->reload_requested)
+        {
+            return existed_module;
         }
 
         v8::Isolate* isolate = runtime_->isolate_;
@@ -195,13 +207,14 @@ namespace jsb
         // find loader with the module id
         if (IModuleLoader* loader = runtime_->find_module_loader(p_module_id))
         {
+            jsb_checkf(!existed_module, "module loader does not support reloading");
             JavaScriptModule& module = module_cache_.insert(p_module_id, false);
             v8::Local<v8::Object> module_obj = v8::Object::New(isolate);
             v8::Local<v8::String> propkey_loaded = v8::String::NewFromUtf8Literal(isolate, "loaded");
 
             // register the new module obj into module_cache obj
             v8::Local<v8::Object> jmodule_cache = jmodule_cache_.Get(isolate);
-            CharString cmodule_id = p_module_id.utf8();
+            const CharString cmodule_id = p_module_id.utf8();
             v8::Local<v8::String> jmodule_id = v8::String::NewFromUtf8(isolate, cmodule_id.ptr(), v8::NewStringType::kNormal, cmodule_id.length()).ToLocalChecked();
             jmodule_cache->Set(context, jmodule_id, module_obj).Check();
 
@@ -213,12 +226,11 @@ namespace jsb
             //NOTE the loader should throw error if failed
             if (!loader->load(this, module))
             {
-                return false;
+                return nullptr;
             }
 
             module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, true)).Check();
-            r_module = &module;
-            return true;
+            return &module;
         }
 
         // try resolve the module id
@@ -229,7 +241,7 @@ namespace jsb
             if (internal::PathUtil::extract(combined_id, normalized_id) != OK || normalized_id.is_empty())
             {
                 isolate->ThrowError("bad path");
-                return false;
+                return nullptr;
             }
         }
         else
@@ -244,84 +256,106 @@ namespace jsb
             const String& module_id = asset_path;
 
             // check again with the resolved module_id
-            if (JavaScriptModule* module = module_cache_.find(module_id))
+            existed_module = module_cache_.find(module_id);
+            if (existed_module && !existed_module->reload_requested)
             {
-                r_module = module;
-                return true;
+                return existed_module;
             }
 
             // supported module properties: id, filename, cache, loaded, exports, children
-            JavaScriptModule& module = module_cache_.insert(module_id, true);
-            const CharString cmodule_id = module_id.utf8();
-            v8::Local<v8::Object> module_obj = v8::Object::New(isolate);
-            v8::Local<v8::String> propkey_loaded = v8::String::NewFromUtf8Literal(isolate, "loaded");
-            v8::Local<v8::String> propkey_children = v8::String::NewFromUtf8Literal(isolate, "children");
-
-            // register the new module obj into module_cache obj
-            v8::Local<v8::Object> jmodule_cache = jmodule_cache_.Get(isolate);
-            v8::Local<v8::String> jmodule_id = v8::String::NewFromUtf8(isolate, cmodule_id.ptr(), v8::NewStringType::kNormal, cmodule_id.length()).ToLocalChecked();
-            jmodule_cache->Set(context, jmodule_id, module_obj).Check();
-
-            // init the new module obj
-            module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, false)).Check();
-            module_obj->Set(context, v8::String::NewFromUtf8Literal(isolate, "id"), jmodule_id).Check();
-            module_obj->Set(context, propkey_children, v8::Array::New(isolate)).Check();
-            module.id = module_id;
-            module.path = asset_path;
-            module.module.Reset(isolate, module_obj);
-
-            //NOTE the resolver should throw error if failed
-            //NOTE module.filename should be set in `resolve.load`
-            if (!resolver->load(this, asset_path, module))
+            if (existed_module)
             {
-                return false;
-            }
+                jsb_check(existed_module->id == module_id);
+                jsb_check(existed_module->path == asset_path);
 
-            // build the module tree
-            if (!p_parent_id.is_empty())
-            {
-                if (const JavaScriptModule* cparent_module = module_cache_.find(p_parent_id))
+                JSB_LOG(Verbose, "reload module %s", module_id);
+                existed_module->reload_requested = false;
+                if (!resolver->load(this, asset_path, *existed_module))
                 {
-                    v8::Local<v8::Object> jparent_module = cparent_module->module.Get(isolate);
-                    v8::Local<v8::Value> jparent_children_v;
-                    if (jparent_module->Get(context, propkey_children).ToLocal(&jparent_children_v) && jparent_children_v->IsArray())
+                    return nullptr;
+                }
+                _parse_script_class(isolate, context, *existed_module);
+                return existed_module;
+            }
+            else
+            {
+                JavaScriptModule& module = module_cache_.insert(module_id, true);
+                const CharString cmodule_id = module_id.utf8();
+                v8::Local<v8::Object> module_obj = v8::Object::New(isolate);
+                v8::Local<v8::Object> exports_obj = v8::Object::New(isolate);
+                v8::Local<v8::String> propkey_loaded = v8::String::NewFromUtf8Literal(isolate, "loaded");
+                v8::Local<v8::String> propkey_children = v8::String::NewFromUtf8Literal(isolate, "children");
+
+                // register the new module obj into module_cache obj
+                v8::Local<v8::Object> jmodule_cache = jmodule_cache_.Get(isolate);
+                v8::Local<v8::String> jmodule_id = v8::String::NewFromUtf8(isolate, cmodule_id.ptr(), v8::NewStringType::kNormal, cmodule_id.length()).ToLocalChecked();
+                jmodule_cache->Set(context, jmodule_id, module_obj).Check();
+
+                // init the new module obj
+                module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, false)).Check();
+                module_obj->Set(context, v8::String::NewFromUtf8Literal(isolate, "id"), jmodule_id).Check();
+                module_obj->Set(context, propkey_children, v8::Array::New(isolate)).Check();
+                module_obj->Set(context, v8::String::NewFromUtf8Literal(isolate, "exports"), exports_obj);
+                module.id = module_id;
+                module.path = asset_path;
+                module.module.Reset(isolate, module_obj);
+                module.exports.Reset(isolate, exports_obj);
+
+                //NOTE the resolver should throw error if failed
+                //NOTE module.filename should be set in `resolve.load`
+                if (!resolver->load(this, asset_path, module))
+                {
+                    return nullptr;
+                }
+
+                // build the module tree
+                if (!p_parent_id.is_empty())
+                {
+                    if (const JavaScriptModule* cparent_module = module_cache_.find(p_parent_id))
                     {
-                        v8::Local<v8::Array> jparent_children = jparent_children_v.As<v8::Array>();
-                        const uint32_t children_num = jparent_children->Length();
-                        jparent_children->Set(context, children_num, module_obj).Check();
+                        v8::Local<v8::Object> jparent_module = cparent_module->module.Get(isolate);
+                        v8::Local<v8::Value> jparent_children_v;
+                        if (jparent_module->Get(context, propkey_children).ToLocal(&jparent_children_v) && jparent_children_v->IsArray())
+                        {
+                            v8::Local<v8::Array> jparent_children = jparent_children_v.As<v8::Array>();
+                            const uint32_t children_num = jparent_children->Length();
+                            jparent_children->Set(context, children_num, module_obj).Check();
+                        }
+                        else
+                        {
+                            JSB_LOG(Error, "can not access children on '%s'", p_parent_id);
+                        }
                     }
                     else
                     {
-                        JSB_LOG(Error, "can not access children on '%s'", p_parent_id);
+                        JSB_LOG(Warning, "parent module not found with the name '%s'", p_parent_id);
                     }
                 }
-                else
-                {
-                    JSB_LOG(Warning, "parent module not found with the name '%s'", p_parent_id);
-                }
+                module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, true)).Check();
+                _parse_script_class(isolate, context, module);
+                return &module;
             }
-            module_obj->Set(context, propkey_loaded, v8::Boolean::New(isolate, true)).Check();
-            _parse_script_class(isolate, context, module);
-            r_module = &module;
-            return true;
         }
 
         const CharString cerror_message = vformat("unknown module: %s", normalized_id).utf8();
         isolate->ThrowError(v8::String::NewFromUtf8(isolate, cerror_message.ptr(), v8::NewStringType::kNormal, cerror_message.length()).ToLocalChecked());
-        return false;
+        return nullptr;
     }
 
     void JavaScriptContext::_parse_script_class(v8::Isolate* p_isolate, const v8::Local<v8::Context>& p_context, JavaScriptModule& p_module)
     {
         // only classes in files of godot package system could be used as godot js script
-        if (!p_module.path.begins_with("res://"))
+        if (!p_module.path.begins_with("res://") || p_module.exports.IsEmpty())
         {
             return;
         }
 
-        //TODO just a temp test trying to read javascript class info from module
-        //TODO `module_id` is not file path based for now, will it be better to directly use the path as `module_id`??
-        v8::Local<v8::Object> exports = p_module.exports.Get(p_isolate);
+        v8::Local<v8::Value> exports_val = p_module.exports.Get(p_isolate);
+        if (!exports_val->IsObject())
+        {
+            return;
+        }
+        v8::Local<v8::Object> exports = exports_val.As<v8::Object>();
         v8::Local<v8::Value> default_val;
         if (!exports->Get(p_context, v8::String::NewFromUtf8Literal(p_isolate, "default")).ToLocal(&default_val)
             || !default_val->IsObject())
@@ -342,18 +376,33 @@ namespace jsb
         // unsafe
         const NativeClassID native_class_id = (NativeClassID) class_id_val->Uint32Value(p_context).ToChecked();
         const NativeClassInfo& native_class_info = runtime_->get_native_class(native_class_id);
+        GodotJSClassInfo* existed_class_info = runtime_->find_gdjs_class(p_module.default_class_id);
+        if (existed_class_info)
+        {
+            existed_class_info->methods.clear();
+            existed_class_info->signals.clear();
+            existed_class_info->properties.clear();
+        }
+        else
+        {
+            GodotJSClassID gdjs_class_id;
+            existed_class_info = &runtime_->add_gdjs_class(gdjs_class_id);
+            p_module.default_class_id = gdjs_class_id;
+            existed_class_info->module_id = p_module.id;
+        }
+        jsb_check(existed_class_info->module_id == p_module.id);
+        existed_class_info->js_class_name = String(*name, name.length());
+        existed_class_info->native_class_id = native_class_id;
+        existed_class_info->native_class_name = native_class_info.name;
+        existed_class_info->js_class.Reset(p_isolate, default_obj);
+        JSB_LOG(Verbose, "godot js class name %s (native: %s)", existed_class_info->js_class_name, existed_class_info->native_class_name);
+        _parse_script_class_iterate(p_isolate, p_context, *existed_class_info);
+    }
 
-        GodotJSClassID gdjs_class_id;
-        GodotJSClassInfo& js_class_info = runtime_->add_gdjs_class(gdjs_class_id);
-        p_module.default_class_id = gdjs_class_id;
-        js_class_info.module_id = p_module.id;
-        js_class_info.js_class_name = String(*name, name.length());
-        js_class_info.native_class_id = native_class_id;
-        js_class_info.native_class_name = native_class_info.name;
-        js_class_info.js_class.Reset(p_isolate, default_obj);
-        JSB_LOG(Verbose, "godot js class name %s (native: %s)", js_class_info.js_class_name, js_class_info.native_class_name);
+    void JavaScriptContext::_parse_script_class_iterate(v8::Isolate* p_isolate, const v8::Local<v8::Context>& p_context, GodotJSClassInfo& p_class_info)
+    {
         //TODO collect methods/signals/properties
-        // v8::Local<v8::Object> prototype = default_obj->GetPrototype().As<v8::Object>();
+        v8::Local<v8::Object> default_obj = p_class_info.js_class.Get(p_isolate);
         v8::Local<v8::Object> prototype = default_obj->Get(p_context, v8::String::NewFromUtf8Literal(p_isolate, "prototype")).ToLocalChecked().As<v8::Object>();
         v8::Local<v8::Array> property_names = prototype->GetPropertyNames(p_context, v8::KeyCollectionMode::kOwnOnly, v8::PropertyFilter::ALL_PROPERTIES, v8::IndexFilter::kSkipIndices, v8::KeyConversionMode::kNoNumbers).ToLocalChecked();
 
@@ -367,7 +416,7 @@ namespace jsb
             const v8::Local<v8::Context>& context;
             GodotJSClassInfo& class_info;
             Vector<String> properties;
-        } payload = { p_isolate, p_context, js_class_info, };
+        } payload = { p_isolate, p_context, p_class_info, {}, };
         property_names->Iterate(p_context, [](uint32_t index, v8::Local<v8::Value> prop_name, void* data)
         {
             Payload& payload = *(Payload*) data;
@@ -604,9 +653,8 @@ namespace jsb
         v8::Local<v8::Context> context = context_.Get(isolate);
         v8::Context::Scope context_scope(context);
 
-        JavaScriptModule* module;
         v8::TryCatch try_catch_run(isolate);
-        if (_load_module("", p_name, module))
+        if (_load_module("", p_name))
         {
             // no exception should thrown if module loaded successfully
             jsb_check(!try_catch_run.HasCaught());
@@ -1214,7 +1262,7 @@ namespace jsb
         isolate->ThrowError(v8::String::NewFromUtf8(isolate, message.ptr(), v8::NewStringType::kNormal, message.length()).ToLocalChecked());
     }
 
-    Error JavaScriptContext::eval(const CharString& p_source, const String& p_filename)
+    Error JavaScriptContext::eval_source(const CharString& p_source, const String& p_filename)
     {
         v8::Isolate* isolate = get_isolate();
         v8::Isolate::Scope isolate_scope(isolate);
@@ -1223,7 +1271,7 @@ namespace jsb
         v8::Context::Scope context_scope(context);
 
         v8::TryCatch try_catch_run(isolate);
-        /* return value discarded */ _compile_run(p_source, p_filename);
+        /* return value discarded */ _compile_run(p_source, p_source.length(), p_filename);
         if (try_catch_run.HasCaught())
         {
             v8::Local<v8::Message> message = try_catch_run.Message();
@@ -1257,7 +1305,7 @@ namespace jsb
         return false;
     }
 
-    bool JavaScriptContext::validate(const String &p_source, JavaScriptExceptionInfo *r_err)
+    bool JavaScriptContext::validate_script(const String &p_path, JavaScriptExceptionInfo *r_err)
     {
         //TODO try to compile?
         return true;
@@ -1267,16 +1315,8 @@ namespace jsb
     {
         v8::Isolate* isolate = get_isolate();
         v8::Local<v8::Context> context = context_.Get(isolate);
-
-#if WINDOWS_ENABLED
-        const CharString filename = p_filename.replace("/", "\\").utf8();
-#else
-        const CharString filename = p_filename.utf8();
-#endif
-        v8::ScriptOrigin origin(isolate, v8::String::NewFromUtf8(isolate, filename, v8::NewStringType::kNormal, filename.length()).ToLocalChecked());
         v8::MaybeLocal<v8::String> source = v8::String::NewFromUtf8(isolate, p_source, v8::NewStringType::kNormal, p_source_len);
-        v8::MaybeLocal<v8::Script> script = v8::Script::Compile(context, source.ToLocalChecked(), &origin);
-
+        v8::MaybeLocal<v8::Script> script = V8Helper::compile(context, source.ToLocalChecked(), p_filename);
         if (script.IsEmpty())
         {
             return {};
@@ -1290,11 +1330,6 @@ namespace jsb
 
         JSB_LOG(Verbose, "script compiled %s", p_filename);
         return maybe_value;
-    }
-
-    bool JavaScriptContext::remove_function(GodotJSFunctionID p_func_id)
-    {
-        return js_functions_.remove_at(p_func_id);
     }
 
     GodotJSFunctionID JavaScriptContext::get_function(NativeObjectID p_object_id, const StringName& p_method)

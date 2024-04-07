@@ -52,8 +52,7 @@ namespace jsb
         const CharString cdirname = internal::PathUtil::dirname(p_filename_abs).utf8();
 
         v8::Local<v8::Object> jmodule = p_module.module.Get(isolate);
-        //TODO [uncertain] hot-reload support, reuse the existed `exports`
-        v8::Local<v8::Object> jexports = v8::Object::New(isolate);
+        v8::Local<v8::Value> jexports = p_module.exports.Get(isolate);
         v8::Local<v8::String> jfilename = v8::String::NewFromUtf8(isolate, cfilename.ptr(), v8::NewStringType::kNormal, cfilename.length()).ToLocalChecked();
         v8::Local<v8::Function> jrequire = p_ccontext->_new_require_func(cmodule_id);
         v8::Local<v8::Function> elevator = func_local.As<v8::Function>();
@@ -69,13 +68,18 @@ namespace jsb
         //TODO set `require.cache`
         // ...
 
-        p_module.exports.Reset(isolate, jexports);
         v8::MaybeLocal<v8::Value> type_maybe_local = elevator->Call(context, v8::Undefined(isolate), ::std::size(argv), argv);
         if (type_maybe_local.IsEmpty())
         {
             return false;
         }
 
+        // update `exports`, because its value may be covered during the execution process of the elevator script.
+        v8::Local<v8::Value> updated_exports = jmodule->Get(context, v8::String::NewFromUtf8Literal(isolate, "exports")).ToLocalChecked();
+#if DEV_ENABLED
+        if (updated_exports != jexports) JSB_LOG(Warning, "`exports` is covered in module");
+#endif
+        p_module.exports.Reset(isolate, updated_exports);
         jmodule->Set(context, v8::String::NewFromUtf8Literal(isolate, "filename"), jfilename).Check();
         return true;
     }

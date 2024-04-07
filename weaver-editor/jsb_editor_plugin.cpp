@@ -91,6 +91,7 @@ void GodotJSEditorPlugin::install_ts_project()
     write_file("res://javascripts/jsb", "jsb.core.js.map");
     write_file("res://javascripts/jsb", "jsb.editor.codegen.js.map");
     write_file("res://javascripts/jsb", "jsb.editor.main.js.map");
+    write_file("res://javascripts/icon", "filetype-js.svg");
 
     generate_godot_dts();
     load_editor_entry_module();

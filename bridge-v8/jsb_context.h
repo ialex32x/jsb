@@ -68,15 +68,17 @@ namespace jsb
 
         //TODO temp
         GodotJSFunctionID get_function(NativeObjectID p_object_id, const StringName& p_method);
-        bool remove_function(GodotJSFunctionID p_func_id);
+        bool remove_function(GodotJSFunctionID p_func_id)
+        {
+            return js_functions_.remove_at(p_func_id);
+        }
         Variant call_function(NativeObjectID p_object_id, GodotJSFunctionID p_func_id, const Variant **p_args, int p_argcount, Callable::CallError &r_error);
 
         jsb_force_inline const JavaScriptModuleCache& get_module_cache() const { return module_cache_; }
 
         //NOTE AVOID USING THIS CALL, CONSIDERING REMOVING IT.
         //     eval from source
-        jsb_deprecated
-        Error eval(const CharString& p_source, const String& p_filename);
+        Error eval_source(const CharString& p_source, const String& p_filename);
 
         /**
          * \brief load a module script
@@ -86,22 +88,19 @@ namespace jsb
         Error load(const String& p_name);
 
         //TODO is there a simple way to compile (validate) the script without any side effect?
-        bool validate(const String& p_name, struct JavaScriptExceptionInfo* r_err = nullptr);
+        bool validate_script(const String& p_path, struct JavaScriptExceptionInfo* r_err = nullptr);
 
         NativeObjectID crossbind(Object* p_this, GodotJSClassID p_class_id);
 
         jsb_force_inline v8::Isolate* get_isolate() const { jsb_check(runtime_); return runtime_->isolate_; }
 
         /**
-         * @param p_source utf-8 encoded CharString
-         * @param p_filename a hint for source origin
-         * @note handle scope is required to call this method
+         * \brief run  and return a value from source
+         * \param p_source source bytes (utf-8 encoded)
+         * \param p_source_len length of source
+         * \param p_filename SourceOrigin (compile the code snippet without ScriptOrigin if `p_filename` is empty)
+         * \return js rval
          */
-        jsb_force_inline v8::MaybeLocal<v8::Value> _compile_run(const CharString& p_source, const String& p_filename)
-        {
-            return _compile_run(p_source.ptr(), p_source.length(), p_filename);
-        }
-
         v8::MaybeLocal<v8::Value> _compile_run(const char* p_source, int p_source_len, const String& p_filename);
         v8::Local<v8::Function> _new_require_func(const CharString& p_module_id)
         {
@@ -138,7 +137,8 @@ namespace jsb
 
         // return false if something wrong with an exception thrown
         // caller should handle the exception if it's not called from js
-        bool _load_module(const String& p_parent_id, const String& p_module_id, JavaScriptModule*& r_module);
+        JavaScriptModule* _load_module(const String& p_parent_id, const String& p_module_id);
+        void _reload_module(const String& p_module_id);
 
     private:
         static void _define(const v8::FunctionCallbackInfo<v8::Value>& info);
@@ -151,6 +151,7 @@ namespace jsb
         void _register_builtins(const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& self);
 
         void _parse_script_class(v8::Isolate* p_isolate, const v8::Local<v8::Context>& p_context, JavaScriptModule& p_module);
+        void _parse_script_class_iterate(v8::Isolate* p_isolate, const v8::Local<v8::Context>& p_context, GodotJSClassInfo& p_class_info);
     };
 }
 

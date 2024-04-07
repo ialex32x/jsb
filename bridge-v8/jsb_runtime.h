@@ -274,7 +274,8 @@ namespace jsb
             return gdjs_classes_[r_class_id];
         }
         jsb_force_inline GodotJSClassInfo& get_gdjs_class(GodotJSClassID p_class_id) { return gdjs_classes_[p_class_id]; }
-        jsb_force_inline const GodotJSClassInfo& get_gdjs_class(GodotJSClassID p_class_id) const { return gdjs_classes_[p_class_id]; }
+        jsb_force_inline GodotJSClassInfo* find_gdjs_class(GodotJSClassID p_class_id) { return gdjs_classes_.is_valid_index(p_class_id) ? &gdjs_classes_[p_class_id] : nullptr; }
+        // jsb_force_inline const GodotJSClassInfo& get_gdjs_class(GodotJSClassID p_class_id) const { return gdjs_classes_[p_class_id]; }
 
     private:
         void on_context_created(const v8::Local<v8::Context>& p_context);
