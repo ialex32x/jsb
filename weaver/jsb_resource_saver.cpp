@@ -6,20 +6,17 @@ Error ResourceFormatSaverGodotJSScript::save(const Ref<Resource> &p_resource, co
     const Ref<GodotJSScript> sqscr = p_resource;
     ERR_FAIL_COND_V(sqscr.is_null(), ERR_INVALID_PARAMETER);
 
+    Error err;
+    const Ref<FileAccess> file = FileAccess::open(p_path, FileAccess::WRITE, &err);
+    ERR_FAIL_COND_V_MSG(err, err, "Cannot save " JSB_RES_TYPE " file '" + p_path + "'.");
+    file->store_string(sqscr->get_source_code());
+    if (file->get_error() != OK && file->get_error() != ERR_FILE_EOF)
     {
-        Error err;
-        const Ref<FileAccess> file = FileAccess::open(p_path, FileAccess::WRITE, &err);
-
-        ERR_FAIL_COND_V_MSG(err, err, "Cannot save " JSB_RES_TYPE " file '" + p_path + "'.");
-        file->store_string(sqscr->get_source_code());
-        if (file->get_error() != OK && file->get_error() != ERR_FILE_EOF)
-        {
-            return ERR_CANT_CREATE;
-        }
+        return ERR_CANT_CREATE;
     }
 
     if (ScriptServer::is_reload_scripts_on_save_enabled()) {
-        //TODO !!!
+        sqscr->reload();
         //GodotJSScriptLanguage::get_singleton()->reload_tool_script(p_resource, true);
     }
 

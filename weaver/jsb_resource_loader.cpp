@@ -17,7 +17,12 @@ Ref<Resource> ResourceFormatLoaderGodotJSScript::load(const String &p_path, cons
     }
     GodotJSScriptLanguage* lang = GodotJSScriptLanguage::get_singleton();
     std::shared_ptr<jsb::JavaScriptContext> ccontext = lang->get_context();
-    ccontext->load(p_path);
+    err = ccontext->load(p_path);
+    if (err != OK)
+    {
+        if (r_error) *r_error = err;
+        return {};
+    }
     const jsb::JavaScriptModuleCache& module_cache = ccontext->get_module_cache();
     if (jsb::JavaScriptModule* module = module_cache.find(p_path))
     {
@@ -28,6 +33,7 @@ Ref<Resource> ResourceFormatLoaderGodotJSScript::load(const String &p_path, cons
             spt->attach_source(ccontext, p_path, code, module->default_class_id);
             return spt;
         }
+        JSB_LOG(Error, "no godot js class defined as default exported in module '%s'", p_path);
     }
 
     if (r_error) *r_error = FAILED;

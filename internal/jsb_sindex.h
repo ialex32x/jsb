@@ -49,6 +49,11 @@ namespace jsb::internal
             return lhs.packed_ == rhs.packed_;
         }
 
+        jsb_force_inline friend bool operator<(const TIndex& lhs, const TIndex& rhs)
+        {
+            return lhs.packed_ < rhs.packed_;
+        }
+
         jsb_force_inline friend bool operator!=(const TIndex& lhs, const TIndex& rhs)
         {
             return lhs.packed_ != rhs.packed_;

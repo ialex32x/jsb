@@ -185,7 +185,7 @@ namespace jsb
         {
             if (!existed_module->path.is_empty())
             {
-                //TODO reload all related
+                //TODO reload all related modules (search the module graph)
                 existed_module->reload_requested = true;
                 _load_module("", existed_module->id);
             }

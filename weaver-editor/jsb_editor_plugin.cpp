@@ -22,7 +22,11 @@ void GodotJSEditorPlugin::_bind_methods()
 
 void GodotJSEditorPlugin::_notification(int p_what)
 {
-
+    // switch (p_what)
+    // {
+    // case NOTIFICATION_APPLICATION_FOCUS_IN: break;
+    // default: break;
+    // }
 }
 
 void GodotJSEditorPlugin::_on_menu_pressed(int p_what)
