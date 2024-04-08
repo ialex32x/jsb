@@ -141,6 +141,7 @@ namespace jsb
         void _reload_module(const String& p_module_id);
 
     private:
+        static void _new_callable(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void _define(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void _print(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void _set_timer(const v8::FunctionCallbackInfo<v8::Value>& info);

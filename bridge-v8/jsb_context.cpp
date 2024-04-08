@@ -40,6 +40,11 @@ namespace jsb
         }
     }
 
+    void JavaScriptContext::_new_callable(const v8::FunctionCallbackInfo<v8::Value>& info)
+    {
+        //TODO construct a callable object
+    }
+
     void JavaScriptContext::_print(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
         v8::Isolate* isolate = info.GetIsolate();
@@ -465,11 +470,12 @@ namespace jsb
 
         // internal 'jsb'
         {
-            v8::Local<v8::Object> jhost = v8::Object::New(isolate);
+            v8::Local<v8::Object> jenv = v8::Object::New(isolate);
 
-            self->Set(context, v8::String::NewFromUtf8Literal(isolate, "jsb"), jhost).Check();
-            jhost->Set(context, v8::String::NewFromUtf8Literal(isolate, "DEV_ENABLED"), v8::Boolean::New(isolate, DEV_ENABLED)).Check();
-            jhost->Set(context, v8::String::NewFromUtf8Literal(isolate, "TOOLS_ENABLED"), v8::Boolean::New(isolate, TOOLS_ENABLED)).Check();
+            self->Set(context, v8::String::NewFromUtf8Literal(isolate, "jsb"), jenv).Check();
+            jenv->Set(context, v8::String::NewFromUtf8Literal(isolate, "DEV_ENABLED"), v8::Boolean::New(isolate, DEV_ENABLED)).Check();
+            jenv->Set(context, v8::String::NewFromUtf8Literal(isolate, "TOOLS_ENABLED"), v8::Boolean::New(isolate, TOOLS_ENABLED)).Check();
+            jenv->Set(context, v8::String::NewFromUtf8Literal(isolate, "callable"), v8::Function::New(context, _new_callable).ToLocalChecked()).Check();
 
             {
                 v8::Local<v8::Object> ptypes = v8::Object::New(isolate);
@@ -478,14 +484,14 @@ namespace jsb
 #define DEF(FieldName) ptypes->Set(context, v8::String::NewFromUtf8Literal(isolate, #FieldName), v8::Int32::New(isolate, Variant::FieldName)).Check();
 #include "jsb_variant_types.h"
 #pragma pop_macro("DEF")
-                jhost->Set(context, v8::String::NewFromUtf8Literal(isolate, "GodotVariantType"), ptypes).Check();
+                jenv->Set(context, v8::String::NewFromUtf8Literal(isolate, "GodotVariantType"), ptypes).Check();
             }
 #if TOOLS_ENABLED
             // internal 'jsb.editor'
             {
                 v8::Local<v8::Object> editor = v8::Object::New(isolate);
 
-                jhost->Set(context, v8::String::NewFromUtf8Literal(isolate, "editor"), editor).Check();
+                jenv->Set(context, v8::String::NewFromUtf8Literal(isolate, "editor"), editor).Check();
                 editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "get_classes"), v8::Function::New(context, JavaScriptEditorUtility::_get_classes).ToLocalChecked()).Check();
                 editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "get_global_constants"), v8::Function::New(context, JavaScriptEditorUtility::_get_global_constants).ToLocalChecked()).Check();
                 editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "get_singletons"), v8::Function::New(context, JavaScriptEditorUtility::_get_singletons).ToLocalChecked()).Check();

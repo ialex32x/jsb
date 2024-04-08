@@ -3,6 +3,26 @@ declare namespace jsb {
     const DEV_ENABLED: boolean;
     const TOOLS_ENABLED: boolean;
 
+    /**
+     * @todo not implemented yet
+     * create godot Callable with a bound object `self`
+     */
+    function callable(self: godot.Object, fn: Function): godot.Callable;
+
+    /**
+     * @todo not implemented yet
+     * create godot Callable without a bound object
+     */
+    function callable(fn: Function): godot.Callable;
+
+    /**
+     * @todo a wrapper layer for signal emitting?
+     * @todo signal function annotation helper
+     */
+    interface Signal {
+        emit(...args: any[])
+    }
+
     //TODO remove this later
     enum GodotVariantType {
         NIL,
