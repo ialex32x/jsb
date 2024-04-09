@@ -43,6 +43,8 @@ const MockLines = [
     "namespace Vector3i { enum Axis { AXIS_X, AXIS_Y, AXIS_Z } }",
     "namespace Vector4 { enum Axis { AXIS_X, AXIS_Y, AXIS_Z, AXIS_W } }",
     "namespace Vector4i { enum Axis { AXIS_X, AXIS_Y, AXIS_Z, AXIS_W } }",
+    "class Callable{}",
+    "type Signal = ((op: jsb.SignalOp.Connect | jsb.SignalOp.Disconnect, callable: Callable) => void) | ((op: jsb.SignalOp.IsConnected, callable: Callable) => boolean) | ((op: jsb.SignalOp.Emit, ...args: any[]) => GodotError)",
 ];
 const KeywordReplacement = {
     ["default"]: "default_",
@@ -90,8 +92,8 @@ const PrimitiveTypes = {
     [jsb.GodotVariantType.NODE_PATH]: "NodePath",
     [jsb.GodotVariantType.RID]: "RID",
     [jsb.GodotVariantType.OBJECT]: "Object",
-    [jsb.GodotVariantType.CALLABLE]: "any /*CALLABLE*/",
-    [jsb.GodotVariantType.SIGNAL]: "any /*SIGNAL*/",
+    [jsb.GodotVariantType.CALLABLE]: "Callable",
+    [jsb.GodotVariantType.SIGNAL]: "Signal",
     [jsb.GodotVariantType.DICTIONARY]: "Dictionary",
     [jsb.GodotVariantType.ARRAY]: "Array",
     // typed arrays
@@ -290,7 +292,10 @@ class ClassWriter extends IndentWriter {
         this.line(`function ${method_info.name}(${args}): ${rval}`);
     }
     signal_(signal_info) {
-        this.line_comment_(`SIGNAL: ${signal_info.name}`);
+        this.line_comment_(`// ${signal_info.name}: signal`);
+        // this.line(`${signal_info.name}(op: jsb.SignalOp.Connect | jsb.SignalOp.Disconnect, callable: Callable): void`);
+        // this.line(`${signal_info.name}(op: jsb.SignalOp.IsConnected, callable: Callable): boolean`);
+        // this.line(`${signal_info.name}(op: jsb.SignalOp.Emit, ...args: any[]): GodotError`);
     }
 }
 class EnumWriter extends IndentWriter {

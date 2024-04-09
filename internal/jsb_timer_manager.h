@@ -171,7 +171,7 @@ namespace jsb::internal
 			_used_timers.remove_at(inout_handle.id);
 
 			const uint64_t delay = p_first_delay > 0 ? p_first_delay : p_rate;
-			const Index32 index = _used_timers.append(TimerData());
+			const Index32 index = _used_timers.add(TimerData());
 			TimerData& timer = _used_timers.get_value(index);
 		    jsb_check(!timer.action);
 			timer.rate = p_rate;

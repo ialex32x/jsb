@@ -68,6 +68,9 @@ namespace jsb
         // they're only collected on a module loaded
         internal::SArray<GodotJSClassInfo, GodotJSClassID> gdjs_classes_;
 
+        internal::SArray<StringName, StringNameID> stringnames_;
+        HashMap<StringName, StringNameID> stringnames_index_;
+
         // cpp objects should be added here since the gc callback is not guaranteed by v8
         // we need to delete them on finally releasing JavaScriptRuntime
         internal::SArray<ObjectHandle, NativeObjectID> objects_;
@@ -123,6 +126,16 @@ namespace jsb
         jsb_no_discard
         jsb_force_inline
         bool check(v8::Isolate* p_isolate) const { return p_isolate == isolate_; }
+
+        jsb_force_inline StringNameID add_string_name(const StringName& p_string_name)
+        {
+            if (const HashMap<StringName, StringNameID>::Iterator& it = stringnames_index_.find(p_string_name); it != stringnames_index_.end())
+            {
+                return it->value;
+            }
+            return stringnames_.add(p_string_name);
+        }
+        jsb_force_inline StringName get_string_name(const StringNameID& p_string_name_id) const { return stringnames_[p_string_name_id]; }
 
         /**
          * \brief bind a C++ `p_pointer` with a JS `p_object`
@@ -234,7 +247,7 @@ namespace jsb
          */
         NativeClassInfo& add_class(NativeClassInfo::Type p_type, const StringName& p_class_name, NativeClassID* r_class_id = nullptr)
         {
-            const NativeClassID class_id = native_classes_.append(NativeClassInfo());
+            const NativeClassID class_id = native_classes_.add(NativeClassInfo());
             NativeClassInfo& class_info = native_classes_.get_value(class_id);
             class_info.type = p_type;
             class_info.name = p_class_name;

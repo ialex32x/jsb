@@ -1,7 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.test = void 0;
-function test() {
+exports.signal = void 0;
+/**
+ *
+ */
+function signal() {
+    return function (target, prop, descriptor) {
+        //TODO
+    };
 }
-exports.test = test;
+exports.signal = signal;
 //# sourceMappingURL=jsb.core.js.map

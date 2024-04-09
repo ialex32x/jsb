@@ -25,8 +25,8 @@ namespace jsb::internal
 
 		    jsb_force_inline void reset_value() { }
 		    jsb_force_inline bool has_value() const { return true; }
-		    jsb_force_inline void set_value(T &&p_value) { value = std::forward<T>(p_value); }
-		    jsb_force_inline void set_value(const T &p_value) { value = p_value; }
+		    jsb_force_inline void set_value(T&& p_value) { value = std::forward<T>(p_value); }
+		    jsb_force_inline void set_value(const T& p_value) { value = p_value; }
 		};
 
 		using AllocatorType = typename TAllocator::template ForType<Slot>;
@@ -230,10 +230,8 @@ namespace jsb::internal
 		    return true;
 		}
 
-		jsb_force_inline IndexType add(T&& value) { return append(std::forward<T>(value)); }
-		jsb_force_inline IndexType push_back(T&& value) { return append(std::forward<T>(value)); }
-
-		IndexType append(T&& value)
+        template<typename TArg = T>
+        IndexType add(TArg&& value)
 		{
 			grow_if_needed(1);
 			const int new_index = _free_index;
@@ -242,7 +240,7 @@ namespace jsb::internal
 			increase_revision(slot.revision);
 			// recreate `value` before assignment
 		    construct_element(slot);
-			slot.set_value(std::forward<T>(value));
+			slot.set_value(std::forward<TArg>(value));
 			_free_index = slot.next;
 			slot.next = INDEX_NONE;
 			slot.previous = _last_index;

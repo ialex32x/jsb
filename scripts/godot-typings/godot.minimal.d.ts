@@ -15,6 +15,8 @@ declare namespace jsb {
      */
     function callable(fn: Function): godot.Callable;
 
+    enum SignalOp { Connect = 0, Disconnect = 1, IsConnected = 2, Emit = 3 }
+
     /**
      * @todo a wrapper layer for signal emitting?
      * @todo signal function annotation helper
