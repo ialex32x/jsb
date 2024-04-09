@@ -10,9 +10,5 @@ namespace jsb
     typedef internal::Index64 NativeObjectID;
     typedef internal::Index64 GodotJSFunctionID;
 
-    namespace SignalOp
-    {
-        enum { Connect, Disconnect, IsConnected, Emit };
-    };
 }
 #endif

@@ -59,13 +59,14 @@ def generate_method_code(output, methodname, indent, filenames):
     output.write(indent+"static const char data[] = {\n")
     positions = {}
     cursor = 0
-    newline = 0
-    output.write(indent+indent)
     for sourcename in filenames:
         targetname = filenames[sourcename]
         if len(targetname) == 0:
             targetname = os.path.basename(sourcename)
         targetstart = cursor
+        newline = 0
+        output.write(indent+indent+"// target: "+targetname+"\n")
+        output.write(indent+indent)
         with open(sourcename, "rb") as input:
             bytes = input.read()
             cursor += len(bytes)
@@ -77,6 +78,9 @@ def generate_method_code(output, methodname, indent, filenames):
                     newline = 0
                     output.write("\n")
                     output.write(indent+indent)
+        if newline != 0:
+            newline = 0
+            output.write("\n")
     output.write("\n")
     output.write(indent+"};\n")
     for targetname in positions:

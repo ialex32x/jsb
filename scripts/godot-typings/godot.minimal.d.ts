@@ -15,18 +15,20 @@ declare namespace jsb {
      */
     function callable(fn: Function): godot.Callable;
 
-    enum SignalOp { Connect = 0, Disconnect = 1, IsConnected = 2, Emit = 3 }
-
     /**
-     * @todo a wrapper layer for signal emitting?
-     * @todo signal function annotation helper
+     * keep consistency with the implementation of signal in GDScript
      */
     interface Signal {
-        emit(...args: any[])
+        connect(callable: godot.Callable): void
+        disconnect(callable: godot.Callable): void
+        is_connected(callable: godot.Callable): boolean
+        emit(...args: any[]): godot.GodotError
     }
 
-    //TODO remove this later
-    enum GodotVariantType {
+    //TODO
+    type Callable = any;
+
+    enum VariantType {
         NIL,
 
         // atomic types

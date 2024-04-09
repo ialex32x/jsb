@@ -43,8 +43,8 @@ const MockLines = [
     "namespace Vector3i { enum Axis { AXIS_X, AXIS_Y, AXIS_Z } }",
     "namespace Vector4 { enum Axis { AXIS_X, AXIS_Y, AXIS_Z, AXIS_W } }",
     "namespace Vector4i { enum Axis { AXIS_X, AXIS_Y, AXIS_Z, AXIS_W } }",
-    "class Callable{}",
-    "type Signal = ((op: jsb.SignalOp.Connect | jsb.SignalOp.Disconnect, callable: Callable) => void) | ((op: jsb.SignalOp.IsConnected, callable: Callable) => boolean) | ((op: jsb.SignalOp.Emit, ...args: any[]) => GodotError)",
+    "type Callable = jsb.Callable",
+    "type Signal = jsb.Signal",
 ];
 const KeywordReplacement = {
     ["default"]: "default_",
@@ -65,47 +65,47 @@ const KeywordReplacement = {
     ["typeof"]: "typeof_",
 };
 const PrimitiveTypes = {
-    [jsb.GodotVariantType.NIL]: "any",
-    [jsb.GodotVariantType.BOOL]: "boolean",
-    [jsb.GodotVariantType.INT]: "number /*i64*/",
-    [jsb.GodotVariantType.FLOAT]: "number /*f64*/",
-    [jsb.GodotVariantType.STRING]: "string",
+    [jsb.VariantType.NIL]: "any",
+    [jsb.VariantType.BOOL]: "boolean",
+    [jsb.VariantType.INT]: "number /*i64*/",
+    [jsb.VariantType.FLOAT]: "number /*f64*/",
+    [jsb.VariantType.STRING]: "string",
     // math types
-    [jsb.GodotVariantType.VECTOR2]: "Vector2",
-    [jsb.GodotVariantType.VECTOR2I]: "Vector2i",
-    [jsb.GodotVariantType.RECT2]: "Rect2",
-    [jsb.GodotVariantType.RECT2I]: "Rect2i",
-    [jsb.GodotVariantType.VECTOR3]: "Vector3",
-    [jsb.GodotVariantType.VECTOR3I]: "Vector3i",
-    [jsb.GodotVariantType.TRANSFORM2D]: "Transform2D",
-    [jsb.GodotVariantType.VECTOR4]: "Vector4",
-    [jsb.GodotVariantType.VECTOR4I]: "Vector4i",
-    [jsb.GodotVariantType.PLANE]: "Plane",
-    [jsb.GodotVariantType.QUATERNION]: "Quaternion",
-    [jsb.GodotVariantType.AABB]: "AABB",
-    [jsb.GodotVariantType.BASIS]: "Basis",
-    [jsb.GodotVariantType.TRANSFORM3D]: "Transform3D",
-    [jsb.GodotVariantType.PROJECTION]: "Projection",
+    [jsb.VariantType.VECTOR2]: "Vector2",
+    [jsb.VariantType.VECTOR2I]: "Vector2i",
+    [jsb.VariantType.RECT2]: "Rect2",
+    [jsb.VariantType.RECT2I]: "Rect2i",
+    [jsb.VariantType.VECTOR3]: "Vector3",
+    [jsb.VariantType.VECTOR3I]: "Vector3i",
+    [jsb.VariantType.TRANSFORM2D]: "Transform2D",
+    [jsb.VariantType.VECTOR4]: "Vector4",
+    [jsb.VariantType.VECTOR4I]: "Vector4i",
+    [jsb.VariantType.PLANE]: "Plane",
+    [jsb.VariantType.QUATERNION]: "Quaternion",
+    [jsb.VariantType.AABB]: "AABB",
+    [jsb.VariantType.BASIS]: "Basis",
+    [jsb.VariantType.TRANSFORM3D]: "Transform3D",
+    [jsb.VariantType.PROJECTION]: "Projection",
     // misc types
-    [jsb.GodotVariantType.COLOR]: "Color",
-    [jsb.GodotVariantType.STRING_NAME]: "StringName",
-    [jsb.GodotVariantType.NODE_PATH]: "NodePath",
-    [jsb.GodotVariantType.RID]: "RID",
-    [jsb.GodotVariantType.OBJECT]: "Object",
-    [jsb.GodotVariantType.CALLABLE]: "Callable",
-    [jsb.GodotVariantType.SIGNAL]: "Signal",
-    [jsb.GodotVariantType.DICTIONARY]: "Dictionary",
-    [jsb.GodotVariantType.ARRAY]: "Array",
+    [jsb.VariantType.COLOR]: "Color",
+    [jsb.VariantType.STRING_NAME]: "StringName",
+    [jsb.VariantType.NODE_PATH]: "NodePath",
+    [jsb.VariantType.RID]: "RID",
+    [jsb.VariantType.OBJECT]: "Object",
+    [jsb.VariantType.CALLABLE]: "Callable",
+    [jsb.VariantType.SIGNAL]: "Signal",
+    [jsb.VariantType.DICTIONARY]: "Dictionary",
+    [jsb.VariantType.ARRAY]: "Array",
     // typed arrays
-    [jsb.GodotVariantType.PACKED_BYTE_ARRAY]: "PackedByteArray",
-    [jsb.GodotVariantType.PACKED_INT32_ARRAY]: "PackedInt32Array",
-    [jsb.GodotVariantType.PACKED_INT64_ARRAY]: "PackedInt64Array",
-    [jsb.GodotVariantType.PACKED_FLOAT32_ARRAY]: "PackedFloat32Array",
-    [jsb.GodotVariantType.PACKED_FLOAT64_ARRAY]: "PackedFloat64Array",
-    [jsb.GodotVariantType.PACKED_STRING_ARRAY]: "PackedStringArray",
-    [jsb.GodotVariantType.PACKED_VECTOR2_ARRAY]: "PackedVector2Array",
-    [jsb.GodotVariantType.PACKED_VECTOR3_ARRAY]: "PackedVector3Array",
-    [jsb.GodotVariantType.PACKED_COLOR_ARRAY]: "PackedColorArray",
+    [jsb.VariantType.PACKED_BYTE_ARRAY]: "PackedByteArray",
+    [jsb.VariantType.PACKED_INT32_ARRAY]: "PackedInt32Array",
+    [jsb.VariantType.PACKED_INT64_ARRAY]: "PackedInt64Array",
+    [jsb.VariantType.PACKED_FLOAT32_ARRAY]: "PackedFloat32Array",
+    [jsb.VariantType.PACKED_FLOAT64_ARRAY]: "PackedFloat64Array",
+    [jsb.VariantType.PACKED_STRING_ARRAY]: "PackedStringArray",
+    [jsb.VariantType.PACKED_VECTOR2_ARRAY]: "PackedVector2Array",
+    [jsb.VariantType.PACKED_VECTOR3_ARRAY]: "PackedVector3Array",
+    [jsb.VariantType.PACKED_COLOR_ARRAY]: "PackedColorArray",
 };
 const RemapTypes = {
     ["Error"]: "GodotError",
@@ -118,8 +118,40 @@ const IgnoredTypes = new Set([
     "PhysicsServer2DExtension",
     "PhysicsServer3DExtension",
 ]);
-const ReservedTypes = new Set([
-    "Vector3.Axis",
+const PrimitiveTypesSet = new Set([
+    "Vector2",
+    "Vector2i",
+    "Rect2",
+    "Rect2i",
+    "Vector3",
+    "Vector3i",
+    "Transform2D",
+    "Vector4",
+    "Vector4i",
+    "Plane",
+    "Quaternion",
+    "AABB",
+    "Basis",
+    "Transform3D",
+    "Projection",
+    "Color",
+    "StringName",
+    "NodePath",
+    "RID",
+    "Object",
+    "Callable",
+    "Signal",
+    "Dictionary",
+    "Array",
+    "PackedByteArray",
+    "PackedInt32Array",
+    "PackedInt64Array",
+    "PackedFloat32Array",
+    "PackedFloat64Array",
+    "PackedStringArray",
+    "PackedVector2Array",
+    "PackedVector3Array",
+    "PackedColorArray",
 ]);
 function replace(name) {
     const rep = KeywordReplacement[name];
@@ -237,6 +269,10 @@ class ClassWriter extends IndentWriter {
             if (info.class_name.indexOf(".") >= 0) {
                 const layers = info.class_name.split(".");
                 if (layers.length == 2) {
+                    // nested enums in primitive types do not exist in class_info, they are manually binded.
+                    if (PrimitiveTypesSet.has(layers[0])) {
+                        return info.class_name;
+                    }
                     const cls = this.types.classes[layers[0]];
                     if (typeof cls !== "undefined" && cls.enums.findIndex(v => v.name == layers[1]) >= 0) {
                         return info.class_name;
@@ -249,9 +285,9 @@ class ClassWriter extends IndentWriter {
             if (info.class_name in this.types.singletons) {
                 return info.class_name;
             }
-            if (ReservedTypes.has(info.class_name)) {
-                return info.class_name;
-            }
+            // if (ReservedTypes.has(info.class_name)) {
+            //     return info.class_name;
+            // }
             console.warn("undefined class", info.class_name);
             return `any /*${info.class_name}*/`;
         }
@@ -286,13 +322,18 @@ class ClassWriter extends IndentWriter {
         const prefix = this.make_method_prefix(method_info);
         this.line(`${prefix}${method_info.name}(${args}): ${rval}`);
     }
-    function_(method_info) {
-        const args = this.make_args(method_info);
-        const rval = this.make_return(method_info);
-        this.line(`function ${method_info.name}(${args}): ${rval}`);
-    }
+    // function_(method_info: jsb.editor.MethodInfo) {
+    //     const args = this.make_args(method_info)
+    //     const rval = this.make_return(method_info)
+    //     this.line(`function ${method_info.name}(${args}): ${rval}`);
+    // }
     signal_(signal_info) {
-        this.line_comment_(`// ${signal_info.name}: signal`);
+        if (this._singleton_mode) {
+            this.line(`static ${signal_info.name}: Signal`);
+        }
+        else {
+            this.line(`${signal_info.name}: Signal`);
+        }
         // this.line(`${signal_info.name}(op: jsb.SignalOp.Connect | jsb.SignalOp.Disconnect, callable: Callable): void`);
         // this.line(`${signal_info.name}(op: jsb.SignalOp.IsConnected, callable: Callable): boolean`);
         // this.line(`${signal_info.name}(op: jsb.SignalOp.Emit, ...args: any[]): GodotError`);
@@ -456,6 +497,7 @@ class TSDCodeGen {
             const singleton = this._types.singletons[singleton_name];
             const cls = this._types.classes[singleton.class_name];
             if (typeof cls !== "undefined") {
+                cg.line_comment_("// Singleton Class");
                 this.emit_godot_class(cg, cls, true);
             }
             else {

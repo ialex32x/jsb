@@ -484,17 +484,9 @@ namespace jsb
 #define DEF(FieldName) ptypes->Set(context, v8::String::NewFromUtf8Literal(isolate, #FieldName), v8::Int32::New(isolate, Variant::FieldName)).Check();
 #include "jsb_variant_types.h"
 #pragma pop_macro("DEF")
-                jenv->Set(context, v8::String::NewFromUtf8Literal(isolate, "GodotVariantType"), ptypes).Check();
+                jenv->Set(context, v8::String::NewFromUtf8Literal(isolate, "VariantType"), ptypes).Check();
             }
 
-            {
-                v8::Local<v8::Object> ptypes = v8::Object::New(isolate);
-                jenv->Set(context, v8::String::NewFromUtf8Literal(isolate, "Connect"), v8::Int32::New(isolate, SignalOp::Connect)).Check();
-                jenv->Set(context, v8::String::NewFromUtf8Literal(isolate, "Disconnect"), v8::Int32::New(isolate, SignalOp::Disconnect)).Check();
-                jenv->Set(context, v8::String::NewFromUtf8Literal(isolate, "IsConnected"), v8::Int32::New(isolate, SignalOp::IsConnected)).Check();
-                jenv->Set(context, v8::String::NewFromUtf8Literal(isolate, "Emit"), v8::Int32::New(isolate, SignalOp::Emit)).Check();
-                jenv->Set(context, v8::String::NewFromUtf8Literal(isolate, "SignalOp"), ptypes).Check();
-            }
 #if TOOLS_ENABLED
             // internal 'jsb.editor'
             {
@@ -537,7 +529,6 @@ namespace jsb
 
         //TODO the root 'import' function (async module loading?)
         {
-
         }
 
         // essential timer support
@@ -749,7 +740,8 @@ namespace jsb
                 const CharString name = ((String) name_str).utf8();
                 v8::Local<v8::String> propkey_name = v8::String::NewFromUtf8(isolate, name.ptr(), v8::NewStringType::kNormal, name.length()).ToLocalChecked();
                 v8::Local<v8::FunctionTemplate> propval_func = v8::FunctionTemplate::New(isolate, _godot_signal, v8::Uint32::NewFromUnsigned(isolate, (uint32_t) runtime_->add_string_name(pair.key)));
-                object_template->Set(propkey_name, propval_func);
+                // object_template->Set(propkey_name, propval_func);
+                object_template->SetAccessorProperty(propkey_name, propval_func);
             }
 
             // expose nested enum
@@ -1125,11 +1117,6 @@ namespace jsb
 
     };
 
-    // valid sigs:
-    //     (Connect, callable: Variant<Callable>, flags?: u32): void
-    //     (Disconnect, callable: Variant<Callable>): void
-    //     (IsConnected, callable: Variant<Callable>): boolean
-    //     (Emit, ...varargs: any): any
     void JavaScriptContext::_godot_signal(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
         v8::Isolate* isolate = info.GetIsolate();
@@ -1148,68 +1135,14 @@ namespace jsb
 
         // signal must be instance-owned
         Object* gd_object = (Object*) pointer;
-        Variant callable;
-        if (!js_to_gd_var(isolate, context, info[1], Variant::CALLABLE, callable))
+        Variant signal = Signal(gd_object, name);
+        v8::Local<v8::Value> rval;
+        if (!gd_var_to_js(isolate, context, signal, rval))
         {
-            isolate->ThrowError("bad callable");
+            isolate->ThrowError("bad signal");
             return;
         }
-        const uint32_t op = info[0].As<v8::Uint32>()->Value();
-        switch (op)
-        {
-        case SignalOp::Connect:
-            {
-                const int flags = info.Length() > 2 && info[2]->IsInt32() ? info[2].As<v8::Int32>()->Value() : 0;
-                gd_object->connect(name, callable, flags);
-                return;
-            }
-        case SignalOp::Disconnect:
-            gd_object->disconnect(name, callable);
-            return;
-        case SignalOp::IsConnected:
-            info.GetReturnValue().Set(gd_object->is_connected(name, callable));
-            return;
-        case SignalOp::Emit:
-            {
-                //TODO better approach to get MethodInfo
-                const StringName& class_name = gd_object->get_class_name();
-                const ClassDB::ClassInfo& class_info = ClassDB::classes[class_name];
-                const MethodInfo& signal_info = class_info.signal_map[name];
-                const int argc = info.Length() - 1;
-
-                const Variant** argv = jsb_stackalloc(const Variant*, argc);
-                Variant* args = jsb_stackalloc(Variant, argc);
-                // construct arguments
-                for (int index = 0; index < argc; ++index)
-                {
-                    memnew_placement(&args[index], Variant);
-                    argv[index] = &args[index];
-                    //TODO check
-                    const PropertyInfo& property_info = signal_info.arguments[index];
-                    Variant::Type type = property_info.type;
-                    if (!js_to_gd_var(isolate, context, info[index], type, args[index]))
-                    {
-                        // revert all constructors
-                        const CharString raw_string = vformat("bad argument: %d", index + 1).ascii();
-                        while (index >= 0) { args[index--].~Variant(); }
-                        v8::Local<v8::String> error_message = v8::String::NewFromOneByte(isolate, (const uint8_t*) raw_string.ptr(), v8::NewStringType::kNormal, raw_string.length()).ToLocalChecked();
-                        isolate->ThrowError(error_message);
-                        return;
-                    }
-                }
-
-                const Error err = gd_object->emit_signalp(name, argv, argc);
-
-                // destruct arguments
-                for (int index = 0; index < argc; ++index)
-                {
-                    args[index].~Variant();
-                }
-                info.GetReturnValue().Set((int32_t) err);
-                return;
-            }
-        default: isolate->ThrowError("bad op"); return;
-        }
+        info.GetReturnValue().Set(rval);
     }
 
     void JavaScriptContext::_godot_object_method(const v8::FunctionCallbackInfo<v8::Value>& info)

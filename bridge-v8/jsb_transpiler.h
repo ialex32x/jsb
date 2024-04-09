@@ -84,6 +84,26 @@ namespace jsb
         }
     };
 
+    template<> struct VariantCaster<Signal>
+    {
+        constexpr static Variant::Type Type = Variant::SIGNAL;
+        static Signal* from(const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_val)
+        {
+            Variant* variant = (Variant*) p_val.As<v8::Object>()->GetAlignedPointerFromInternalField(kObjectFieldPointer);
+            return VariantInternal::get_signal(variant);
+        }
+    };
+
+    template<> struct VariantCaster<Callable>
+    {
+        constexpr static Variant::Type Type = Variant::SIGNAL;
+        static Callable* from(const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_val)
+        {
+            Variant* variant = (Variant*) p_val.As<v8::Object>()->GetAlignedPointerFromInternalField(kObjectFieldPointer);
+            return VariantInternal::get_callable(variant);
+        }
+    };
+
     template<> struct VariantCaster<Basis>
     {
         constexpr static Variant::Type Type = Variant::BASIS;
@@ -124,6 +144,8 @@ namespace jsb
     template<> struct PrimitiveAccess<Vector2> : PrimitiveAccessBoilerplate<Vector2> {};
     template<> struct PrimitiveAccess<Vector3> : PrimitiveAccessBoilerplate<Vector3> {};
     template<> struct PrimitiveAccess<Vector4> : PrimitiveAccessBoilerplate<Vector4> {};
+    template<> struct PrimitiveAccess<Signal> : PrimitiveAccessBoilerplate<Signal> {};
+    template<> struct PrimitiveAccess<Callable> : PrimitiveAccessBoilerplate<Callable> {};
     template<> struct PrimitiveAccess<Basis> : PrimitiveAccessBoilerplate<Basis> {};
 
     // template<> struct PrimitiveAccess<const Vector2> : PrimitiveAccessBoilerplate<Vector2> {};
@@ -133,6 +155,8 @@ namespace jsb
     template<> struct PrimitiveAccess<const Vector2&> : PrimitiveAccessBoilerplate<Vector2> {};
     template<> struct PrimitiveAccess<const Vector3&> : PrimitiveAccessBoilerplate<Vector3> {};
     template<> struct PrimitiveAccess<const Vector4&> : PrimitiveAccessBoilerplate<Vector4> {};
+    template<> struct PrimitiveAccess<const Signal&> : PrimitiveAccessBoilerplate<Signal> {};
+    template<> struct PrimitiveAccess<const Callable&> : PrimitiveAccessBoilerplate<Callable> {};
 
     template<> struct PrimitiveAccess<real_t>
     {
@@ -161,10 +185,35 @@ namespace jsb
             return true;
         }
     };
+    template<> struct PrimitiveAccess<uint32_t>
+    {
+        static uint32_t from(const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_val)
+        {
+            return p_val->Uint32Value(context).ToChecked();
+        }
+        static bool return_(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::FunctionCallbackInfo<v8::Value>& info, uint32_t val)
+        {
+            info.GetReturnValue().Set(val);
+            return true;
+        }
+    };
     template<> struct PrimitiveAccess<const int32_t> : PrimitiveAccess<int32_t> {};
     template<> struct PrimitiveAccess<Vector2::Axis> : PrimitiveAccess<int32_t> {};
     template<> struct PrimitiveAccess<Vector3::Axis> : PrimitiveAccess<int32_t> {};
     template<> struct PrimitiveAccess<Vector4::Axis> : PrimitiveAccess<int32_t> {};
+
+    template<> struct PrimitiveAccess<Error>
+    {
+        static Error from(const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_val)
+        {
+            return (Error) p_val->Int32Value(context).ToChecked();
+        }
+        static bool return_(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::FunctionCallbackInfo<v8::Value>& info, Error val)
+        {
+            info.GetReturnValue().Set((int32_t) val);
+            return true;
+        }
+    };
 
     template<> struct PrimitiveAccess<bool>
     {
