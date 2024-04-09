@@ -36,6 +36,7 @@ namespace jsb
     {
     private:
         friend class JavaScriptContext;
+        friend struct JavaScriptFunction;
 
         // symbol for class_id on FunctionTemplate of native class
         v8::Global<v8::Symbol> symbols_[Symbols::kNum];
@@ -143,6 +144,9 @@ namespace jsb
          * \param p_persistent keep a strong reference on pointer, usually used on binding singleton objects which are manually managed by native codes.
          */
         NativeObjectID bind_object(NativeClassID p_class_id, void* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent);
+
+        //TODO move this into JavaScriptContext, change the token for set_instance_binding to context
+        //TODO store all context instead of runtimes into a global array
         NativeObjectID bind_object(NativeClassID p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent);
         void unbind_object(void* p_pointer);
 

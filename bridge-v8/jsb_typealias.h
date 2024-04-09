@@ -1,6 +1,7 @@
 ﻿#ifndef JAVASCRIPT_TYPE_ALIAS_H
 #define JAVASCRIPT_TYPE_ALIAS_H
-#include "jsb_pch.h"
+
+#include "../internal/jsb_sindex.h"
 
 namespace jsb
 {

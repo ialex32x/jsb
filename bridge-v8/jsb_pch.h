@@ -23,4 +23,6 @@
 #include "../internal/jsb_sarray.h"
 #include "../internal/jsb_function_pointer.h"
 
+#include "jsb_typealias.h"
+
 #endif

@@ -22,6 +22,7 @@ namespace jsb
     {
     private:
         friend class JavaScriptLanguage;
+        friend struct JavaScriptFunction;
 
         // hold a reference to JavaScriptRuntime which ensure runtime being destructed after context
         std::shared_ptr<class JavaScriptRuntime> runtime_;
@@ -68,10 +69,7 @@ namespace jsb
 
         //TODO temp
         GodotJSFunctionID get_function(NativeObjectID p_object_id, const StringName& p_method);
-        bool remove_function(GodotJSFunctionID p_func_id)
-        {
-            return js_functions_.remove_at(p_func_id);
-        }
+        bool remove_function(GodotJSFunctionID p_func_id) { return js_functions_.remove_at(p_func_id); }
         Variant call_function(NativeObjectID p_object_id, GodotJSFunctionID p_func_id, const Variant **p_args, int p_argcount, Callable::CallError &r_error);
 
         jsb_force_inline const JavaScriptModuleCache& get_module_cache() const { return module_cache_; }
@@ -139,6 +137,10 @@ namespace jsb
         // caller should handle the exception if it's not called from js
         JavaScriptModule* _load_module(const String& p_parent_id, const String& p_module_id);
         void _reload_module(const String& p_module_id);
+
+        static bool gd_var_to_js(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const Variant& p_cvar, v8::Local<v8::Value>& r_jval);
+        static bool js_to_gd_var(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_jval, Variant::Type p_type, Variant& r_cvar);
+        static bool js_to_gd_var(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_jval, Variant& r_cvar);
 
     private:
         static void _new_callable(const v8::FunctionCallbackInfo<v8::Value>& info);

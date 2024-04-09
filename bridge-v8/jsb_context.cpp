@@ -808,7 +808,7 @@ namespace jsb
     }
 
     // translate js val into gd variant without any type hint
-    jsb_force_inline bool js_to_gd_var(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_jval, Variant& r_cvar)
+    bool JavaScriptContext::js_to_gd_var(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_jval, Variant& r_cvar)
     {
         //TODO not implemented
         if (p_jval.IsEmpty() || p_jval->IsNullOrUndefined())
@@ -829,7 +829,7 @@ namespace jsb
     }
 
     // translate js val into gd variant with an expected type
-    jsb_force_inline bool js_to_gd_var(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_jval, Variant::Type p_type, Variant& r_cvar)
+    bool JavaScriptContext::js_to_gd_var(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_jval, Variant::Type p_type, Variant& r_cvar)
     {
         switch (p_type)
         {
@@ -964,7 +964,7 @@ namespace jsb
         return false;
     }
 
-    jsb_force_inline bool gd_var_to_js(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const Variant& p_cvar, v8::Local<v8::Value>& r_jval)
+    bool JavaScriptContext::gd_var_to_js(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const Variant& p_cvar, v8::Local<v8::Value>& r_jval)
     {
         switch (const Variant::Type var_type = p_cvar.get_type())
         {
@@ -1083,7 +1083,7 @@ namespace jsb
             for (int index = 0; index < argc_; ++index)
             {
                 Variant::Type type = p_method_bind.get_argument_type(index);
-                if (!js_to_gd_var(p_isolate, p_context, p_info[index], type, args_[index]))
+                if (!JavaScriptContext::js_to_gd_var(p_isolate, p_context, p_info[index], type, args_[index]))
                 {
                     r_failed_arg_index = index;
                     return false;
@@ -1407,52 +1407,7 @@ namespace jsb
 
         JavaScriptFunction& js_func = js_functions_.get_value(p_func_id);
         jsb_check(js_func);
-
-        v8::Isolate* isolate = runtime_->isolate_;
-        v8::HandleScope handle_scope(isolate);
-        v8::Local<v8::Context> context = context_.Get(isolate);
-        v8::Context::Scope context_scope(context);
-        ObjectHandle& object_handle = runtime_->objects_.get_value(p_object_id);
-        v8::Local<v8::Function> func = js_func.function_.Get(isolate);
-        v8::Local<v8::Value> self = object_handle.ref_.Get(isolate);
-
-        v8::TryCatch try_catch_run(isolate);
-        using LocalValue = v8::Local<v8::Value>;
-        LocalValue* argv = jsb_stackalloc(LocalValue, p_argcount);
-        for (int index = 0; index < p_argcount; ++index)
-        {
-            memnew_placement(&argv[index], LocalValue);
-            if (!gd_var_to_js(isolate, context, *p_args[index], argv[index]))
-            {
-                // revert constructed values if error occured
-                while (index >= 0) argv[index--].~LocalValue();
-                r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;
-                return {};
-            }
-        }
-        v8::MaybeLocal<v8::Value> rval = func->Call(context, self, p_argcount, argv);
-        for (int index = 0; index < p_argcount; ++index)
-        {
-            argv[index].~LocalValue();
-        }
-        if (JavaScriptExceptionInfo exception_info = JavaScriptExceptionInfo(isolate, try_catch_run))
-        {
-            r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;
-            return {};
-        }
-
-        if (rval.IsEmpty())
-        {
-            return {};
-        }
-
-        Variant rvar;
-        if (!js_to_gd_var(isolate, context, rval.ToLocalChecked(), rvar))
-        {
-            r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;
-            return {};
-        }
-        return rvar;
+        return js_func.call(this, p_object_id, p_args, p_argcount, r_error);
     }
 
 }

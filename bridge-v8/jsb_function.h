@@ -23,6 +23,7 @@ namespace jsb
 
         jsb_force_inline operator bool() const { return !function_.IsEmpty(); }
 
+        Variant call(class JavaScriptContext* p_ccontext, NativeObjectID p_object_id, const Variant **p_args, int p_argcount, Callable::CallError &r_error);
     };
 }
 #endif
