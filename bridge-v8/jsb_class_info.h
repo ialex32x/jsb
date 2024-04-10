@@ -2,7 +2,6 @@
 #define JAVASCRIPT_CLASS_INFO_H
 
 #include "jsb_pch.h"
-#include "jsb_typealias.h"
 
 namespace jsb
 {

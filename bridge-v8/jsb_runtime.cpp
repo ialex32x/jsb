@@ -26,6 +26,7 @@ namespace jsb
 
     struct JavaScriptRuntimeStore
     {
+        // return a JavaScriptRuntime shared pointer with a unknown pointer if it's a valid JavaScriptRuntime instance.
         std::shared_ptr<JavaScriptRuntime> access(void* p_runtime)
         {
             std::shared_ptr<JavaScriptRuntime> rval;
@@ -83,7 +84,7 @@ namespace jsb
 
         static void free_callback(void* p_token, void* p_instance, void* p_binding)
         {
-            if (std::shared_ptr<JavaScriptRuntime> cruntime = JavaScriptRuntime::safe_wrap(p_token))
+            if (std::shared_ptr<JavaScriptRuntime> cruntime = JavaScriptRuntimeStore::get_shared().access(p_token))
             {
                 jsb_check(p_instance == p_binding);
                 cruntime->unbind_object(p_binding);
@@ -92,7 +93,7 @@ namespace jsb
 
         static GDExtensionBool reference_callback(void* p_token, void* p_binding, GDExtensionBool p_reference)
         {
-            if (std::shared_ptr<JavaScriptRuntime> cruntime = JavaScriptRuntime::safe_wrap(p_token))
+            if (std::shared_ptr<JavaScriptRuntime> cruntime = JavaScriptRuntimeStore::get_shared().access(p_token))
             {
                 return cruntime->reference_object(p_binding, !!p_reference);
             }
@@ -133,11 +134,6 @@ namespace jsb
                 JSB_LOG(Error, "Unhandled promise rejection: %s", temp_str);
             }
         }
-    }
-
-    std::shared_ptr<JavaScriptRuntime> JavaScriptRuntime::safe_wrap(void* p_pointer)
-    {
-        return JavaScriptRuntimeStore::get_shared().access(p_pointer);
     }
 
     void JavaScriptRuntime::on_context_created(const v8::Local<v8::Context>& p_context)

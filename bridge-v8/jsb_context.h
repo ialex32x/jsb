@@ -18,11 +18,15 @@ namespace jsb
      * a sandbox-like execution context for scripting (NOT thread-safe)
      * \note members starting with '_' are assumed the a v8 scope already existed in the caller
      */
-    class JavaScriptContext //: public std::enable_shared_from_this<JavaScriptContext>
+    class JavaScriptContext : public std::enable_shared_from_this<JavaScriptContext>
     {
     private:
         friend class JavaScriptLanguage;
         friend struct JavaScriptFunction;
+
+        static internal::SArray<JavaScriptContext*, ContextID> contexts_;
+
+        ContextID id_;
 
         // hold a reference to JavaScriptRuntime which ensure runtime being destructed after context
         std::shared_ptr<class JavaScriptRuntime> runtime_;
@@ -41,6 +45,17 @@ namespace jsb
     public:
         JavaScriptContext(const std::shared_ptr<class JavaScriptRuntime>& runtime);
         ~JavaScriptContext();
+
+        jsb_force_inline ContextID id() const { return id_; }
+
+        const std::shared_ptr<JavaScriptRuntime>& get_runtime() const { return runtime_; }
+
+        static std::shared_ptr<JavaScriptContext> get_context(ContextID p_context_id)
+        {
+            return contexts_[p_context_id]->shared_from_this();
+            // JavaScriptContext* ptr;
+            // return contexts_.try_get_value(p_context_id, ptr) ? ptr->shared_from_this() : nullptr;
+        }
 
         void register_primitive_binding(const StringName& p_name, PrimitiveTypeRegisterFunc p_func);
 

@@ -2,7 +2,6 @@
 
 #include "jsb_class_info.h"
 #include "jsb_transpiler.h"
-#include "jsb_typealias.h"
 
 #define JSB_GENERATE_PROP_ACCESSORS(ClassName, FieldType, FieldName) \
     jsb_force_inline static FieldType ClassName##_##FieldName##_getter(ClassName* self) { return self->FieldName; } \

@@ -8,6 +8,9 @@
 #include "jsb_v8_helper.h"
 #include "../internal/jsb_path_util.h"
 
+//TODO
+#include "../weaver/jsb_callable_custom.h"
+
 namespace jsb
 {
     template<typename T>
@@ -40,9 +43,59 @@ namespace jsb
         }
     }
 
+    internal::SArray<JavaScriptContext*, ContextID> JavaScriptContext::contexts_;
+
+    // construct a callable object
+    // [js] function callable(fn: Function): godot.Callable;
+    // [js] function callable(thiz: godot.Object, fn: Function): godot.Callable;
     void JavaScriptContext::_new_callable(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
-        //TODO construct a callable object
+        v8::Isolate* isolate = info.GetIsolate();
+        v8::HandleScope handle_scope(isolate);
+        v8::Local<v8::Context> context = isolate->GetCurrentContext();
+        JavaScriptContext* ccontext = JavaScriptContext::wrap(context);
+
+        const int argc = info.Length();
+        int func_arg_index;
+        ObjectID caller_id = {};
+        switch (argc)
+        {
+        case 1:
+            func_arg_index = 0;
+            break;
+        case 2:
+            {
+                Variant obj_var;
+                if (!js_to_gd_var(isolate, context, info[0], Variant::OBJECT, obj_var) || obj_var.is_null())
+                {
+                    isolate->ThrowError("bad object");
+                    return;
+                }
+
+                caller_id = ((Object*) obj_var)->get_instance_id();
+                func_arg_index = 1;
+            }
+            break;
+        default:
+            isolate->ThrowError("bad parameter");
+            return;
+        }
+
+        if (!info[func_arg_index]->IsFunction())
+        {
+            isolate->ThrowError("bad function");
+            return;
+        }
+        ContextID context_id = ccontext->id();
+        GodotJSFunctionID function_id = ccontext->js_functions_.add(JavaScriptFunction{ v8::Global<v8::Function>(isolate, info[func_arg_index].As<v8::Function>()) });
+        Variant callable = Callable(memnew(GodotJSCallableCustom(caller_id, context_id, function_id)));
+        v8::Local<v8::Value> rval;
+        if (!gd_var_to_js(isolate, context, callable, rval))
+        {
+            isolate->ThrowError("bad callable");
+            return;
+        }
+        info.GetReturnValue().Set(rval);
     }
 
     void JavaScriptContext::_print(const v8::FunctionCallbackInfo<v8::Value>& info)
@@ -635,10 +688,13 @@ namespace jsb
             register_primitive_bindings(this);
         }
         runtime_->on_context_created(context);
+        id_ = contexts_.add(this);
     }
 
     JavaScriptContext::~JavaScriptContext()
     {
+        contexts_.remove_at(id_);
+        id_ = {};
         v8::Isolate* isolate = runtime_->isolate_;
         v8::Isolate::Scope isolate_scope(isolate);
         v8::HandleScope handle_scope(isolate);
@@ -857,8 +913,22 @@ namespace jsb
             return false;
 
         case Variant::OBJECT:
-            //TODO ...
-            return false;
+            {
+                if (!p_jval->IsObject())
+                {
+                    return false;
+                }
+                v8::Local<v8::Object> self = p_jval.As<v8::Object>();
+                if (self->InternalFieldCount() != kObjectFieldCount)
+                {
+                    return false;
+                }
+
+                void* pointer = self->GetAlignedPointerFromInternalField(kObjectFieldPointer);
+                jsb_check(JavaScriptRuntime::wrap(isolate)->check_object(pointer));
+                r_cvar = (Object*) pointer;
+                return true;
+            }
         // math types
         case Variant::VECTOR2:
         case Variant::VECTOR2I:
@@ -898,25 +968,30 @@ namespace jsb
         case Variant::PACKED_COLOR_ARRAY:
             {
                 //TODO TEMP SOLUTION
-                if (p_jval->IsObject())
+                if (!p_jval->IsObject())
                 {
-                    v8::Local<v8::Object> jobj = p_jval.As<v8::Object>();
-                    if (jobj->InternalFieldCount() == kObjectFieldCount)
-                    {
-                        //TODO check the class to make it safe to cast (space cheaper?)
-                        //TODO or, add one more InternalField to ensure it (time cheaper?)
-                        void* pointer = jobj->GetAlignedPointerFromInternalField(isolate, kObjectFieldPointer);
-                        const JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
-                        if (const NativeClassInfo* class_info = cruntime->get_object_class(pointer))
-                        {
-                            if (class_info->type == NativeClassInfo::GodotPrimitive)
-                            {
-                                r_cvar = *(Variant*) pointer;
-                            }
-                        }
-                    }
+                    return false;
                 }
-                return false;
+                v8::Local<v8::Object> self = p_jval.As<v8::Object>();
+                if (self->InternalFieldCount() != kObjectFieldCount)
+                {
+                    return false;
+                }
+
+                //TODO check the class to make it safe to cast (space cheaper?)
+                //TODO or, add one more InternalField to ensure it (time cheaper?)
+                void* pointer = self->GetAlignedPointerFromInternalField(isolate, kObjectFieldPointer);
+                const NativeClassInfo* class_info = JavaScriptRuntime::wrap(isolate)->get_object_class(pointer);
+                if (!class_info)
+                {
+                    return false;
+                }
+                if (class_info->type != NativeClassInfo::GodotPrimitive)
+                {
+                    return false;
+                }
+                r_cvar = *(Variant*) pointer;
+                return true;
             }
         default: return false;
         }

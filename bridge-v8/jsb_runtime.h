@@ -107,11 +107,6 @@ namespace jsb
             return symbols_[p_type].Get(isolate_);
         }
 
-        // return a JavaScriptRuntime pointer via `p_pointer` if it's still alive
-        // `p_pointer` should point to a JavaScriptRuntime instance
-        jsb_no_discard
-        static std::shared_ptr<JavaScriptRuntime> safe_wrap(void* p_pointer);
-
         jsb_no_discard
         static
         jsb_force_inline
@@ -151,9 +146,11 @@ namespace jsb
         void unbind_object(void* p_pointer);
 
         // whether the pointer registered in the object binding map
-        jsb_force_inline bool check_object(void* p_pointer) const
+        jsb_force_inline bool check_object(void* p_pointer) const { return get_object_id(p_pointer).is_valid(); }
+        jsb_force_inline NativeObjectID get_object_id(void* p_pointer) const
         {
-            return objects_index_.has(p_pointer);
+            const HashMap<void*, internal::Index64>::ConstIterator& it = objects_index_.find(p_pointer);
+            return it != objects_index_.end() ? it->value : NativeObjectID();
         }
 
         // whether the `p_pointer` registered in the object binding map
