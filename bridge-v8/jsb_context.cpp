@@ -87,7 +87,22 @@ namespace jsb
             return;
         }
         ContextID context_id = ccontext->id();
-        GodotJSFunctionID function_id = ccontext->js_functions_.add(JavaScriptFunction{ v8::Global<v8::Function>(isolate, info[func_arg_index].As<v8::Function>()) });
+        v8::Local<v8::Function> js_func = info[func_arg_index].As<v8::Function>();
+        GodotJSFunctionID function_id = {};
+
+        //TODO stupid way to get a unique handle for each function object
+        GodotJSFunctionID index = ccontext->js_functions_.get_first_index();
+        while (index.is_valid())
+        {
+            JavaScriptFunction& func = ccontext->js_functions_[index];
+            if (func.function_ == js_func)
+            {
+                function_id = index;
+                break;
+            }
+            index = ccontext->js_functions_.get_next_index(index);
+        }
+        if (!function_id.is_valid()) function_id = ccontext->js_functions_.add(JavaScriptFunction{ v8::Global<v8::Function>(isolate, js_func) });
         Variant callable = Callable(memnew(GodotJSCallableCustom(caller_id, context_id, function_id)));
         v8::Local<v8::Value> rval;
         if (!gd_var_to_js(isolate, context, callable, rval))
@@ -512,7 +527,7 @@ namespace jsb
         GodotJSClassInfo& class_info = runtime_->get_gdjs_class(p_class_id);
         v8::Local<v8::Object> constructor = class_info.js_class.Get(isolate);
         v8::Local<v8::Object> instance = constructor->CallAsConstructor(context, 0, nullptr).ToLocalChecked().As<v8::Object>();
-        const NativeObjectID object_id = runtime_->bind_object(class_info.native_class_id, p_this, instance, false);
+        const NativeObjectID object_id = runtime_->bind_godot_object(class_info.native_class_id, p_this, instance, false);
         JSB_LOG(Warning, "[experimental] crossbinding %s", uitos((uintptr_t) p_this));
         return object_id;
     }
@@ -997,21 +1012,21 @@ namespace jsb
         }
     }
 
-    jsb_force_inline bool gd_obj_to_js(v8::Isolate* isolate, const v8::Local<v8::Context>& context, Object* p_cvar, v8::Local<v8::Value>& r_jval, bool is_persistent)
+    jsb_force_inline bool gd_obj_to_js(v8::Isolate* isolate, const v8::Local<v8::Context>& context, Object* p_godot_obj, v8::Local<v8::Value>& r_jval, bool is_persistent)
     {
-        if (unlikely(!p_cvar))
+        if (unlikely(!p_godot_obj))
         {
             r_jval = v8::Null(isolate);
             return true;
         }
         JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
-        if (cruntime->check_object(p_cvar, r_jval))
+        if (cruntime->check_object(p_godot_obj, r_jval))
         {
             return true;
         }
 
         // freshly bind existing gd object (not constructed in javascript)
-        const StringName& class_name = p_cvar->get_class_name();
+        const StringName& class_name = p_godot_obj->get_class_name();
         JavaScriptContext* ccontext = JavaScriptContext::wrap(context);
         NativeClassID jclass_id;
         if (const NativeClassInfo* jclass = ccontext->_expose_godot_class(class_name, &jclass_id))
@@ -1020,19 +1035,19 @@ namespace jsb
             r_jval = jtemplate->InstanceTemplate()->NewInstance(context).ToLocalChecked();
             jsb_check(r_jval.As<v8::Object>()->InternalFieldCount() == kObjectFieldCount);
 
-            if (p_cvar->is_ref_counted())
+            if (p_godot_obj->is_ref_counted())
             {
                 //NOTE in the case this godot object created by a godot method which returns a Ref<T>,
                 //     it's `refcount_init` will be zero after the object pointer assigned to a Variant.
                 //     we need to resurrect the object from this special state, or it will be a dangling pointer.
-                if (((RefCounted*) p_cvar)->init_ref())
+                if (((RefCounted*) p_godot_obj)->init_ref())
                 {
                     // great, it's resurrected.
                 }
             }
 
             // the lifecycle will be managed by javascript runtime, DO NOT DELETE it externally
-            cruntime->bind_object(jclass_id, p_cvar, r_jval.As<v8::Object>(), is_persistent);
+            cruntime->bind_godot_object(jclass_id, p_godot_obj, r_jval.As<v8::Object>(), is_persistent);
             return true;
         }
         JSB_LOG(Error, "failed to expose godot class '%s'", class_name);
@@ -1097,8 +1112,6 @@ namespace jsb
         case Variant::COLOR:
         case Variant::NODE_PATH:
         case Variant::RID:
-            //TODO unimplemented
-            return false;
         case Variant::CALLABLE:
         case Variant::SIGNAL:
         case Variant::DICTIONARY:
@@ -1123,9 +1136,11 @@ namespace jsb
                     v8::Local<v8::FunctionTemplate> jtemplate = class_info.template_.Get(isolate);
                     r_jval = jtemplate->InstanceTemplate()->NewInstance(context).ToLocalChecked();
                     jsb_check(r_jval.As<v8::Object>()->InternalFieldCount() == kObjectFieldCount);
+                    // void* pointer = r_jval.As<v8::Object>()->GetAlignedPointerFromInternalField(kObjectFieldPointer);
+                    // *(Variant*)pointer = p_cvar;
 
                     // the lifecycle will be managed by javascript runtime, DO NOT DELETE it externally
-                    cruntime->bind_object(class_id, p_cvar, r_jval.As<v8::Object>(), false);
+                    cruntime->bind_object(class_id, (void*) memnew(Variant(p_cvar)), r_jval.As<v8::Object>(), false);
                     return true;
                 }
                 return false;
@@ -1135,72 +1150,14 @@ namespace jsb
         }
     }
 
-    struct GodotArguments
-    {
-    private:
-        int argc_;
-        Variant *args_;
-
-    public:
-        jsb_force_inline GodotArguments() : argc_(0), args_(nullptr) {}
-
-        jsb_force_inline bool translate(const MethodBind& p_method_bind, v8::Isolate* p_isolate, const v8::Local<v8::Context>& p_context, const v8::FunctionCallbackInfo<v8::Value>& p_info, int& r_failed_arg_index)
-        {
-            argc_ = p_info.Length();
-            args_ = argc_ == 0 ? nullptr : memnew_arr(Variant, argc_);
-
-            //TODO handle vararg call
-            if (p_method_bind.is_vararg())
-            {
-
-            }
-
-            for (int index = 0; index < argc_; ++index)
-            {
-                Variant::Type type = p_method_bind.get_argument_type(index);
-                if (!JavaScriptContext::js_to_gd_var(p_isolate, p_context, p_info[index], type, args_[index]))
-                {
-                    r_failed_arg_index = index;
-                    return false;
-                }
-            }
-
-            //TODO use default argument var if not given in js call info
-            // p_method_bind.get_default_argument(index);
-            return true;
-        }
-
-        jsb_force_inline ~GodotArguments()
-        {
-            if (args_)
-            {
-                memdelete_arr(args_);
-            }
-        }
-
-        jsb_force_inline int argc() const { return argc_; }
-
-        jsb_force_inline Variant& operator[](int p_index) { return args_[p_index]; }
-
-        jsb_force_inline void fill(const Variant** p_argv) const
-        {
-            for (int i = 0; i < argc_; ++i)
-            {
-                p_argv[i] = &args_[i];
-            }
-        }
-
-    };
-
     void JavaScriptContext::_godot_signal(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
         v8::Isolate* isolate = info.GetIsolate();
-        if (info.Length() < 1 || !info[0]->IsUint32())
-        {
-            isolate->ThrowError("bad parameter");
-            return;
-        }
+        v8::Isolate::Scope isolate_scope(isolate);
+        v8::HandleScope handle_scope(isolate);
         v8::Local<v8::Context> context = isolate->GetCurrentContext();
+        v8::Context::Scope context_scope(context);
+
         JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
         const StringName name = cruntime->get_string_name((const StringNameID) info.Data().As<v8::Uint32>()->Value());
 
@@ -1483,6 +1440,13 @@ namespace jsb
         JavaScriptFunction& js_func = js_functions_.get_value(p_func_id);
         jsb_check(js_func);
         return js_func.call(this, p_object_id, p_args, p_argcount, r_error);
+    }
+
+    bool JavaScriptContext::equals_function(GodotJSFunctionID p_func_id1, GodotJSFunctionID p_func_id2)
+    {
+        JavaScriptFunction& js_func1 = js_functions_.get_value(p_func_id1);
+        JavaScriptFunction& js_func2 = js_functions_.get_value(p_func_id2);
+        return js_func1.function_ == js_func2.function_;
     }
 
 }

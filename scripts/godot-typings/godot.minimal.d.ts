@@ -19,7 +19,7 @@ declare namespace jsb {
      * keep consistency with the implementation of signal in GDScript
      */
     interface Signal {
-        connect(callable: godot.Callable): void
+        connect(callable: godot.Callable, flags: number): void
         disconnect(callable: godot.Callable): void
         is_connected(callable: godot.Callable): boolean
         emit(...args: any[]): godot.GodotError

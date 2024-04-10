@@ -52,9 +52,9 @@ namespace jsb
 
         static std::shared_ptr<JavaScriptContext> get_context(ContextID p_context_id)
         {
-            return contexts_[p_context_id]->shared_from_this();
-            // JavaScriptContext* ptr;
-            // return contexts_.try_get_value(p_context_id, ptr) ? ptr->shared_from_this() : nullptr;
+            // return contexts_[p_context_id]->shared_from_this();
+            JavaScriptContext* ptr;
+            return contexts_.try_get_value(p_context_id, ptr) ? ptr->shared_from_this() : nullptr;
         }
 
         void register_primitive_binding(const StringName& p_name, PrimitiveTypeRegisterFunc p_func);
@@ -86,6 +86,7 @@ namespace jsb
         GodotJSFunctionID get_function(NativeObjectID p_object_id, const StringName& p_method);
         bool remove_function(GodotJSFunctionID p_func_id) { return js_functions_.remove_at(p_func_id); }
         Variant call_function(NativeObjectID p_object_id, GodotJSFunctionID p_func_id, const Variant **p_args, int p_argcount, Callable::CallError &r_error);
+        bool equals_function(GodotJSFunctionID p_func_id1, GodotJSFunctionID p_func_id2);
 
         jsb_force_inline const JavaScriptModuleCache& get_module_cache() const { return module_cache_; }
 

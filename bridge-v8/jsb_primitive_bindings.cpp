@@ -155,7 +155,7 @@ namespace jsb
     {
         NativeClassID class_id;
         const StringName class_name = jsb_typename(Signal);
-        NativeClassInfo& class_info = p_env.cruntime->add_primitive_class(Variant::VECTOR4, class_name, &class_id);
+        NativeClassInfo& class_info = p_env.cruntime->add_primitive_class(Variant::SIGNAL, class_name, &class_id);
 
         v8::Local<v8::FunctionTemplate> function_template = VariantClassTemplate<Signal>::create(p_env.isolate, class_id, class_info);
         v8::Local<v8::ObjectTemplate> prototype_template = function_template->PrototypeTemplate();
@@ -169,11 +169,28 @@ namespace jsb
         return function_template->GetFunction(p_env.context).ToLocalChecked();
     }
 
+    v8::Local<v8::Value> bind_Callable(const FBindingEnv& p_env)
+    {
+        NativeClassID class_id;
+        const StringName class_name = jsb_typename(Callable);
+        NativeClassInfo& class_info = p_env.cruntime->add_primitive_class(Variant::CALLABLE, class_name, &class_id);
+
+        v8::Local<v8::FunctionTemplate> function_template = VariantClassTemplate<Callable>::create(p_env.isolate, class_id, class_info);
+        v8::Local<v8::ObjectTemplate> prototype_template = function_template->PrototypeTemplate();
+
+        // methods
+        // bind::method(p_env, prototype_template, jsb_methodbind(Callable, get_object));
+        // bind::method_varargs(p_env, prototype_template, jsb_methodbind(Signal, emit));
+
+        return function_template->GetFunction(p_env.context).ToLocalChecked();
+    }
+
     void register_primitive_bindings(class JavaScriptContext* p_ccontext)
     {
         p_ccontext->register_primitive_binding(jsb_typename(Vector2), bind_Vector2);
         p_ccontext->register_primitive_binding(jsb_typename(Vector3), bind_Vector3);
         p_ccontext->register_primitive_binding(jsb_typename(Vector4), bind_Vector4);
         p_ccontext->register_primitive_binding(jsb_typename(Signal), bind_Signal);
+        p_ccontext->register_primitive_binding(jsb_typename(Callable), bind_Callable);
     }
 }

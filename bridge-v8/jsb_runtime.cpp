@@ -265,7 +265,7 @@ namespace jsb
 #endif
     }
 
-    NativeObjectID JavaScriptRuntime::bind_object(NativeClassID p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
+    NativeObjectID JavaScriptRuntime::bind_godot_object(NativeClassID p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
     {
         const NativeObjectID object_id = bind_object(p_class_id, (void*) p_pointer, p_object, p_persistent);
         p_pointer->set_instance_binding(this, p_pointer, gd_instance_binding_callbacks);

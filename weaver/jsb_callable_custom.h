@@ -24,6 +24,7 @@ public:
         const GodotJSCallableCustom* js_cc_a = (const GodotJSCallableCustom*) p_a;
         const GodotJSCallableCustom* js_cc_b = (const GodotJSCallableCustom*) p_b;
         return js_cc_a->function_id_ < js_cc_b->function_id_;
+        // return !_compare_equal(p_a, p_b) && p_a < p_b;
     }
 
     GodotJSCallableCustom(ObjectID p_object_id, jsb::ContextID p_context_id, jsb::GodotJSFunctionID p_function_id)

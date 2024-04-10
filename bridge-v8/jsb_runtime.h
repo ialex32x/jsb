@@ -142,7 +142,7 @@ namespace jsb
 
         //TODO move this into JavaScriptContext, change the token for set_instance_binding to context
         //TODO store all context instead of runtimes into a global array
-        NativeObjectID bind_object(NativeClassID p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent);
+        NativeObjectID bind_godot_object(NativeClassID p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent);
         void unbind_object(void* p_pointer);
 
         // whether the pointer registered in the object binding map
