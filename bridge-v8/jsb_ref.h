@@ -18,6 +18,13 @@ namespace jsb
         int hash_;
         v8::Global<T> object_;
 
+        TWeakRef(v8::Isolate* p_isolate, const v8::Global<T>& p_object)
+        {
+            hash_ = p_object.Get(p_isolate)->GetIdentityHash();
+            object_.Reset(p_isolate, p_object);
+            object_.SetWeak();
+        }
+
         TWeakRef(v8::Isolate* p_isolate, const v8::Local<T>& p_object)
         {
             hash_ = p_object->GetIdentityHash();

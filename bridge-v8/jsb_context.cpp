@@ -1441,6 +1441,8 @@ namespace jsb
             TStrongRef<v8::Function>& strong_ref = function_bank_.get_value(p_func_id);
             if (strong_ref.unref())
             {
+                const size_t r = function_refs_.erase(TWeakRef(get_isolate(), strong_ref.object_));
+                jsb_check(r != 0);
                 function_bank_.remove_at(p_func_id);
             }
             return true;
