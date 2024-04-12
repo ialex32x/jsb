@@ -27,7 +27,7 @@ private:
     String path_;
     GodotJSScript* base_ = nullptr;
     jsb::GodotJSClassID gdjs_class_id_;
-    HashMap<StringName, jsb::GodotJSFunctionID> cached_methods_;
+    HashMap<StringName, jsb::ObjectCacheID> cached_methods_;
 
 public:
     GodotJSScript();

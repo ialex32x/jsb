@@ -363,20 +363,25 @@ namespace jsb
 
         ObjectHandle& object_handle = objects_.get_value(object_id);
         jsb_check(object_handle.pointer == p_pointer);
+        const NativeClassID class_id = object_handle.class_id;
         const bool is_persistent = persistent_objects_.has(p_pointer);
 
         // remove index at first to make `free_object` safely reentrant
         if (is_persistent) persistent_objects_.erase(p_pointer);
         objects_index_.erase(p_pointer);
+        object_handle.ref_.Reset();
+
+        //NOTE DO NOT USE `object_handle` after this statement since it becomes invalid after `remove_at`
+        // At this stage, the JS Object is being garbage collected, we'd better to break the link between JS Object & C++ Object before `finalizer` to avoid accessing the JS Object unexpectedly.
+        objects_.remove_at(object_id);
 
         if (p_free)
         {
-            const NativeClassInfo& class_info = native_classes_.get_value(object_handle.class_id);
+            const NativeClassInfo& class_info = native_classes_.get_value(class_id);
+
+            //NOTE Godot will call Object::_predelete to post a notification NOTIFICATION_PREDELETE which finally call `ScriptInstance::callp`
             class_info.finalizer(this, p_pointer, is_persistent);
         }
-        object_handle.ref_.Reset();
-        // `object_handle` becomes invalid after `remove_at`, so do it finally.
-        objects_.remove_at(object_id);
     }
 
     String JavaScriptRuntime::handle_source_map(const String& p_stacktrace)

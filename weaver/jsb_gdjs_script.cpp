@@ -230,14 +230,14 @@ const jsb::GodotJSClassInfo& GodotJSScript::get_js_class_info() const
 
 Variant GodotJSScript::call_js(jsb::NativeObjectID p_object_id, const StringName& p_method, const Variant** p_argv, int p_argc, Callable::CallError& r_error)
 {
-    jsb::GodotJSFunctionID func_id;
-    if (const HashMap<StringName, jsb::GodotJSFunctionID>::Iterator& it = cached_methods_.find(p_method))
+    jsb::ObjectCacheID func_id;
+    if (const HashMap<StringName, jsb::ObjectCacheID>::Iterator& it = cached_methods_.find(p_method))
     {
         func_id = it->value;
     }
     else
     {
-        func_id = context_->get_function(p_object_id, p_method);
+        func_id = context_->retain_function(p_object_id, p_method);
         cached_methods_.insert(p_method, func_id);
     }
     return context_->call_function(p_object_id, func_id, p_argv, p_argc, r_error);

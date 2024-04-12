@@ -10,7 +10,8 @@ namespace jsb
     typedef internal::Index32 GodotJSClassID;
     typedef internal::Index32 ContextID;
     typedef internal::Index64 NativeObjectID;
-    typedef internal::Index64 GodotJSFunctionID;
+
+    typedef internal::Index32 ObjectCacheID;
 
 }
 #endif

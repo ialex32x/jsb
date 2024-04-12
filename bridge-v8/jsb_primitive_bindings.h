@@ -12,7 +12,7 @@ namespace jsb
         v8::Isolate* isolate;
         const v8::Local<v8::Context>& context;
 
-        internal::FunctionPointers& function_pointers;
+        internal::CFunctionPointers& function_pointers;
     };
 
     typedef v8::Local<v8::Value> (*PrimitiveTypeRegisterFunc)(const FBindingEnv& p_env);

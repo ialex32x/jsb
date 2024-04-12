@@ -8,6 +8,7 @@ namespace jsb::internal
     template<typename UnderlyingType, uint8_t TMaskBit = 6, UnderlyingType TMask = 0x3f>
     struct TIndex
     {
+        typedef uint32_t RevisionType;
         constexpr static uint8_t kRevisionBits = TMaskBit;
         constexpr static UnderlyingType kRevisionMask = TMask;
 
@@ -19,7 +20,7 @@ namespace jsb::internal
 
         jsb_force_inline TIndex(): packed_(0) {}
 
-        jsb_force_inline TIndex(int32_t index, uint32_t revision):
+        jsb_force_inline TIndex(int32_t index, RevisionType revision):
             packed_(((UnderlyingType)index << kRevisionBits) | ((UnderlyingType)revision & kRevisionMask))
         {
             // index overflow check
@@ -42,7 +43,7 @@ namespace jsb::internal
         jsb_force_inline operator bool() const { return packed_ != 0; }
 
         jsb_force_inline int32_t get_index() const { return (int32_t) (packed_ >> kRevisionBits); }
-        jsb_force_inline uint32_t get_revision() const { return (uint32_t) (packed_ & kRevisionMask); }
+        jsb_force_inline RevisionType get_revision() const { return (RevisionType) (packed_ & kRevisionMask); }
 
         jsb_force_inline friend bool operator==(const TIndex& lhs, const TIndex& rhs)
         {

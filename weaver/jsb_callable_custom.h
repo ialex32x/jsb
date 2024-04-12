@@ -7,7 +7,7 @@ class GodotJSCallableCustom : public CallableCustom
 {
 private:
     ObjectID object_id_;
-    jsb::GodotJSFunctionID function_id_;
+    jsb::ObjectCacheID callback_id_;
     jsb::ContextID context_id_;
 
 public:
@@ -16,19 +16,19 @@ public:
         // types are already ensured by `Callable::operator==` with the comparator function pointers before calling
         const GodotJSCallableCustom* js_cc_a = (const GodotJSCallableCustom*) p_a;
         const GodotJSCallableCustom* js_cc_b = (const GodotJSCallableCustom*) p_b;
-        return js_cc_a->function_id_ == js_cc_b->function_id_;
+        return js_cc_a->callback_id_ == js_cc_b->callback_id_;
     }
 
     static bool _compare_less(const CallableCustom* p_a, const CallableCustom* p_b)
     {
         const GodotJSCallableCustom* js_cc_a = (const GodotJSCallableCustom*) p_a;
         const GodotJSCallableCustom* js_cc_b = (const GodotJSCallableCustom*) p_b;
-        return js_cc_a->function_id_ < js_cc_b->function_id_;
+        return js_cc_a->callback_id_ < js_cc_b->callback_id_;
         // return !_compare_equal(p_a, p_b) && p_a < p_b;
     }
 
-    GodotJSCallableCustom(ObjectID p_object_id, jsb::ContextID p_context_id, jsb::GodotJSFunctionID p_function_id)
-    : object_id_(p_object_id), function_id_(p_function_id), context_id_(p_context_id)
+    GodotJSCallableCustom(ObjectID p_object_id, jsb::ContextID p_context_id, jsb::ContextID p_callback_id)
+    : object_id_(p_object_id), callback_id_(p_callback_id), context_id_(p_context_id)
     {}
 
     virtual ~GodotJSCallableCustom() override;
@@ -39,7 +39,7 @@ public:
 
     virtual CompareEqualFunc get_compare_equal_func() const override { return _compare_equal; }
     virtual CompareLessFunc get_compare_less_func() const override { return _compare_less; }
-    virtual uint32_t hash() const override { return function_id_.hash(); }
+    virtual uint32_t hash() const override { return callback_id_.hash(); }
 };
 
 #endif

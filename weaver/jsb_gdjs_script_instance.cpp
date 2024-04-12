@@ -60,6 +60,13 @@ Variant GodotJSScriptInstance::callp(const StringName &p_method, const Variant *
 
 void GodotJSScriptInstance::notification(int p_notification, bool p_reversed)
 {
+    if (p_reversed && (p_notification == Object::NOTIFICATION_PREDELETE || p_notification == Object::NOTIFICATION_PREDELETE_CLEANUP))
+    {
+        // the JS counterpart is garbage collected (which finally caused Godot Object deleting)
+        // so, some of the reversed notifications can not be handled by script instances
+        return;
+    }
+
     //TODO find the method named `_notification`, cal it with `p_notification` as `argv`
     //TODO call it at all type levels? @seealso `GDScriptInstance::notification`
     Variant value = p_notification;

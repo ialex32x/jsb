@@ -36,7 +36,6 @@ namespace jsb
     {
     private:
         friend class JavaScriptContext;
-        friend struct JavaScriptFunction;
 
         // symbol for class_id on FunctionTemplate of native class
         v8::Global<v8::Symbol> symbols_[Symbols::kNum];

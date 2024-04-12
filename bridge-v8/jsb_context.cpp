@@ -4,7 +4,7 @@
 #include "jsb_exception_info.h"
 #include "jsb_module_loader.h"
 #include "jsb_transpiler.h"
-#include "jsb_function.h"
+#include "jsb_ref.h"
 #include "jsb_v8_helper.h"
 #include "../internal/jsb_path_util.h"
 
@@ -88,22 +88,8 @@ namespace jsb
         }
         ContextID context_id = ccontext->id();
         v8::Local<v8::Function> js_func = info[func_arg_index].As<v8::Function>();
-        GodotJSFunctionID function_id = {};
-
-        //TODO stupid way to get a unique handle for each function object
-        GodotJSFunctionID index = ccontext->js_functions_.get_first_index();
-        while (index.is_valid())
-        {
-            JavaScriptFunction& func = ccontext->js_functions_[index];
-            if (func.function_ == js_func)
-            {
-                function_id = index;
-                break;
-            }
-            index = ccontext->js_functions_.get_next_index(index);
-        }
-        if (!function_id.is_valid()) function_id = ccontext->js_functions_.add(JavaScriptFunction{ v8::Global<v8::Function>(isolate, js_func) });
-        Variant callable = Callable(memnew(GodotJSCallableCustom(caller_id, context_id, function_id)));
+        const internal::Index32 callback_id = ccontext->get_cached_function(js_func);
+        Variant callable = Callable(memnew(GodotJSCallableCustom(caller_id, context_id, callback_id)));
         v8::Local<v8::Value> rval;
         if (!gd_var_to_js(isolate, context, callable, rval))
         {
@@ -111,6 +97,22 @@ namespace jsb
             return;
         }
         info.GetReturnValue().Set(rval);
+    }
+
+    ObjectCacheID JavaScriptContext::get_cached_function(const v8::Local<v8::Function>& p_func)
+    {
+        v8::Isolate* isolate = get_isolate();
+        const auto& it = function_refs_.find(TWeakRef(isolate, p_func));
+        if (it != function_refs_.end())
+        {
+            const ObjectCacheID callback_id = it->second;
+            TStrongRef<v8::Function>& strong_ref = function_bank_.get_value(callback_id);
+            strong_ref.ref();
+            return callback_id;
+        }
+        const ObjectCacheID new_id = function_bank_.add(TStrongRef(isolate, p_func));
+        function_refs_.insert(std::pair(TWeakRef(isolate, p_func), new_id));
+        return new_id;
     }
 
     void JavaScriptContext::_print(const v8::FunctionCallbackInfo<v8::Value>& info)
@@ -714,6 +716,9 @@ namespace jsb
         v8::Isolate::Scope isolate_scope(isolate);
         v8::HandleScope handle_scope(isolate);
         v8::Local<v8::Context> context = context_.Get(get_isolate());
+
+        function_bank_.clear();
+        function_refs_.clear();
 
         runtime_->on_context_destroyed(context);
         context->SetAlignedPointerInEmbedderData(kContextEmbedderData, nullptr);
@@ -1410,7 +1415,7 @@ namespace jsb
         return maybe_value;
     }
 
-    GodotJSFunctionID JavaScriptContext::get_function(NativeObjectID p_object_id, const StringName& p_method)
+    ObjectCacheID JavaScriptContext::retain_function(NativeObjectID p_object_id, const StringName& p_method)
     {
         ObjectHandle* handle;
         if (runtime_->objects_.try_get_value_pointer(p_object_id, handle))
@@ -1423,30 +1428,100 @@ namespace jsb
             v8::Local<v8::Value> find;
             if (obj->Get(context, v8::String::NewFromOneByte(isolate, (const uint8_t* ) name.ptr(), v8::NewStringType::kNormal, name.length()).ToLocalChecked()).ToLocal(&find) && find->IsFunction())
             {
-                return js_functions_.add(JavaScriptFunction {v8::Global<v8::Function>(isolate, find.As<v8::Function>()) });
+                return get_cached_function(find.As<v8::Function>());
             }
         }
         return {};
     }
 
-    Variant JavaScriptContext::call_function(NativeObjectID p_object_id, GodotJSFunctionID p_func_id, const Variant** p_args, int p_argcount, Callable::CallError& r_error)
+    bool JavaScriptContext::release_function(ObjectCacheID p_func_id)
     {
-        if (!p_func_id.is_valid())
+        if (function_bank_.is_valid_index(p_func_id))
+        {
+            TStrongRef<v8::Function>& strong_ref = function_bank_.get_value(p_func_id);
+            if (strong_ref.unref())
+            {
+                function_bank_.remove_at(p_func_id);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    Variant JavaScriptContext::_call(const v8::Local<v8::Function>& p_func, const v8::Local<v8::Value>& p_self, const Variant** p_args, int p_argcount, Callable::CallError& r_error)
+    {
+        v8::Isolate* isolate = p_func->GetIsolate();
+        v8::Local<v8::Context> context = this->unwrap();
+        v8::Context::Scope context_scope(context);
+
+        v8::TryCatch try_catch_run(isolate);
+        using LocalValue = v8::Local<v8::Value>;
+        LocalValue* argv = jsb_stackalloc(LocalValue, p_argcount);
+        for (int index = 0; index < p_argcount; ++index)
+        {
+            memnew_placement(&argv[index], LocalValue);
+            if (!JavaScriptContext::gd_var_to_js(isolate, context, *p_args[index], argv[index]))
+            {
+                // revert constructed values if error occured
+                while (index >= 0) argv[index--].~LocalValue();
+                r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;
+                return {};
+            }
+        }
+        v8::MaybeLocal<v8::Value> rval = p_func->Call(context, p_self, p_argcount, argv);
+        for (int index = 0; index < p_argcount; ++index)
+        {
+            argv[index].~LocalValue();
+        }
+        if (JavaScriptExceptionInfo exception_info = JavaScriptExceptionInfo(isolate, try_catch_run))
         {
             r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;
             return {};
         }
 
-        JavaScriptFunction& js_func = js_functions_.get_value(p_func_id);
-        jsb_check(js_func);
-        return js_func.call(this, p_object_id, p_args, p_argcount, r_error);
+        if (rval.IsEmpty())
+        {
+            return {};
+        }
+
+        Variant rvar;
+        if (!JavaScriptContext::js_to_gd_var(isolate, context, rval.ToLocalChecked(), rvar))
+        {
+            r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;
+            return {};
+        }
+        return rvar;
     }
 
-    bool JavaScriptContext::equals_function(GodotJSFunctionID p_func_id1, GodotJSFunctionID p_func_id2)
+    Variant JavaScriptContext::call_function(NativeObjectID p_object_id, ObjectCacheID p_func_id, const Variant** p_args, int p_argcount, Callable::CallError& r_error)
     {
-        JavaScriptFunction& js_func1 = js_functions_.get_value(p_func_id1);
-        JavaScriptFunction& js_func2 = js_functions_.get_value(p_func_id2);
-        return js_func1.function_ == js_func2.function_;
+        if (!function_bank_.is_valid_index(p_func_id))
+        {
+            r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;
+            return {};
+        }
+
+        v8::Isolate* isolate = get_isolate();
+        v8::HandleScope handle_scope(isolate);
+        if (p_object_id.is_valid())
+        {
+            // if object_id is nonzero but can't be found in `objects_` registry, it usually means that this invocation originally triggered by JS GC.
+            // the JS Object is disposed before the Godot Object, but Godot will post notifications (like NOTIFICATION_PREDELETE) to script instances.
+            if (!this->runtime_->objects_.is_valid_index(p_object_id))
+            {
+                JSB_LOG(Error, "invalid `this` for calling function");
+                r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;
+                return {};
+            }
+            const TStrongRef<v8::Function>& js_func = function_bank_.get_value(p_func_id);
+            jsb_check(js_func);
+            v8::Local<v8::Value> self = this->runtime_->objects_.get_value(p_object_id).ref_.Get(isolate);
+            return _call(js_func.object_.Get(isolate), self, p_args, p_argcount, r_error);
+        }
+
+        const TStrongRef<v8::Function>& js_func = function_bank_.get_value(p_func_id);
+        jsb_check(js_func);
+        return _call(js_func.object_.Get(isolate), v8::Undefined(isolate), p_args, p_argcount, r_error);
     }
 
 }

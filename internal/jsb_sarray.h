@@ -6,21 +6,27 @@
 #include "jsb_ansi_allocator.h"
 #include "jsb_sindex.h"
 
+#ifndef JSB_AUTOWRAP_REVISION_INC
+#define JSB_AUTOWRAP_REVISION_INC 1
+#endif
+
 namespace jsb::internal
 {
     //TODO use move-constructor if possible when resizing
     template <typename T, typename IndexType = Index64, typename TAllocator = AnsiAllocator>
 	class SArray
 	{
+        using RevisionType = typename IndexType::RevisionType;
 		using ElementTypeTypedef = std::remove_pointer_t<T>;
 
 		enum { INDEX_NONE = -1 };
+        enum { kInitialRevision = 1 };
 
 		struct Slot
 		{
 			int next;
 			int previous;
-			uint32_t revision;
+			RevisionType revision;
 			T value;
 
 		    jsb_force_inline void reset_value() { }
@@ -508,7 +514,7 @@ namespace jsb::internal
 		    {
 		        Slot& slot = slots_base[i];
 		        slot.next = _free_index;
-		        slot.revision = 2;
+		        slot.revision = kInitialRevision;
 		        _free_index = i;
 		    }
 			jsb_check(is_consistent());
@@ -741,14 +747,13 @@ namespace jsb::internal
 			return _first_index == INDEX_NONE && _last_index == INDEX_NONE;
 		}
 
-		jsb_force_inline static void increase_revision(uint32_t& p_value)
+		jsb_force_inline static void increase_revision(RevisionType& p_value)
 		{
-#if defined(JSB_NO_OVERFLOW_CHECK) && JSB_NO_OVERFLOW_CHECK
-			p_value += 2;
+#if JSB_AUTOWRAP_REVISION_INC
+			p_value += 2; // should skip zero automatically if overflowed (initial rev must be 1)
 #else
 		    p_value = (p_value + 1 & IndexType::kRevisionMask) == 0 ? 1 : p_value + 1;
 #endif
-		    jsb_check(p_value != 0);
 		}
 
 	    jsb_force_inline static void construct_element(Slot& p_slot)

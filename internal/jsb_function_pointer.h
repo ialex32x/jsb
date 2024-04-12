@@ -6,9 +6,9 @@
 
 namespace jsb::internal
 {
-    struct FunctionPointers
+    struct CFunctionPointers
     {
-        FunctionPointers(): cursor_(0) { pointer_.resize(16 * 512); }
+        CFunctionPointers(): cursor_(0) { pointer_.resize(16 * 512); }
 
         template<typename Func>
         uint32_t add(Func func)

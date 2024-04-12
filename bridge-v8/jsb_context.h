@@ -1,11 +1,12 @@
 #ifndef JAVASCRIPT_CONTEXT_H
 #define JAVASCRIPT_CONTEXT_H
 
-#include "jsb_function.h"
+#include "jsb_ref.h"
 #include "jsb_pch.h"
 #include "jsb_runtime.h"
 #include "jsb_module.h"
 #include "jsb_primitive_bindings.h"
+#include <unordered_map>
 
 namespace jsb
 {
@@ -22,7 +23,6 @@ namespace jsb
     {
     private:
         friend class JavaScriptLanguage;
-        friend struct JavaScriptFunction;
 
         static internal::SArray<JavaScriptContext*, ContextID> contexts_;
 
@@ -32,14 +32,15 @@ namespace jsb
         std::shared_ptr<class JavaScriptRuntime> runtime_;
         v8::Global<v8::Context> context_;
 
-        internal::FunctionPointers function_pointers_;
+        internal::CFunctionPointers function_pointers_;
 
         JavaScriptModuleCache module_cache_;
         v8::Global<v8::Object> jmodule_cache_;
 
-        // cache all js functions accessed by GodotJSScript (GodotJSScriptInstance)
-        internal::SArray<JavaScriptFunction> js_functions_;
+        std::unordered_map<TWeakRef<v8::Function>, internal::Index32, TWeakRef<v8::Function>::hasher, TWeakRef<v8::Function>::equaler> function_refs_; // backlink
+        internal::SArray<TStrongRef<v8::Function>, internal::Index32> function_bank_;
 
+        //TODO handle the situation that primitive types are not accessed by name (such as used by param/return in native wrapper methods)
         HashMap<StringName, PrimitiveTypeRegisterFunc> primitive_regs_;
 
     public:
@@ -77,16 +78,16 @@ namespace jsb
         //TODO temp
         jsb_force_inline const GodotJSClassInfo& get_gdjs_class_info(GodotJSClassID p_class_id) const { return runtime_->get_gdjs_class(p_class_id); }
 
+        //TODO temp, get C++ function pointer (include class methods)
         jsb_force_inline static uint8_t* get_function_pointer(const v8::Local<v8::Context>& p_context, uint32_t p_offset)
         {
             return wrap(p_context)->function_pointers_[p_offset];
         }
 
-        //TODO temp
-        GodotJSFunctionID get_function(NativeObjectID p_object_id, const StringName& p_method);
-        bool remove_function(GodotJSFunctionID p_func_id) { return js_functions_.remove_at(p_func_id); }
-        Variant call_function(NativeObjectID p_object_id, GodotJSFunctionID p_func_id, const Variant **p_args, int p_argcount, Callable::CallError &r_error);
-        bool equals_function(GodotJSFunctionID p_func_id1, GodotJSFunctionID p_func_id2);
+        //TODO temp, js function (cached in `function_bank_`)
+        ObjectCacheID retain_function(NativeObjectID p_object_id, const StringName& p_method);
+        bool release_function(ObjectCacheID p_func_id);
+        Variant call_function(NativeObjectID p_object_id, ObjectCacheID p_func_id, const Variant **p_args, int p_argcount, Callable::CallError &r_error);
 
         jsb_force_inline const JavaScriptModuleCache& get_module_cache() const { return module_cache_; }
 
@@ -172,6 +173,9 @@ namespace jsb
 
         void _parse_script_class(v8::Isolate* p_isolate, const v8::Local<v8::Context>& p_context, JavaScriptModule& p_module);
         void _parse_script_class_iterate(v8::Isolate* p_isolate, const v8::Local<v8::Context>& p_context, GodotJSClassInfo& p_class_info);
+
+        ObjectCacheID get_cached_function(const v8::Local<v8::Function>& p_func);
+        Variant _call(const v8::Local<v8::Function>& p_func, const v8::Local<v8::Value>& p_self, const Variant** p_args, int p_argcount, Callable::CallError& r_error);
     };
 }
 
