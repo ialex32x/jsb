@@ -15,17 +15,16 @@
 #   define JSB_MIN_LOG_LEVEL Verbose
 #endif
 
+#define JSB_LOG_FORMAT(Severity, Format, ...) vformat("[jsb][" #Severity "] " Format, ##__VA_ARGS__)
+
 #if DEV_ENABLED
 #   define JSB_LOG(Severity, Format, ...) \
     if constexpr (jsb::internal::ELogSeverity::Severity >= jsb::internal::ELogSeverity::JSB_MIN_LOG_LEVEL) \
     {\
-        if (jsb::internal::ELogSeverity::Severity != jsb::internal::ELogSeverity::Verbose || OS::get_singleton()->is_stdout_verbose()) \
-        {\
-            const String msg = vformat("[jsb][" #Severity "] " Format, ##__VA_ARGS__); \
-            if constexpr (jsb::internal::ELogSeverity::Severity >= jsb::internal::ELogSeverity::Error) { _err_print_error(FUNCTION_STR, __FILE__, __LINE__, "Method/function failed.", msg); } \
-            else if constexpr (jsb::internal::ELogSeverity::Severity >= jsb::internal::ELogSeverity::Warning) { _err_print_error(FUNCTION_STR, __FILE__, __LINE__, msg, false, ERR_HANDLER_WARNING); }\
-            else { print_line(msg); } \
-        }\
+        if constexpr (jsb::internal::ELogSeverity::Severity >= jsb::internal::ELogSeverity::Error) { _err_print_error(FUNCTION_STR, __FILE__, __LINE__, "Method/function failed.", JSB_LOG_FORMAT(Severity, Format, ##__VA_ARGS__)); } \
+        else if constexpr (jsb::internal::ELogSeverity::Severity >= jsb::internal::ELogSeverity::Warning) { _err_print_error(FUNCTION_STR, __FILE__, __LINE__, JSB_LOG_FORMAT(Severity, Format, ##__VA_ARGS__), false, ERR_HANDLER_WARNING); }\
+        else if constexpr (jsb::internal::ELogSeverity::Severity > jsb::internal::ELogSeverity::Verbose) { print_line(JSB_LOG_FORMAT(Severity, Format, ##__VA_ARGS__)); } \
+        else if (OS::get_singleton()->is_stdout_verbose()) { print_line(JSB_LOG_FORMAT(Severity, Format, ##__VA_ARGS__)); } \
     } (void) 0
 #   define jsb_check(Condition) CRASH_COND(!(Condition))
 #   define jsb_checkf(Condition, Format, ...) CRASH_COND_MSG(!(Condition), vformat(Format, ##__VA_ARGS__))
