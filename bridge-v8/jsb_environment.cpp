@@ -215,8 +215,9 @@ namespace jsb
             const internal::Index64 first_index = objects_.get_first_index();
             ObjectHandle& handle = objects_.get_value(first_index);
             const bool is_persistent = persistent_objects_.has(handle.pointer);
-
             const NativeClassInfo& class_info = native_classes_.get_value(handle.class_id);
+
+            JSB_LOG(Verbose, "deleting %s(%d) %s", (String) class_info.name, (uint32_t) handle.class_id, uitos((uintptr_t) handle.pointer));
             class_info.finalizer(this, handle.pointer, is_persistent);
             handle.ref_.Reset();
             objects_index_.erase(handle.pointer);
@@ -265,14 +266,14 @@ namespace jsb
 #endif
     }
 
-    NativeObjectID Environment::bind_godot_object(NativeClassID p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
+    NativeObjectID Environment::bind_godot_object(NativeClassID p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object)
     {
-        const NativeObjectID object_id = bind_object(p_class_id, (void*) p_pointer, p_object, p_persistent);
+        const NativeObjectID object_id = bind_object(p_class_id, (void*) p_pointer, p_object, false);
         p_pointer->set_instance_binding(this, p_pointer, gd_instance_binding_callbacks);
         return object_id;
     }
 
-    NativeObjectID Environment::bind_object(NativeClassID p_class_id, void* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
+    NativeObjectID Environment::bind_object(NativeClassID p_class_id, void* p_pointer, const v8::Local<v8::Object>& p_object, bool p_weakref)
     {
         jsb_checkf(Thread::get_caller_id() == thread_id_, "multi-threaded call not supported yet");
         jsb_checkf(native_classes_.is_valid_index(p_class_id), "bad class_id");
@@ -286,17 +287,28 @@ namespace jsb
         handle.ref_.Reset(isolate_, p_object);
         objects_index_.insert(p_pointer, object_id);
         p_object->SetAlignedPointerInInternalField(kObjectFieldPointer, p_pointer);
-        if (p_persistent)
-        {
-            persistent_objects_.insert(p_pointer);
-            handle.ref_count_ = 1;
-        }
-        else
+        if (p_weakref)
         {
             handle.ref_.SetWeak(p_pointer, &object_gc_callback, v8::WeakCallbackType::kInternalFields);
         }
+        else
+        {
+            handle.ref_count_ = 1;
+        }
         JSB_LOG(Verbose, "bind object %s class_id %d", uitos((uint64_t) object_id), (uint32_t) p_class_id);
         return object_id;
+    }
+
+    void Environment::mark_as_persistent_object(void* p_pointer)
+    {
+        if (const HashMap<void*, internal::Index64>::Iterator it = objects_index_.find(p_pointer); it != objects_index_.end())
+        {
+            jsb_checkf(!persistent_objects_.has(p_pointer), "duplicate adding persistent object");
+            reference_object(p_pointer, true);
+            persistent_objects_.insert(p_pointer);
+            return;
+        }
+        JSB_LOG(Error, "failed to mark as persistent due to invalid pointer");
     }
 
     void Environment::unbind_object(void* p_pointer)
@@ -379,6 +391,7 @@ namespace jsb
         {
             const NativeClassInfo& class_info = native_classes_.get_value(class_id);
 
+            JSB_LOG(Verbose, "deleting %s(%d) %s", (String) class_info.name, (uint32_t) class_id, uitos((uintptr_t) p_pointer));
             //NOTE Godot will call Object::_predelete to post a notification NOTIFICATION_PREDELETE which finally call `ScriptInstance::callp`
             class_info.finalizer(this, p_pointer, is_persistent);
         }

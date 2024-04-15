@@ -1,5 +1,5 @@
 
-// declare module globalThis {
+declare module "godot" {
 //     class Vector2 {
 
 //     }
@@ -25,4 +25,4 @@
 //     type GodotVariant = number | string | {
 //         // 
 //     }
-// }
+}

@@ -135,11 +135,11 @@ namespace jsb
          * \param p_class_id
          * \param p_persistent keep a strong reference on pointer, usually used on binding singleton objects which are manually managed by native codes.
          */
-        NativeObjectID bind_object(NativeClassID p_class_id, void* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent);
+        NativeObjectID bind_object(NativeClassID p_class_id, void* p_pointer, const v8::Local<v8::Object>& p_object, bool p_weakref = true);
 
         //TODO move this into Realm, change the token for set_instance_binding to context
         //TODO store all context instead of runtimes into a global array
-        NativeObjectID bind_godot_object(NativeClassID p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent);
+        NativeObjectID bind_godot_object(NativeClassID p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object);
         void unbind_object(void* p_pointer);
 
         // whether the pointer registered in the object binding map
@@ -152,7 +152,7 @@ namespace jsb
 
         // whether the `p_pointer` registered in the object binding map
         // return true, and the corresponding JS value if `p_pointer` is valid
-        jsb_force_inline bool check_object(void* p_pointer, v8::Local<v8::Value>& r_unwrap) const
+        jsb_force_inline bool get_object(void* p_pointer, v8::Local<v8::Value>& r_unwrap) const
         {
             const HashMap<void*, internal::Index64>::ConstIterator& it = objects_index_.find(p_pointer);
             if (it != objects_index_.end())
@@ -181,6 +181,7 @@ namespace jsb
 
         // return true if can die
         bool reference_object(void* p_pointer, bool p_is_inc);
+        void mark_as_persistent_object(void* p_pointer);
 
         // request a garbage collection
         void gc();

@@ -529,8 +529,8 @@ namespace jsb
         GodotJSClassInfo& class_info = environment_->get_gdjs_class(p_class_id);
         v8::Local<v8::Object> constructor = class_info.js_class.Get(isolate);
         v8::Local<v8::Object> instance = constructor->CallAsConstructor(context, 0, nullptr).ToLocalChecked().As<v8::Object>();
-        const NativeObjectID object_id = environment_->bind_godot_object(class_info.native_class_id, p_this, instance, false);
-        JSB_LOG(Warning, "[experimental] crossbinding %s", uitos((uintptr_t) p_this));
+        const NativeObjectID object_id = environment_->bind_godot_object(class_info.native_class_id, p_this, instance);
+        JSB_LOG(Verbose, "[experimental] crossbinding %s %s(%d) %s", class_info.js_class_name,  class_info.native_class_name, (uint32_t) class_info.native_class_id, uitos((uintptr_t) p_this));
         return object_id;
     }
 
@@ -797,7 +797,6 @@ namespace jsb
 
         NativeClassID class_id;
         NativeClassInfo& jclass_info = environment_->add_class(NativeClassInfo::GodotObject, p_class_info->name, &class_id);
-        JSB_LOG(Verbose, "expose godot type %s (%d)", p_class_info->name, (uint32_t) class_id);
 
         // construct type template
         {
@@ -807,6 +806,8 @@ namespace jsb
             jsb_check(context == context_.Get(isolate));
             v8::Local<v8::FunctionTemplate> function_template = ClassTemplate<Object>::create(isolate, class_id, jclass_info);
             v8::Local<v8::ObjectTemplate> object_template = function_template->PrototypeTemplate();
+            jsb_check(function_template == jclass_info.template_);
+            JSB_LOG(Verbose, "expose godot type %s(%d)", p_class_info->name, (uint32_t) class_id);
 
             // expose class methods
             for (const KeyValue<StringName, MethodBind*>& pair : p_class_info->method_map)
@@ -1036,7 +1037,7 @@ namespace jsb
         }
     }
 
-    jsb_force_inline bool gd_obj_to_js(v8::Isolate* isolate, const v8::Local<v8::Context>& context, Object* p_godot_obj, v8::Local<v8::Value>& r_jval, bool is_persistent)
+    jsb_force_inline bool gd_obj_to_js(v8::Isolate* isolate, const v8::Local<v8::Context>& context, Object* p_godot_obj, v8::Local<v8::Value>& r_jval)
     {
         if (unlikely(!p_godot_obj))
         {
@@ -1044,7 +1045,7 @@ namespace jsb
             return true;
         }
         Environment* environment = Environment::wrap(isolate);
-        if (environment->check_object(p_godot_obj, r_jval))
+        if (environment->get_object(p_godot_obj, r_jval))
         {
             return true;
         }
@@ -1071,7 +1072,7 @@ namespace jsb
             }
 
             // the lifecycle will be managed by javascript runtime, DO NOT DELETE it externally
-            environment->bind_godot_object(jclass_id, p_godot_obj, r_jval.As<v8::Object>(), is_persistent);
+            environment->bind_godot_object(jclass_id, p_godot_obj, r_jval.As<v8::Object>());
             return true;
         }
         JSB_LOG(Error, "failed to expose godot class '%s'", class_name);
@@ -1113,7 +1114,7 @@ namespace jsb
             }
         case Variant::OBJECT:
             {
-                return gd_obj_to_js(isolate, context, (Object*) p_cvar, r_jval, false);
+                return gd_obj_to_js(isolate, context, (Object*) p_cvar, r_jval);
             }
         // math types
         case Variant::VECTOR2:
@@ -1164,7 +1165,7 @@ namespace jsb
                     // *(Variant*)pointer = p_cvar;
 
                     // the lifecycle will be managed by javascript runtime, DO NOT DELETE it externally
-                    realm->environment_->bind_object(class_id, (void*) memnew(Variant(p_cvar)), r_jval.As<v8::Object>(), false);
+                    realm->environment_->bind_object(class_id, (void*) memnew(Variant(p_cvar)), r_jval.As<v8::Object>());
                     return true;
                 }
                 return false;
@@ -1314,8 +1315,9 @@ namespace jsb
         {
             v8::Local<v8::Value> rval;
             JSB_LOG(Verbose, "exposing singleton object %s", (String) type_name);
-            if (gd_obj_to_js(isolate, context, gd_singleton, rval, true))
+            if (gd_obj_to_js(isolate, context, gd_singleton, rval))
             {
+                realm->environment_->mark_as_persistent_object(gd_singleton);
                 jsb_check(!rval.IsEmpty());
                 info.GetReturnValue().Set(rval);
                 return;
@@ -1346,7 +1348,7 @@ namespace jsb
         }
 
         // finally, classes in ClassDB
-        HashMap<StringName, ClassDB::ClassInfo>::Iterator it = ClassDB::classes.find(type_name);
+        const HashMap<StringName, ClassDB::ClassInfo>::Iterator it = ClassDB::classes.find(type_name);
         if (it != ClassDB::classes.end())
         {
             if (NativeClassInfo* godot_class = realm->_expose_godot_class(&it->value))
@@ -1456,6 +1458,8 @@ namespace jsb
             TStrongRef<v8::Function>& strong_ref = function_bank_.get_value(p_func_id);
             if (strong_ref.unref())
             {
+                v8::Isolate* isolate = get_isolate();
+                v8::HandleScope handle_scope(isolate);
                 const size_t r = function_refs_.erase(TWeakRef(get_isolate(), strong_ref.object_));
                 jsb_check(r != 0);
                 function_bank_.remove_at(p_func_id);

@@ -119,6 +119,7 @@ namespace jsb
     {
         static T from(const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_val)
         {
+            if (p_val.IsEmpty() || !p_val->IsObject()) return {};
             return *VariantCaster<T>::from(context, p_val);
         }
 
@@ -136,7 +137,7 @@ namespace jsb
 
             Variant* p_cvar = memnew(Variant(val));
             // the lifecycle will be managed by javascript runtime, DO NOT DELETE it externally
-            environment->bind_object(class_id, p_cvar, r_jval.As<v8::Object>(), false);
+            environment->bind_object(class_id, p_cvar, r_jval.As<v8::Object>());
             info.GetReturnValue().Set(r_jval);
             return true;
         }
@@ -178,7 +179,9 @@ namespace jsb
     {
         static int32_t from(const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_val)
         {
-            return p_val->Int32Value(context).ToChecked();
+            int32_t val = 0;
+            p_val->Int32Value(context).To(&val);
+            return val;
         }
         static bool return_(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::FunctionCallbackInfo<v8::Value>& info, int32_t val)
         {
@@ -479,7 +482,7 @@ namespace jsb
 
             TSelf* ptr = memnew(TSelf);
             Environment* runtime = Environment::wrap(isolate);
-            runtime->bind_object(class_id, ptr, self, false);
+            runtime->bind_object(class_id, ptr, self);
         }
 
         template<typename P0, typename P1, typename P2>
@@ -501,7 +504,7 @@ namespace jsb
             P2 p2 = PrimitiveAccess<P2>::from(context, info[2]);
             TSelf* ptr = memnew(TSelf(p0, p1, p2));
             Environment* runtime = Environment::wrap(isolate);
-            runtime->bind_object(class_id, ptr, self, false);
+            runtime->bind_object(class_id, ptr, self);
         }
 
         static void finalizer(Environment* runtime, void* pointer, bool p_persistent)
@@ -509,7 +512,6 @@ namespace jsb
             TSelf* self = (TSelf*) pointer;
             if (!p_persistent)
             {
-                JSB_LOG(Verbose, "deleting object %d", (uintptr_t) self);
                 memdelete(self);
             }
         }
@@ -531,7 +533,7 @@ namespace jsb
 
             Variant* ptr = memnew(Variant);
             Environment* runtime = Environment::wrap(isolate);
-            runtime->bind_object(class_id, ptr, self, false);
+            runtime->bind_object(class_id, ptr, self);
         }
 
         template<typename P0>
@@ -551,7 +553,7 @@ namespace jsb
             P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
             Variant* ptr = memnew(Variant(TSelf(p0)));
             Environment* runtime = Environment::wrap(isolate);
-            runtime->bind_object(class_id, ptr, self, false);
+            runtime->bind_object(class_id, ptr, self);
         }
 
         template<typename P0, typename P1>
@@ -572,7 +574,7 @@ namespace jsb
             P1 p1 = PrimitiveAccess<P1>::from(context, info[1]);
             Variant* ptr = memnew(Variant(TSelf(p0, p1)));
             Environment* runtime = Environment::wrap(isolate);
-            runtime->bind_object(class_id, ptr, self, false);
+            runtime->bind_object(class_id, ptr, self);
         }
 
         template<typename P0, typename P1, typename P2>
@@ -594,7 +596,7 @@ namespace jsb
             P2 p2 = PrimitiveAccess<P2>::from(context, info[2]);
             Variant* ptr = memnew(Variant(TSelf(p0, p1, p2)));
             Environment* runtime = Environment::wrap(isolate);
-            runtime->bind_object(class_id, ptr, self, false);
+            runtime->bind_object(class_id, ptr, self);
         }
 
         template<typename P0, typename P1, typename P2, typename P3>
@@ -617,7 +619,7 @@ namespace jsb
             P3 p3 = PrimitiveAccess<P3>::from(context, info[3]);
             Variant* ptr = memnew(Variant(TSelf(p0, p1, p2, p3)));
             Environment* runtime = Environment::wrap(isolate);
-            runtime->bind_object(class_id, ptr, self, false);
+            runtime->bind_object(class_id, ptr, self);
         }
 
         static void finalizer(Environment* runtime, void* pointer, bool p_persistent)
@@ -625,7 +627,6 @@ namespace jsb
             Variant* self = (Variant*) pointer;
             if (!p_persistent)
             {
-                JSB_LOG(Verbose, "deleting object %s", uitos((uintptr_t) self));
                 memdelete(self);
             }
         }
@@ -651,6 +652,12 @@ namespace jsb
             jsb_check(jclass_info.type == NativeClassInfo::GodotObject);
 
             v8::Local<v8::Function> constructor = jclass_info.template_.Get(isolate)->GetFunction(context).ToLocalChecked();
+
+            JSB_LOG(Verbose, "constructor === info.NewTarget() %d", constructor->StrictEquals(info.NewTarget()) ? 1 : 0);
+            JSB_LOG(Verbose, "info.This() === info.NewTarget() %d", info.This()->StrictEquals(info.NewTarget()) ? 1 : 0);
+            JSB_LOG(Verbose, "info.NewTarget()->IsFunction() %d", info.NewTarget()->IsFunction() ? 1 : 0);
+            JSB_LOG(Verbose, "constructor->GetIdentityHash() %d", constructor->GetIdentityHash());
+            JSB_LOG(Verbose, "info.NewTarget().As<v8::Object>()->GetIdentityHash() %d", info.NewTarget().As<v8::Object>()->GetIdentityHash());
             if (constructor == info.NewTarget())
             {
                 const HashMap<StringName, ClassDB::ClassInfo>::Iterator it = ClassDB::classes.find(jclass_info.name);
@@ -660,11 +667,11 @@ namespace jsb
                 Object* gd_object = gd_class_info.creation_func();
                 //NOTE IS IT A TRUTH that ref_count==1 after creation_func??
                 jsb_check(!gd_object->is_ref_counted() || !((RefCounted*) gd_object)->is_referenced());
-                environment->bind_object(class_id, gd_object, self, false);
+                environment->bind_godot_object(class_id, gd_object, self);
             }
             else
             {
-                JSB_LOG(Warning, "[experimental] constructing from subclass");
+                JSB_LOG(Verbose, "[experimental] constructing %s from subclass", jclass_info.name);
             }
         }
 
