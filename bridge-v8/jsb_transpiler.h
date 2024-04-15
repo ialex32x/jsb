@@ -2,8 +2,8 @@
 #define JAVASCRIPT_TEMPLATE_H
 
 #include "jsb_pch.h"
-#include "jsb_runtime.h"
-#include "jsb_context.h"
+#include "jsb_environment.h"
+#include "jsb_realm.h"
 #include "jsb_object_handle.h"
 
 #if DEV_ENABLED
@@ -45,7 +45,7 @@
     v8::HandleScope handle_scope(isolate);\
     v8::Isolate::Scope isolate_scope(isolate);\
     v8::Local<v8::Context> context = isolate->GetCurrentContext();\
-    Functor& func = *(Functor*) JavaScriptContext::get_function_pointer(context, info.Data()->Uint32Value(context).ToChecked());\
+    Functor& func = *(Functor*) Realm::get_function_pointer(context, info.Data()->Uint32Value(context).ToChecked());\
     (void) 0
 
 namespace jsb
@@ -125,17 +125,18 @@ namespace jsb
         //TODO test
         static bool return_(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::FunctionCallbackInfo<v8::Value>& info, const T& val)
         {
-            JavaScriptRuntime* cruntime =JavaScriptRuntime::wrap(isolate);
-            const internal::Index32 class_id = cruntime->get_native_class_id(VariantCaster<T>::Type);
-            const NativeClassInfo& class_info = cruntime->get_native_class(class_id);
+            Environment* environment = Environment::wrap(isolate);
+            Realm* realm = Realm::wrap(context);
+            NativeClassID class_id;
+            const NativeClassInfo* class_info = realm->_expose_godot_primitive_class(VariantCaster<T>::Type, &class_id);
 
-            v8::Local<v8::FunctionTemplate> jtemplate = class_info.template_.Get(isolate);
+            v8::Local<v8::FunctionTemplate> jtemplate = class_info->template_.Get(isolate);
             v8::Local<v8::Object> r_jval = jtemplate->InstanceTemplate()->NewInstance(context).ToLocalChecked();
             jsb_check(r_jval.As<v8::Object>()->InternalFieldCount() == kObjectFieldCount);
 
             Variant* p_cvar = memnew(Variant(val));
             // the lifecycle will be managed by javascript runtime, DO NOT DELETE it externally
-            cruntime->bind_object(class_id, p_cvar, r_jval.As<v8::Object>(), false);
+            environment->bind_object(class_id, p_cvar, r_jval.As<v8::Object>(), false);
             info.GetReturnValue().Set(r_jval);
             return true;
         }
@@ -477,7 +478,7 @@ namespace jsb
             internal::Index32 class_id(v8::Local<v8::Uint32>::Cast(info.Data())->Value());
 
             TSelf* ptr = memnew(TSelf);
-            JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
+            Environment* runtime = Environment::wrap(isolate);
             runtime->bind_object(class_id, ptr, self, false);
         }
 
@@ -499,11 +500,11 @@ namespace jsb
             P1 p1 = PrimitiveAccess<P1>::from(context, info[1]);
             P2 p2 = PrimitiveAccess<P2>::from(context, info[2]);
             TSelf* ptr = memnew(TSelf(p0, p1, p2));
-            JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
+            Environment* runtime = Environment::wrap(isolate);
             runtime->bind_object(class_id, ptr, self, false);
         }
 
-        static void finalizer(JavaScriptRuntime* runtime, void* pointer, bool p_persistent)
+        static void finalizer(Environment* runtime, void* pointer, bool p_persistent)
         {
             TSelf* self = (TSelf*) pointer;
             if (!p_persistent)
@@ -529,7 +530,7 @@ namespace jsb
             internal::Index32 class_id(v8::Local<v8::Uint32>::Cast(info.Data())->Value());
 
             Variant* ptr = memnew(Variant);
-            JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
+            Environment* runtime = Environment::wrap(isolate);
             runtime->bind_object(class_id, ptr, self, false);
         }
 
@@ -549,7 +550,7 @@ namespace jsb
             }
             P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
             Variant* ptr = memnew(Variant(TSelf(p0)));
-            JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
+            Environment* runtime = Environment::wrap(isolate);
             runtime->bind_object(class_id, ptr, self, false);
         }
 
@@ -570,7 +571,7 @@ namespace jsb
             P0 p0 = PrimitiveAccess<P0>::from(context, info[0]);
             P1 p1 = PrimitiveAccess<P1>::from(context, info[1]);
             Variant* ptr = memnew(Variant(TSelf(p0, p1)));
-            JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
+            Environment* runtime = Environment::wrap(isolate);
             runtime->bind_object(class_id, ptr, self, false);
         }
 
@@ -592,7 +593,7 @@ namespace jsb
             P1 p1 = PrimitiveAccess<P1>::from(context, info[1]);
             P2 p2 = PrimitiveAccess<P2>::from(context, info[2]);
             Variant* ptr = memnew(Variant(TSelf(p0, p1, p2)));
-            JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
+            Environment* runtime = Environment::wrap(isolate);
             runtime->bind_object(class_id, ptr, self, false);
         }
 
@@ -615,11 +616,11 @@ namespace jsb
             P2 p2 = PrimitiveAccess<P2>::from(context, info[2]);
             P3 p3 = PrimitiveAccess<P3>::from(context, info[3]);
             Variant* ptr = memnew(Variant(TSelf(p0, p1, p2, p3)));
-            JavaScriptRuntime* runtime = JavaScriptRuntime::wrap(isolate);
+            Environment* runtime = Environment::wrap(isolate);
             runtime->bind_object(class_id, ptr, self, false);
         }
 
-        static void finalizer(JavaScriptRuntime* runtime, void* pointer, bool p_persistent)
+        static void finalizer(Environment* runtime, void* pointer, bool p_persistent)
         {
             Variant* self = (Variant*) pointer;
             if (!p_persistent)
@@ -645,8 +646,8 @@ namespace jsb
             const internal::Index32 class_id(v8::Local<v8::Uint32>::Cast(info.Data())->Value());
 
             jsb_checkf(info.IsConstructCall(), "call constructor as a regular function is not allowed");
-            JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
-            const NativeClassInfo& jclass_info = cruntime->get_native_class(class_id);
+            Environment* environment = Environment::wrap(isolate);
+            const NativeClassInfo& jclass_info = environment->get_native_class(class_id);
             jsb_check(jclass_info.type == NativeClassInfo::GodotObject);
 
             v8::Local<v8::Function> constructor = jclass_info.template_.Get(isolate)->GetFunction(context).ToLocalChecked();
@@ -659,7 +660,7 @@ namespace jsb
                 Object* gd_object = gd_class_info.creation_func();
                 //NOTE IS IT A TRUTH that ref_count==1 after creation_func??
                 jsb_check(!gd_object->is_ref_counted() || !((RefCounted*) gd_object)->is_referenced());
-                cruntime->bind_object(class_id, gd_object, self, false);
+                environment->bind_object(class_id, gd_object, self, false);
             }
             else
             {
@@ -667,7 +668,7 @@ namespace jsb
             }
         }
 
-        static void finalizer(JavaScriptRuntime* runtime, void* pointer, bool p_persistent)
+        static void finalizer(Environment* runtime, void* pointer, bool p_persistent)
         {
             Object* self = (Object*) pointer;
             if (self->is_ref_counted())

@@ -1,4 +1,4 @@
-#include "jsb_context.h"
+#include "jsb_realm.h"
 
 #include "jsb_editor_utility.h"
 #include "jsb_exception_info.h"
@@ -43,17 +43,17 @@ namespace jsb
         }
     }
 
-    internal::SArray<JavaScriptContext*, ContextID> JavaScriptContext::contexts_;
+    internal::SArray<Realm*, RealmID> Realm::realms_;
 
     // construct a callable object
     // [js] function callable(fn: Function): godot.Callable;
     // [js] function callable(thiz: godot.Object, fn: Function): godot.Callable;
-    void JavaScriptContext::_new_callable(const v8::FunctionCallbackInfo<v8::Value>& info)
+    void Realm::_new_callable(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
         v8::Isolate* isolate = info.GetIsolate();
         v8::HandleScope handle_scope(isolate);
         v8::Local<v8::Context> context = isolate->GetCurrentContext();
-        JavaScriptContext* ccontext = JavaScriptContext::wrap(context);
+        Realm* realm = Realm::wrap(context);
 
         const int argc = info.Length();
         int func_arg_index;
@@ -86,10 +86,10 @@ namespace jsb
             isolate->ThrowError("bad function");
             return;
         }
-        ContextID context_id = ccontext->id();
+        RealmID realm_id = realm->id();
         v8::Local<v8::Function> js_func = info[func_arg_index].As<v8::Function>();
-        const internal::Index32 callback_id = ccontext->get_cached_function(js_func);
-        Variant callable = Callable(memnew(GodotJSCallableCustom(caller_id, context_id, callback_id)));
+        const internal::Index32 callback_id = realm->get_cached_function(js_func);
+        Variant callable = Callable(memnew(GodotJSCallableCustom(caller_id, realm_id, callback_id)));
         v8::Local<v8::Value> rval;
         if (!gd_var_to_js(isolate, context, callable, rval))
         {
@@ -99,7 +99,7 @@ namespace jsb
         info.GetReturnValue().Set(rval);
     }
 
-    ObjectCacheID JavaScriptContext::get_cached_function(const v8::Local<v8::Function>& p_func)
+    ObjectCacheID Realm::get_cached_function(const v8::Local<v8::Function>& p_func)
     {
         v8::Isolate* isolate = get_isolate();
         const auto& it = function_refs_.find(TWeakRef(isolate, p_func));
@@ -115,7 +115,7 @@ namespace jsb
         return new_id;
     }
 
-    void JavaScriptContext::_print(const v8::FunctionCallbackInfo<v8::Value>& info)
+    void Realm::_print(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
         v8::Isolate* isolate = info.GetIsolate();
         v8::HandleScope handle_scope(isolate);
@@ -179,12 +179,12 @@ namespace jsb
         return StringName();
     }
 
-    void JavaScriptContext::_define(const v8::FunctionCallbackInfo<v8::Value>& info)
+    void Realm::_define(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
         v8::Isolate* isolate = info.GetIsolate();
         v8::HandleScope handle_scope(isolate);
         v8::Local<v8::Context> context = isolate->GetCurrentContext();
-        JavaScriptContext* ccontext = wrap(context);
+        Realm* realm = wrap(context);
 
         if (info.Length() != 3 || !info[0]->IsString() || !info[1]->IsArray() || !info[2]->IsFunction())
         {
@@ -197,7 +197,7 @@ namespace jsb
             isolate->ThrowError("bad module_id");
             return;
         }
-        if (ccontext->module_cache_.find(module_id_str))
+        if (realm->module_cache_.find(module_id_str))
         {
             isolate->ThrowError("conflicted module_id");
             return;
@@ -221,11 +221,11 @@ namespace jsb
             deps.push_back(item_str);
         }
         JSB_LOG(Verbose, "new AMD module loader %s deps: %s", module_id_str, String(", ").join(deps));
-        ccontext->runtime_->add_module_loader<AMDModuleLoader>(module_id_str,
+        realm->environment_->add_module_loader<AMDModuleLoader>(module_id_str,
             deps, v8::Global<v8::Function>(isolate, info[2].As<v8::Function>()));
     }
 
-    void JavaScriptContext::_require(const v8::FunctionCallbackInfo<v8::Value>& info)
+    void Realm::_require(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
         v8::Isolate* isolate = info.GetIsolate();
         v8::HandleScope handle_scope(isolate);
@@ -247,14 +247,14 @@ namespace jsb
         // read parent module id from magic data
         const String parent_id = to_string(isolate, info.Data());
         const String module_id = to_string(isolate, arg0);
-        JavaScriptContext* ccontext = JavaScriptContext::wrap(context);
-        if (JavaScriptModule* module = ccontext->_load_module(parent_id, module_id))
+        Realm* realm = Realm::wrap(context);
+        if (JavaScriptModule* module = realm->_load_module(parent_id, module_id))
         {
             info.GetReturnValue().Set(module->exports);
         }
     }
 
-    void JavaScriptContext::_reload_module(const String& p_module_id)
+    void Realm::_reload_module(const String& p_module_id)
     {
         if (JavaScriptModule* existed_module = module_cache_.find(p_module_id))
         {
@@ -267,7 +267,7 @@ namespace jsb
         }
     }
 
-    JavaScriptModule* JavaScriptContext::_load_module(const String& p_parent_id, const String& p_module_id)
+    JavaScriptModule* Realm::_load_module(const String& p_parent_id, const String& p_module_id)
     {
         JavaScriptModule* existed_module = module_cache_.find(p_module_id);
         if (existed_module && !existed_module->reload_requested)
@@ -275,12 +275,12 @@ namespace jsb
             return existed_module;
         }
 
-        v8::Isolate* isolate = runtime_->isolate_;
+        v8::Isolate* isolate = environment_->isolate_;
         v8::Local<v8::Context> context = isolate->GetCurrentContext();
 
         jsb_check(context == context_.Get(isolate));
         // find loader with the module id
-        if (IModuleLoader* loader = runtime_->find_module_loader(p_module_id))
+        if (IModuleLoader* loader = environment_->find_module_loader(p_module_id))
         {
             jsb_checkf(!existed_module, "module loader does not support reloading");
             JavaScriptModule& module = module_cache_.insert(p_module_id, false);
@@ -326,7 +326,7 @@ namespace jsb
 
         // init source module
         String asset_path;
-        if (IModuleResolver* resolver = runtime_->find_module_resolver(normalized_id, asset_path))
+        if (IModuleResolver* resolver = environment_->find_module_resolver(normalized_id, asset_path))
         {
             const String& module_id = asset_path;
 
@@ -417,7 +417,7 @@ namespace jsb
         return nullptr;
     }
 
-    void JavaScriptContext::_parse_script_class(v8::Isolate* p_isolate, const v8::Local<v8::Context>& p_context, JavaScriptModule& p_module)
+    void Realm::_parse_script_class(v8::Isolate* p_isolate, const v8::Local<v8::Context>& p_context, JavaScriptModule& p_module)
     {
         // only classes in files of godot package system could be used as godot js script
         if (!p_module.path.begins_with("res://") || p_module.exports.IsEmpty())
@@ -442,7 +442,7 @@ namespace jsb
         v8::Local<v8::String> name_str = default_obj->Get(p_context, v8::String::NewFromUtf8Literal(p_isolate, "name")).ToLocalChecked().As<v8::String>();
         v8::String::Utf8Value name(p_isolate, name_str);
         v8::Local<v8::Value> class_id_val;
-        if (!default_obj->Get(p_context, runtime_->get_symbol(Symbols::ClassId)).ToLocal(&class_id_val) || !class_id_val->IsUint32())
+        if (!default_obj->Get(p_context, environment_->get_symbol(Symbols::ClassId)).ToLocal(&class_id_val) || !class_id_val->IsUint32())
         {
             // ignore a javascript which does not inherit from a native class (directly and indirectly both)
             return;
@@ -450,8 +450,8 @@ namespace jsb
 
         // unsafe
         const NativeClassID native_class_id = (NativeClassID) class_id_val->Uint32Value(p_context).ToChecked();
-        const NativeClassInfo& native_class_info = runtime_->get_native_class(native_class_id);
-        GodotJSClassInfo* existed_class_info = runtime_->find_gdjs_class(p_module.default_class_id);
+        const NativeClassInfo& native_class_info = environment_->get_native_class(native_class_id);
+        GodotJSClassInfo* existed_class_info = environment_->find_gdjs_class(p_module.default_class_id);
         if (existed_class_info)
         {
             existed_class_info->methods.clear();
@@ -461,7 +461,7 @@ namespace jsb
         else
         {
             GodotJSClassID gdjs_class_id;
-            existed_class_info = &runtime_->add_gdjs_class(gdjs_class_id);
+            existed_class_info = &environment_->add_gdjs_class(gdjs_class_id);
             p_module.default_class_id = gdjs_class_id;
             existed_class_info->module_id = p_module.id;
         }
@@ -474,7 +474,7 @@ namespace jsb
         _parse_script_class_iterate(p_isolate, p_context, *existed_class_info);
     }
 
-    void JavaScriptContext::_parse_script_class_iterate(v8::Isolate* p_isolate, const v8::Local<v8::Context>& p_context, GodotJSClassInfo& p_class_info)
+    void Realm::_parse_script_class_iterate(v8::Isolate* p_isolate, const v8::Local<v8::Context>& p_context, GodotJSClassInfo& p_class_info)
     {
         //TODO collect methods/signals/properties
         v8::Local<v8::Object> default_obj = p_class_info.js_class.Get(p_isolate);
@@ -520,23 +520,23 @@ namespace jsb
         //TODO iterator payload.properties to determine the type (func/prop/signal)
     }
 
-    NativeObjectID JavaScriptContext::crossbind(Object* p_this, GodotJSClassID p_class_id)
+    NativeObjectID Realm::crossbind(Object* p_this, GodotJSClassID p_class_id)
     {
         v8::Isolate* isolate = get_isolate();
         v8::HandleScope handle_scope(isolate);
         v8::Local<v8::Context> context = context_.Get(isolate);
 
-        GodotJSClassInfo& class_info = runtime_->get_gdjs_class(p_class_id);
+        GodotJSClassInfo& class_info = environment_->get_gdjs_class(p_class_id);
         v8::Local<v8::Object> constructor = class_info.js_class.Get(isolate);
         v8::Local<v8::Object> instance = constructor->CallAsConstructor(context, 0, nullptr).ToLocalChecked().As<v8::Object>();
-        const NativeObjectID object_id = runtime_->bind_godot_object(class_info.native_class_id, p_this, instance, false);
+        const NativeObjectID object_id = environment_->bind_godot_object(class_info.native_class_id, p_this, instance, false);
         JSB_LOG(Warning, "[experimental] crossbinding %s", uitos((uintptr_t) p_this));
         return object_id;
     }
 
-    void JavaScriptContext::_register_builtins(const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& self)
+    void Realm::_register_builtins(const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& self)
     {
-        v8::Isolate* isolate = runtime_->isolate_;
+        v8::Isolate* isolate = environment_->isolate_;
 
         // internal 'jsb'
         {
@@ -610,7 +610,7 @@ namespace jsb
         }
     }
 
-    void JavaScriptContext::_set_timer(const v8::FunctionCallbackInfo<v8::Value>& info)
+    void Realm::_set_timer(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
         v8::Isolate* isolate = info.GetIsolate();
         const int argc = info.Length();
@@ -646,7 +646,7 @@ namespace jsb
         default: break;
         }
 
-        JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
+        Environment* environment = Environment::wrap(isolate);
         v8::Local<v8::Function> func = info[0].As<v8::Function>();
         internal::TimerHandle handle;
 
@@ -657,17 +657,17 @@ namespace jsb
             {
                 action.store(index - extra_arg_index, v8::Global<v8::Value>(isolate, info[index]));
             }
-            cruntime->timer_manager_.set_timer(handle, std::move(action), rate, loop);
+            environment->timer_manager_.set_timer(handle, std::move(action), rate, loop);
             info.GetReturnValue().Set((uint32_t) handle);
         }
         else
         {
-            cruntime->timer_manager_.set_timer(handle, JavaScriptTimerAction(v8::Global<v8::Function>(isolate, func), 0), rate, loop);
+            environment->timer_manager_.set_timer(handle, JavaScriptTimerAction(v8::Global<v8::Function>(isolate, func), 0), rate, loop);
             info.GetReturnValue().Set((uint32_t) handle);
         }
     }
 
-    void JavaScriptContext::_clear_timer(const v8::FunctionCallbackInfo<v8::Value>& info)
+    void Realm::_clear_timer(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
         v8::Isolate* isolate = info.GetIsolate();
         if (info.Length() < 1 || !info[0]->IsUint32())
@@ -683,12 +683,12 @@ namespace jsb
             isolate->ThrowError("bad timer");
             return;
         }
-        JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
-        cruntime->timer_manager_.clear_timer((internal::TimerHandle) (internal::Index32) handle);
+        Environment* environment = Environment::wrap(isolate);
+        environment->timer_manager_.clear_timer((internal::TimerHandle) (internal::Index32) handle);
     }
 
-    JavaScriptContext::JavaScriptContext(const std::shared_ptr<JavaScriptRuntime>& runtime)
-        : runtime_(runtime)
+    Realm::Realm(const std::shared_ptr<Environment>& runtime)
+        : environment_(runtime)
     {
         v8::Isolate* isolate = runtime->isolate_;
         v8::Isolate::Scope isolate_scope(isolate);
@@ -704,15 +704,15 @@ namespace jsb
             _register_builtins(context, global);
             register_primitive_bindings(this);
         }
-        runtime_->on_context_created(context);
-        id_ = contexts_.add(this);
+        environment_->on_context_created(context);
+        id_ = realms_.add(this);
     }
 
-    JavaScriptContext::~JavaScriptContext()
+    Realm::~Realm()
     {
-        contexts_.remove_at(id_);
+        realms_.remove_at(id_);
         id_ = {};
-        v8::Isolate* isolate = runtime_->isolate_;
+        v8::Isolate* isolate = environment_->isolate_;
         v8::Isolate::Scope isolate_scope(isolate);
         v8::HandleScope handle_scope(isolate);
         v8::Local<v8::Context> context = context_.Get(get_isolate());
@@ -720,14 +720,14 @@ namespace jsb
         function_bank_.clear();
         function_refs_.clear();
 
-        runtime_->on_context_destroyed(context);
+        environment_->on_context_destroyed(context);
         context->SetAlignedPointerInEmbedderData(kContextEmbedderData, nullptr);
 
         jmodule_cache_.Reset();
         context_.Reset();
     }
 
-    Error JavaScriptContext::load(const String& p_name)
+    Error Realm::load(const String& p_name)
     {
         v8::Isolate* isolate = get_isolate();
         v8::Isolate::Scope isolate_scope(isolate);
@@ -750,12 +750,31 @@ namespace jsb
         ERR_FAIL_V_MSG(ERR_COMPILATION_FAILED, "something wrong");
     }
 
-    void JavaScriptContext::register_primitive_binding(const StringName& p_name, PrimitiveTypeRegisterFunc p_func)
+    void Realm::register_primitive_binding(const StringName& p_name, Variant::Type p_type, PrimitiveTypeRegisterFunc p_func)
     {
-        primitive_regs_.insert(p_name, p_func);
+        godot_primitive_map_.insert(p_name, p_type);
+        godot_primitive_index_[p_type] = { {}, p_func };
     }
 
-    NativeClassInfo* JavaScriptContext::_expose_godot_class(const ClassDB::ClassInfo* p_class_info, NativeClassID* r_class_id)
+    NativeClassInfo* Realm::_expose_godot_primitive_class(Variant::Type p_type, NativeClassID* r_class_id)
+    {
+        GodotPrimitiveImport& importer = godot_primitive_index_[p_type];
+        if (!importer.id.is_valid())
+        {
+            importer.id = importer.register_func(FBindingEnv {
+                environment_.get(),
+                this,
+                environment_->isolate_,
+                this->context_.Get(environment_->isolate_),
+                this->function_pointers_
+            });
+            jsb_check(importer.id.is_valid());
+        }
+        if (r_class_id) *r_class_id = importer.id;
+        return &environment_->get_native_class(importer.id);
+    }
+
+    NativeClassInfo* Realm::_expose_godot_class(const ClassDB::ClassInfo* p_class_info, NativeClassID* r_class_id)
     {
         if (!p_class_info)
         {
@@ -766,18 +785,18 @@ namespace jsb
             return nullptr;
         }
 
-        const HashMap<StringName, NativeClassID>::Iterator found = runtime_->godot_classes_index_.find(p_class_info->name);
-        if (found != runtime_->godot_classes_index_.end())
+        const HashMap<StringName, NativeClassID>::Iterator found = environment_->godot_classes_index_.find(p_class_info->name);
+        if (found != environment_->godot_classes_index_.end())
         {
             if (r_class_id)
             {
                 *r_class_id = found->value;
             }
-            return &runtime_->get_native_class(found->value);
+            return &environment_->get_native_class(found->value);
         }
 
         NativeClassID class_id;
-        NativeClassInfo& jclass_info = runtime_->add_class(NativeClassInfo::GodotObject, p_class_info->name, &class_id);
+        NativeClassInfo& jclass_info = environment_->add_class(NativeClassInfo::GodotObject, p_class_info->name, &class_id);
         JSB_LOG(Verbose, "expose godot type %s (%d)", p_class_info->name, (uint32_t) class_id);
 
         // construct type template
@@ -815,7 +834,7 @@ namespace jsb
                 // const MethodInfo& method_info = pair.value;
                 const CharString name = ((String) name_str).utf8();
                 v8::Local<v8::String> propkey_name = v8::String::NewFromUtf8(isolate, name.ptr(), v8::NewStringType::kNormal, name.length()).ToLocalChecked();
-                v8::Local<v8::FunctionTemplate> propval_func = v8::FunctionTemplate::New(isolate, _godot_signal, v8::Uint32::NewFromUnsigned(isolate, (uint32_t) runtime_->add_string_name(pair.key)));
+                v8::Local<v8::FunctionTemplate> propval_func = v8::FunctionTemplate::New(isolate, _godot_signal, v8::Uint32::NewFromUnsigned(isolate, (uint32_t) environment_->add_string_name(pair.key)));
                 // object_template->Set(propkey_name, propval_func);
                 object_template->SetAccessorProperty(propkey_name, propval_func);
             }
@@ -862,7 +881,7 @@ namespace jsb
 
             // set `class_id` on the exposed godot class for the convenience when finding it from any subclasses in javascript.
             // currently used in `dump(in module_id, out class_info)`
-            const v8::Local<v8::Symbol> class_id_symbol = runtime_->get_symbol(Symbols::ClassId);
+            const v8::Local<v8::Symbol> class_id_symbol = environment_->get_symbol(Symbols::ClassId);
             function_template->Set(class_id_symbol, v8::Uint32::NewFromUnsigned(isolate, class_id));
 
             // setup the prototype chain (inherit)
@@ -884,7 +903,7 @@ namespace jsb
     }
 
     // translate js val into gd variant without any type hint
-    bool JavaScriptContext::js_to_gd_var(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_jval, Variant& r_cvar)
+    bool Realm::js_to_gd_var(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_jval, Variant& r_cvar)
     {
         //TODO not implemented
         if (p_jval.IsEmpty() || p_jval->IsNullOrUndefined())
@@ -905,7 +924,7 @@ namespace jsb
     }
 
     // translate js val into gd variant with an expected type
-    bool JavaScriptContext::js_to_gd_var(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_jval, Variant::Type p_type, Variant& r_cvar)
+    bool Realm::js_to_gd_var(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Value>& p_jval, Variant::Type p_type, Variant& r_cvar)
     {
         switch (p_type)
         {
@@ -945,7 +964,7 @@ namespace jsb
                 }
 
                 void* pointer = self->GetAlignedPointerFromInternalField(kObjectFieldPointer);
-                jsb_check(JavaScriptRuntime::wrap(isolate)->check_object(pointer));
+                jsb_check(Environment::wrap(isolate)->check_object(pointer));
                 r_cvar = (Object*) pointer;
                 return true;
             }
@@ -1001,7 +1020,7 @@ namespace jsb
                 //TODO check the class to make it safe to cast (space cheaper?)
                 //TODO or, add one more InternalField to ensure it (time cheaper?)
                 void* pointer = self->GetAlignedPointerFromInternalField(isolate, kObjectFieldPointer);
-                const NativeClassInfo* class_info = JavaScriptRuntime::wrap(isolate)->get_object_class(pointer);
+                const NativeClassInfo* class_info = Environment::wrap(isolate)->get_object_class(pointer);
                 if (!class_info)
                 {
                     return false;
@@ -1024,17 +1043,17 @@ namespace jsb
             r_jval = v8::Null(isolate);
             return true;
         }
-        JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
-        if (cruntime->check_object(p_godot_obj, r_jval))
+        Environment* environment = Environment::wrap(isolate);
+        if (environment->check_object(p_godot_obj, r_jval))
         {
             return true;
         }
 
         // freshly bind existing gd object (not constructed in javascript)
         const StringName& class_name = p_godot_obj->get_class_name();
-        JavaScriptContext* ccontext = JavaScriptContext::wrap(context);
+        Realm* realm = Realm::wrap(context);
         NativeClassID jclass_id;
-        if (const NativeClassInfo* jclass = ccontext->_expose_godot_class(class_name, &jclass_id))
+        if (const NativeClassInfo* jclass = realm->_expose_godot_class(class_name, &jclass_id))
         {
             v8::Local<v8::FunctionTemplate> jtemplate = jclass->template_.Get(isolate);
             r_jval = jtemplate->InstanceTemplate()->NewInstance(context).ToLocalChecked();
@@ -1052,14 +1071,14 @@ namespace jsb
             }
 
             // the lifecycle will be managed by javascript runtime, DO NOT DELETE it externally
-            cruntime->bind_godot_object(jclass_id, p_godot_obj, r_jval.As<v8::Object>(), is_persistent);
+            environment->bind_godot_object(jclass_id, p_godot_obj, r_jval.As<v8::Object>(), is_persistent);
             return true;
         }
         JSB_LOG(Error, "failed to expose godot class '%s'", class_name);
         return false;
     }
 
-    bool JavaScriptContext::gd_var_to_js(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const Variant& p_cvar, v8::Local<v8::Value>& r_jval)
+    bool Realm::gd_var_to_js(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const Variant& p_cvar, v8::Local<v8::Value>& r_jval)
     {
         switch (const Variant::Type var_type = p_cvar.get_type())
         {
@@ -1134,18 +1153,18 @@ namespace jsb
         case Variant::PACKED_COLOR_ARRAY:
             {
                 //TODO TEMP SOLUTION
-                JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
-                if (const NativeClassID class_id = cruntime->get_native_class_id(var_type))
+                Realm* realm = Realm::wrap(context);
+                NativeClassID class_id;
+                if (NativeClassInfo* class_info = realm->_expose_godot_primitive_class(var_type, &class_id))
                 {
-                    const NativeClassInfo& class_info = cruntime->get_native_class(class_id);
-                    v8::Local<v8::FunctionTemplate> jtemplate = class_info.template_.Get(isolate);
+                    v8::Local<v8::FunctionTemplate> jtemplate = class_info->template_.Get(isolate);
                     r_jval = jtemplate->InstanceTemplate()->NewInstance(context).ToLocalChecked();
                     jsb_check(r_jval.As<v8::Object>()->InternalFieldCount() == kObjectFieldCount);
                     // void* pointer = r_jval.As<v8::Object>()->GetAlignedPointerFromInternalField(kObjectFieldPointer);
                     // *(Variant*)pointer = p_cvar;
 
                     // the lifecycle will be managed by javascript runtime, DO NOT DELETE it externally
-                    cruntime->bind_object(class_id, (void*) memnew(Variant(p_cvar)), r_jval.As<v8::Object>(), false);
+                    realm->environment_->bind_object(class_id, (void*) memnew(Variant(p_cvar)), r_jval.As<v8::Object>(), false);
                     return true;
                 }
                 return false;
@@ -1155,7 +1174,7 @@ namespace jsb
         }
     }
 
-    void JavaScriptContext::_godot_signal(const v8::FunctionCallbackInfo<v8::Value>& info)
+    void Realm::_godot_signal(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
         v8::Isolate* isolate = info.GetIsolate();
         v8::Isolate::Scope isolate_scope(isolate);
@@ -1163,12 +1182,12 @@ namespace jsb
         v8::Local<v8::Context> context = isolate->GetCurrentContext();
         v8::Context::Scope context_scope(context);
 
-        JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(isolate);
-        const StringName name = cruntime->get_string_name((const StringNameID) info.Data().As<v8::Uint32>()->Value());
+        Environment* environment = Environment::wrap(isolate);
+        const StringName name = environment->get_string_name((const StringNameID) info.Data().As<v8::Uint32>()->Value());
 
         v8::Local<v8::Object> self = info.This();
         void* pointer = self->GetAlignedPointerFromInternalField(kObjectFieldPointer);
-        jsb_check(cruntime->check_object(pointer));
+        jsb_check(environment->check_object(pointer));
 
         // signal must be instance-owned
         Object* gd_object = (Object*) pointer;
@@ -1182,7 +1201,7 @@ namespace jsb
         info.GetReturnValue().Set(rval);
     }
 
-    void JavaScriptContext::_godot_object_method(const v8::FunctionCallbackInfo<v8::Value>& info)
+    void Realm::_godot_object_method(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
         v8::Isolate* isolate = info.GetIsolate();
         if (!info.Data()->IsExternal())
@@ -1213,7 +1232,7 @@ namespace jsb
 
             // `this` must be a gd object which already bound to javascript
             void* pointer = self->GetAlignedPointerFromInternalField(kObjectFieldPointer);
-            jsb_check(JavaScriptRuntime::wrap(isolate)->check_object(pointer));
+            jsb_check(Environment::wrap(isolate)->check_object(pointer));
             gd_object = (Object*) pointer;
         }
 
@@ -1260,7 +1279,7 @@ namespace jsb
     }
 
     // [JS] function load_type(type_name: string): Class;
-    void JavaScriptContext::_load_godot_mod(const v8::FunctionCallbackInfo<v8::Value>& info)
+    void Realm::_load_godot_mod(const v8::FunctionCallbackInfo<v8::Value>& info)
     {
         v8::Isolate* isolate = info.GetIsolate();
         v8::Local<v8::Value> arg0 = info[0];
@@ -1273,19 +1292,15 @@ namespace jsb
         // v8::String::Utf8Value str_utf8(isolate, arg0);
         StringName type_name(V8Helper::to_string(v8::String::Value(isolate, arg0)));
         v8::Local<v8::Context> context = isolate->GetCurrentContext();
-        JavaScriptContext* ccontext = JavaScriptContext::wrap(context);
+        Realm* realm = Realm::wrap(context);
 
-        if (const auto it = ccontext->primitive_regs_.find(type_name); it != ccontext->primitive_regs_.end())
+        if (const auto it = realm->godot_primitive_map_.find(type_name); it != realm->godot_primitive_map_.end())
         {
-            v8::Local<v8::Value> rval = it->value(FBindingEnv {
-                ccontext->runtime_.get(),
-                ccontext,
-                isolate,
-                context,
-                ccontext->function_pointers_
-            });
-            jsb_check(!rval.IsEmpty());
-            info.GetReturnValue().Set(rval);
+            JSB_LOG(Verbose, "import primitive type %s", (String) type_name);
+            const NativeClassInfo* class_info = realm->_expose_godot_primitive_class(it->value);
+            jsb_check(class_info);
+            jsb_check(!class_info->template_.IsEmpty());
+            info.GetReturnValue().Set(class_info->template_.Get(isolate)->GetFunction(context).ToLocalChecked());
             return;
         }
 
@@ -1334,7 +1349,7 @@ namespace jsb
         HashMap<StringName, ClassDB::ClassInfo>::Iterator it = ClassDB::classes.find(type_name);
         if (it != ClassDB::classes.end())
         {
-            if (NativeClassInfo* godot_class = ccontext->_expose_godot_class(&it->value))
+            if (NativeClassInfo* godot_class = realm->_expose_godot_class(&it->value))
             {
                 info.GetReturnValue().Set(godot_class->template_.Get(isolate)->GetFunction(context).ToLocalChecked());
                 return;
@@ -1345,7 +1360,7 @@ namespace jsb
         isolate->ThrowError(v8::String::NewFromUtf8(isolate, message.ptr(), v8::NewStringType::kNormal, message.length()).ToLocalChecked());
     }
 
-    Error JavaScriptContext::eval_source(const CharString& p_source, const String& p_filename)
+    Error Realm::eval_source(const CharString& p_source, const String& p_filename)
     {
         v8::Isolate* isolate = get_isolate();
         v8::Isolate::Scope isolate_scope(isolate);
@@ -1375,7 +1390,7 @@ namespace jsb
         return OK;
     }
 
-    bool JavaScriptContext::_get_main_module(v8::Local<v8::Object>* r_main_module) const
+    bool Realm::_get_main_module(v8::Local<v8::Object>* r_main_module) const
     {
         if (const JavaScriptModule* cmain_module = module_cache_.get_main())
         {
@@ -1388,13 +1403,13 @@ namespace jsb
         return false;
     }
 
-    bool JavaScriptContext::validate_script(const String &p_path, JavaScriptExceptionInfo *r_err)
+    bool Realm::validate_script(const String &p_path, JavaScriptExceptionInfo *r_err)
     {
         //TODO try to compile?
         return true;
     }
 
-    v8::MaybeLocal<v8::Value> JavaScriptContext::_compile_run(const char* p_source, int p_source_len, const String& p_filename)
+    v8::MaybeLocal<v8::Value> Realm::_compile_run(const char* p_source, int p_source_len, const String& p_filename)
     {
         v8::Isolate* isolate = get_isolate();
         v8::Local<v8::Context> context = context_.Get(isolate);
@@ -1415,12 +1430,12 @@ namespace jsb
         return maybe_value;
     }
 
-    ObjectCacheID JavaScriptContext::retain_function(NativeObjectID p_object_id, const StringName& p_method)
+    ObjectCacheID Realm::retain_function(NativeObjectID p_object_id, const StringName& p_method)
     {
         ObjectHandle* handle;
-        if (runtime_->objects_.try_get_value_pointer(p_object_id, handle))
+        if (environment_->objects_.try_get_value_pointer(p_object_id, handle))
         {
-            v8::Isolate* isolate = runtime_->isolate_;
+            v8::Isolate* isolate = environment_->isolate_;
             v8::HandleScope handle_scope(isolate);
             v8::Local<v8::Context> context = context_.Get(isolate);
             v8::Local<v8::Object> obj = handle->ref_.Get(isolate).As<v8::Object>();
@@ -1434,7 +1449,7 @@ namespace jsb
         return {};
     }
 
-    bool JavaScriptContext::release_function(ObjectCacheID p_func_id)
+    bool Realm::release_function(ObjectCacheID p_func_id)
     {
         if (function_bank_.is_valid_index(p_func_id))
         {
@@ -1450,7 +1465,7 @@ namespace jsb
         return false;
     }
 
-    Variant JavaScriptContext::_call(const v8::Local<v8::Function>& p_func, const v8::Local<v8::Value>& p_self, const Variant** p_args, int p_argcount, Callable::CallError& r_error)
+    Variant Realm::_call(const v8::Local<v8::Function>& p_func, const v8::Local<v8::Value>& p_self, const Variant** p_args, int p_argcount, Callable::CallError& r_error)
     {
         v8::Isolate* isolate = p_func->GetIsolate();
         v8::Local<v8::Context> context = this->unwrap();
@@ -1462,7 +1477,7 @@ namespace jsb
         for (int index = 0; index < p_argcount; ++index)
         {
             memnew_placement(&argv[index], LocalValue);
-            if (!JavaScriptContext::gd_var_to_js(isolate, context, *p_args[index], argv[index]))
+            if (!Realm::gd_var_to_js(isolate, context, *p_args[index], argv[index]))
             {
                 // revert constructed values if error occured
                 while (index >= 0) argv[index--].~LocalValue();
@@ -1487,7 +1502,7 @@ namespace jsb
         }
 
         Variant rvar;
-        if (!JavaScriptContext::js_to_gd_var(isolate, context, rval.ToLocalChecked(), rvar))
+        if (!Realm::js_to_gd_var(isolate, context, rval.ToLocalChecked(), rvar))
         {
             r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;
             return {};
@@ -1495,7 +1510,7 @@ namespace jsb
         return rvar;
     }
 
-    Variant JavaScriptContext::call_function(NativeObjectID p_object_id, ObjectCacheID p_func_id, const Variant** p_args, int p_argcount, Callable::CallError& r_error)
+    Variant Realm::call_function(NativeObjectID p_object_id, ObjectCacheID p_func_id, const Variant** p_args, int p_argcount, Callable::CallError& r_error)
     {
         if (!function_bank_.is_valid_index(p_func_id))
         {
@@ -1509,7 +1524,7 @@ namespace jsb
         {
             // if object_id is nonzero but can't be found in `objects_` registry, it usually means that this invocation originally triggered by JS GC.
             // the JS Object is disposed before the Godot Object, but Godot will post notifications (like NOTIFICATION_PREDELETE) to script instances.
-            if (!this->runtime_->objects_.is_valid_index(p_object_id))
+            if (!this->environment_->objects_.is_valid_index(p_object_id))
             {
                 JSB_LOG(Error, "invalid `this` for calling function");
                 r_error.error = Callable::CallError::CALL_ERROR_INVALID_METHOD;
@@ -1517,7 +1532,7 @@ namespace jsb
             }
             const TStrongRef<v8::Function>& js_func = function_bank_.get_value(p_func_id);
             jsb_check(js_func);
-            v8::Local<v8::Value> self = this->runtime_->objects_.get_value(p_object_id).ref_.Get(isolate);
+            v8::Local<v8::Value> self = this->environment_->objects_.get_value(p_object_id).ref_.Get(isolate);
             return _call(js_func.object_.Get(isolate), self, p_args, p_argcount, r_error);
         }
 

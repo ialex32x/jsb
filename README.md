@@ -29,7 +29,7 @@ Compile and launch `Godot Editor`.
 
 Install TS project presets with `Godot Editor` menu item `Project > Tools > GodotJS > Install TS Project`.
 > All `jsb` premade config/scripts will be generated at `res://typescripts` and `res://javascripts` (the location will be configurable in a future version).
-> `d.ts` files of godot classes will also be generated at same time.
+> `d.ts` files of godot classes will also be generated at the same time.
 
 > **NOTE** The directory `typescripts` is automatically ignored in `Godot Editor`. Edit typescript source from the `typescripts` directory with any code editor (like VSCode).
 
@@ -78,7 +78,7 @@ Attach the compiled file to a Node:
 ## Debugger
 
 A debugger bridge is implemented. 
-Open `devtools://devtools/bundled/inspector.html?experiments=true&v8only=true&ws=127.0.0.1:9229/1` in the `Chrome` to start debugging the javascript sources.
+Open `devtools://devtools/bundled/inspector.html?experiments=true&v8only=true&ws=127.0.0.1:9229/1` in `Chrome` to start debugging the javascript sources.
 
 > **NOTE** The listening port can be changed in `Project Settings > jsb > Debugger > Port`. A restart is required for it to take effect.
 

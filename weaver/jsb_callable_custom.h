@@ -8,7 +8,7 @@ class GodotJSCallableCustom : public CallableCustom
 private:
     ObjectID object_id_;
     jsb::ObjectCacheID callback_id_;
-    jsb::ContextID context_id_;
+    jsb::RealmID realm_id_;
 
 public:
     static bool _compare_equal(const CallableCustom* p_a, const CallableCustom* p_b)
@@ -27,8 +27,8 @@ public:
         // return !_compare_equal(p_a, p_b) && p_a < p_b;
     }
 
-    GodotJSCallableCustom(ObjectID p_object_id, jsb::ContextID p_context_id, jsb::ContextID p_callback_id)
-    : object_id_(p_object_id), callback_id_(p_callback_id), context_id_(p_context_id)
+    GodotJSCallableCustom(ObjectID p_object_id, jsb::RealmID p_realm_id, jsb::RealmID p_callback_id)
+    : object_id_(p_object_id), callback_id_(p_callback_id), realm_id_(p_realm_id)
     {}
 
     virtual ~GodotJSCallableCustom() override;

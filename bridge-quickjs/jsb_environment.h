@@ -6,11 +6,11 @@
 
 namespace jsb
 {
-    class JavaScriptRuntime : public JavaScriptHelpers
+    class Environment : public JavaScriptHelpers
     {
     public:
-        JavaScriptRuntime();
-        ~JavaScriptRuntime();
+        Environment();
+        ~Environment();
 
         void bootstrap();
         void shutdown();

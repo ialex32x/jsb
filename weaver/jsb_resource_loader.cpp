@@ -6,7 +6,7 @@
 
 Ref<Resource> ResourceFormatLoaderGodotJSScript::load(const String &p_path, const String &p_original_path, Error *r_error, bool p_use_sub_threads, float *r_progress, CacheMode p_cache_mode)
 {
-    //TODO use JavaScriptContext to resolve?
+    //TODO use Realm to resolve?
     Error err;
     jsb_check(p_path.ends_with(JSB_RES_EXT));
     const String code = FileAccess::get_file_as_string(p_path, &err);
@@ -16,21 +16,21 @@ Ref<Resource> ResourceFormatLoaderGodotJSScript::load(const String &p_path, cons
         return {};
     }
     GodotJSScriptLanguage* lang = GodotJSScriptLanguage::get_singleton();
-    std::shared_ptr<jsb::JavaScriptContext> ccontext = lang->get_context();
-    err = ccontext->load(p_path);
+    std::shared_ptr<jsb::Realm> realm = lang->get_context();
+    err = realm->load(p_path);
     if (err != OK)
     {
         if (r_error) *r_error = err;
         return {};
     }
-    const jsb::JavaScriptModuleCache& module_cache = ccontext->get_module_cache();
+    const jsb::JavaScriptModuleCache& module_cache = realm->get_module_cache();
     if (jsb::JavaScriptModule* module = module_cache.find(p_path))
     {
         if (module->default_class_id)
         {
             Ref<GodotJSScript> spt;
             spt.instantiate();
-            spt->attach_source(ccontext, p_path, code, module->default_class_id);
+            spt->attach_source(realm, p_path, code, module->default_class_id);
             return spt;
         }
         JSB_LOG(Error, "no godot js class defined as default exported in module '%s'", p_path);

@@ -7,6 +7,7 @@
 #include "jsb_class_info.h"
 #include "jsb_module_loader.h"
 #include "jsb_module_resolver.h"
+#include "jsb_primitive_bindings.h"
 #include "jsb_timer_action.h"
 #include "../internal/jsb_sarray.h"
 #include "../internal/jsb_timer_manager.h"
@@ -31,11 +32,11 @@ namespace jsb
         };
     }
 
-    // JavaScriptRuntime it-self is NOT thread-safe.
-    class JavaScriptRuntime : public std::enable_shared_from_this<JavaScriptRuntime>
+    // Environment it-self is NOT thread-safe.
+    class Environment : public std::enable_shared_from_this<Environment>
     {
     private:
-        friend class JavaScriptContext;
+        friend class Realm;
 
         // symbol for class_id on FunctionTemplate of native class
         v8::Global<v8::Symbol> symbols_[Symbols::kNum];
@@ -58,9 +59,6 @@ namespace jsb
         // only godot object classes are mapped
         HashMap<StringName, NativeClassID> godot_classes_index_;
 
-        //TODO
-        NativeClassID godot_primitives_index_[Variant::VARIANT_MAX] = {};
-
         // all exposed native classes
         internal::SArray<NativeClassInfo, NativeClassID> native_classes_;
 
@@ -72,7 +70,7 @@ namespace jsb
         HashMap<StringName, StringNameID> stringnames_index_;
 
         // cpp objects should be added here since the gc callback is not guaranteed by v8
-        // we need to delete them on finally releasing JavaScriptRuntime
+        // we need to delete them on finally releasing Environment
         internal::SArray<ObjectHandle, NativeObjectID> objects_;
 
         // (unsafe) mapping object pointer to object_id
@@ -95,8 +93,8 @@ namespace jsb
 #endif
 
     public:
-        JavaScriptRuntime();
-        ~JavaScriptRuntime();
+        Environment();
+        ~Environment();
 
         // replace position in the stacktrace with source map
         String handle_source_map(const String& p_stacktrace);
@@ -109,9 +107,9 @@ namespace jsb
         jsb_no_discard
         static
         jsb_force_inline
-        JavaScriptRuntime* wrap(v8::Isolate* p_isolate)
+        Environment* wrap(v8::Isolate* p_isolate)
         {
-            return (JavaScriptRuntime*) p_isolate->GetData(kIsolateEmbedderData);
+            return (Environment*) p_isolate->GetData(kIsolateEmbedderData);
         }
 
         jsb_no_discard
@@ -139,7 +137,7 @@ namespace jsb
          */
         NativeObjectID bind_object(NativeClassID p_class_id, void* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent);
 
-        //TODO move this into JavaScriptContext, change the token for set_instance_binding to context
+        //TODO move this into Realm, change the token for set_instance_binding to context
         //TODO store all context instead of runtimes into a global array
         NativeObjectID bind_godot_object(NativeClassID p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent);
         void unbind_object(void* p_pointer);
@@ -229,15 +227,6 @@ namespace jsb
             return *resolver;
         }
 
-        NativeClassInfo& add_primitive_class(Variant::Type p_type, const StringName& p_class_name, NativeClassID* r_class_id = nullptr)
-        {
-            NativeClassID class_id;
-            NativeClassInfo& class_info = add_class(NativeClassInfo::GodotPrimitive, p_class_name, &class_id);
-            godot_primitives_index_[p_type] = class_id;
-            if (r_class_id) *r_class_id = class_id;
-            return class_info;
-        }
-
         /**
          * \brief
          * \param p_type category of the class, a GodotObject class is also registered in `godot_classes_index` map
@@ -278,9 +267,6 @@ namespace jsb
         jsb_force_inline NativeClassInfo& get_native_class(NativeClassID p_class_id) { return native_classes_.get_value(p_class_id); }
         jsb_force_inline const NativeClassInfo& get_native_class(NativeClassID p_class_id) const { return native_classes_.get_value(p_class_id); }
 
-        // [EXPERIMENTAL] get class id of primitive type (all of them are actually based on godot Variant)
-        jsb_force_inline NativeClassID get_native_class_id(Variant::Type p_type) const { return godot_primitives_index_[p_type]; }
-
         jsb_force_inline GodotJSClassInfo& add_gdjs_class(GodotJSClassID& r_class_id)
         {
             r_class_id = gdjs_classes_.add({});
@@ -296,8 +282,8 @@ namespace jsb
 
         jsb_force_inline static void object_gc_callback(const v8::WeakCallbackInfo<void>& info)
         {
-            JavaScriptRuntime* cruntime = wrap(info.GetIsolate());
-            cruntime->free_object(info.GetParameter(), true);
+            Environment* environment = wrap(info.GetIsolate());
+            environment->free_object(info.GetParameter(), true);
         }
 
         void free_object(void* p_pointer, bool p_free);

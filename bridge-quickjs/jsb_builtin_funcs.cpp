@@ -1,5 +1,5 @@
 #include "jsb_builtin_funcs.h"
-#include "jsb_runtime.h"
+#include "jsb_environment.h"
 #include "core/string/string_builder.h"
 
 namespace jsb
@@ -16,7 +16,7 @@ namespace jsb
         const char* str = JS_ToCStringLen(ctx, &len, argv[0]);
         const String module_id(str, (int) len);
         JS_FreeCString(ctx, str);
-        JavaScriptRuntime* runtime = (JavaScriptRuntime*)JS_GetContextOpaque(ctx);
+        Environment* runtime = (Environment*)JS_GetContextOpaque(ctx);
         jsb_check(runtime);
         return runtime->resolve_module(module_id, parent_module_index);
     }

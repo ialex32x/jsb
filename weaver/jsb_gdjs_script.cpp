@@ -88,7 +88,7 @@ ScriptInstance* GodotJSScript::instance_create(Object *p_this)
     instance->owner_ = p_this;
     instance->owner_->set_script_instance(instance);
     instance->script_ = Ref(this);
-    instance->object_id_ = context_->crossbind(p_this, gdjs_class_id_);
+    instance->object_id_ = realm_->crossbind(p_this, gdjs_class_id_);
     return instance;
 }
 
@@ -98,7 +98,7 @@ Error GodotJSScript::reload(bool p_keep_state)
     //TODO all `Callable` objects become invalid after reloading
 
     cached_methods_.clear();
-    context_->_reload_module(get_js_class_info().module_id);
+    realm_->_reload_module(get_js_class_info().module_id);
     return OK;
 }
 
@@ -214,9 +214,9 @@ bool GodotJSScript::instance_has(const Object *p_this) const
     return instances_.has(const_cast<Object*>(p_this));
 }
 
-void GodotJSScript::attach_source(const std::shared_ptr<jsb::JavaScriptContext>& p_context, const String& p_path, const String& p_source, jsb::GodotJSClassID p_class_id)
+void GodotJSScript::attach_source(const std::shared_ptr<jsb::Realm>& p_context, const String& p_path, const String& p_source, jsb::GodotJSClassID p_class_id)
 {
-    context_ = p_context;
+    realm_ = p_context;
     gdjs_class_id_ = p_class_id;
     valid_ = gdjs_class_id_.is_valid();
     set_path(p_path);
@@ -225,7 +225,7 @@ void GodotJSScript::attach_source(const std::shared_ptr<jsb::JavaScriptContext>&
 
 const jsb::GodotJSClassInfo& GodotJSScript::get_js_class_info() const
 {
-    return context_->get_gdjs_class_info(gdjs_class_id_);
+    return realm_->get_gdjs_class_info(gdjs_class_id_);
 }
 
 Variant GodotJSScript::call_js(jsb::NativeObjectID p_object_id, const StringName& p_method, const Variant** p_argv, int p_argc, Callable::CallError& r_error)
@@ -237,8 +237,8 @@ Variant GodotJSScript::call_js(jsb::NativeObjectID p_object_id, const StringName
     }
     else
     {
-        func_id = context_->retain_function(p_object_id, p_method);
+        func_id = realm_->retain_function(p_object_id, p_method);
         cached_methods_.insert(p_method, func_id);
     }
-    return context_->call_function(p_object_id, func_id, p_argv, p_argc, r_error);
+    return realm_->call_function(p_object_id, func_id, p_argv, p_argc, r_error);
 }

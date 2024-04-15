@@ -2,7 +2,7 @@
 #define JAVASCRIPT_EXCEPTION_INFO_H
 
 #include "jsb_pch.h"
-#include "jsb_runtime.h"
+#include "jsb_environment.h"
 
 namespace jsb
 {
@@ -46,9 +46,9 @@ namespace jsb
                 return;
             }
 
-            JavaScriptRuntime* cruntime = JavaScriptRuntime::wrap(p_isolate);
+            Environment* environment = Environment::wrap(p_isolate);
             if (!message_.is_empty()) message_ += "\n";
-            message_ += cruntime->handle_source_map(String(*stack_trace_utf8, stack_trace_utf8.length()));
+            message_ += environment->handle_source_map(String(*stack_trace_utf8, stack_trace_utf8.length()));
         }
     };
 

@@ -12,7 +12,7 @@ namespace jsb
     public:
         virtual ~IModuleLoader() = default;
 
-        virtual bool load(class JavaScriptContext* p_ccontext, JavaScriptModule& p_module) = 0;
+        virtual bool load(class Realm* p_realm, JavaScriptModule& p_module) = 0;
     };
 
     // a lazy loader for Godot classes (and singletons/constants)
@@ -21,7 +21,7 @@ namespace jsb
     public:
         virtual ~GodotModuleLoader() override = default;
 
-        virtual bool load(class JavaScriptContext* p_ccontext, JavaScriptModule& p_module) override;
+        virtual bool load(class Realm* p_realm, JavaScriptModule& p_module) override;
     };
 
     // `AMDModuleLoader` follows the fundamental guidelines of the `AsynchronousModuleDefinition`, but not really async.
@@ -39,7 +39,7 @@ namespace jsb
 
         virtual ~AMDModuleLoader() override { evaluator_.Reset(); }
 
-        virtual bool load(class JavaScriptContext* p_ccontext, JavaScriptModule& p_module) override;
+        virtual bool load(class Realm* p_realm, JavaScriptModule& p_module) override;
     };
 }
 #endif

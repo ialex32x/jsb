@@ -1,9 +1,9 @@
 #include "jsb_module_loader.h"
-#include "jsb_context.h"
+#include "jsb_realm.h"
 
 namespace jsb
 {
-    bool GodotModuleLoader::load(class JavaScriptContext* p_ccontext, JavaScriptModule& p_module)
+    bool GodotModuleLoader::load(class Realm* p_realm, JavaScriptModule& p_module)
     {
         static const CharString on_demand_loader_source = ""
             "(function (type_loader_func) {"
@@ -38,14 +38,14 @@ namespace jsb
             "    })({});"
             "})"
             "";
-        v8::Isolate* isolate = p_ccontext->get_isolate();
+        v8::Isolate* isolate = p_realm->get_isolate();
         v8::Isolate::Scope isolate_scope(isolate);
         v8::HandleScope handle_scope(isolate);
         v8::Local<v8::Context> context = isolate->GetCurrentContext();
         v8::Context::Scope context_scope(context);
 
-        jsb_check(p_ccontext->check(context));
-        v8::MaybeLocal<v8::Value> func_maybe_local = p_ccontext->_compile_run(on_demand_loader_source, on_demand_loader_source.length(), "on_demand_loader_source");
+        jsb_check(p_realm->check(context));
+        v8::MaybeLocal<v8::Value> func_maybe_local = p_realm->_compile_run(on_demand_loader_source, on_demand_loader_source.length(), "on_demand_loader_source");
         if (func_maybe_local.IsEmpty())
         {
             return false;
@@ -59,7 +59,7 @@ namespace jsb
         }
 
         // load_type_impl: function(name)
-        v8::Local<v8::Value> argv[] = { v8::Function::New(context, JavaScriptContext::_load_godot_mod).ToLocalChecked() };
+        v8::Local<v8::Value> argv[] = { v8::Function::New(context, Realm::_load_godot_mod).ToLocalChecked() };
         v8::Local<v8::Function> loader = func_local.As<v8::Function>();
         v8::MaybeLocal<v8::Value> type_maybe_local = loader->Call(context, v8::Undefined(isolate), std::size(argv), argv);
         if (type_maybe_local.IsEmpty())
@@ -79,11 +79,11 @@ namespace jsb
         return true;
     }
 
-    bool AMDModuleLoader::load(JavaScriptContext* p_ccontext, JavaScriptModule& p_module)
+    bool AMDModuleLoader::load(Realm* p_realm, JavaScriptModule& p_module)
     {
         typedef v8::Local<v8::Value> LocalValue;
 
-        v8::Isolate* isolate = p_ccontext->get_isolate();
+        v8::Isolate* isolate = p_realm->get_isolate();
         const int len = deps_.size();
         bool succeeded = true;
         LocalValue* dep_vals = jsb_stackalloc(LocalValue, len);
@@ -103,7 +103,7 @@ namespace jsb
             // special case: `require` & `exports`
             if (dep_module_id == "require")
             {
-                dep_vals[index] = p_ccontext->_new_require_func(self_module_id.utf8());
+                dep_vals[index] = p_realm->_new_require_func(self_module_id.utf8());
                 continue;
             }
             if (dep_module_id == "exports")
@@ -111,7 +111,7 @@ namespace jsb
                 dep_vals[index] = self_exports;
                 continue;
             }
-            if (JavaScriptModule* module = p_ccontext->_load_module(self_module_id, dep_module_id))
+            if (JavaScriptModule* module = p_realm->_load_module(self_module_id, dep_module_id))
             {
                 JSB_LOG(Verbose, "load dep: %s", dep_module_id);
                 dep_vals[index] = module->exports.Get(isolate);

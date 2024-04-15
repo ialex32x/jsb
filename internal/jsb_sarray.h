@@ -12,7 +12,8 @@
 
 namespace jsb::internal
 {
-    //TODO use move-constructor if possible when resizing
+    //TODO use move-constructor if possible when resizing.
+    //NOTE some types (like std::function) are not supported due to copy/move on resizing not implemented for now.
     template <typename T, typename IndexType = Index64, typename TAllocator = AnsiAllocator>
 	class SArray
 	{

@@ -27,10 +27,10 @@ void GodotJSScriptLanguage::init()
     if (!once_inited_)
     {
         once_inited_ = true;
-        runtime_ = std::make_shared<jsb::JavaScriptRuntime>();
-        context_ = std::make_shared<jsb::JavaScriptContext>(runtime_);
+        environment_ = std::make_shared<jsb::Environment>();
+        realm_ = std::make_shared<jsb::Realm>(environment_);
 
-        runtime_->add_module_resolver<jsb::DefaultModuleResolver>()
+        environment_->add_module_resolver<jsb::DefaultModuleResolver>()
             .add_search_path("res://javascripts")
             // // search path for editor only scripts
             // .add_search_path(jsb::internal::PathUtil::combine(
@@ -40,7 +40,7 @@ void GodotJSScriptLanguage::init()
 
         if (FileAccess::exists("res://javascripts/jsb/jsb.editor.main.js"))
         {
-            context_->load("jsb/jsb.editor.main");
+            realm_->load("jsb/jsb.editor.main");
         }
     }
     JSB_LOG(Verbose, "jsb lang init");
@@ -50,15 +50,15 @@ void GodotJSScriptLanguage::finish()
 {
     jsb_check(once_inited_);
     once_inited_ = false;
-    context_.reset();
-    runtime_.reset();
+    realm_.reset();
+    environment_.reset();
     JSB_LOG(Verbose, "jsb lang finish");
 }
 
 void GodotJSScriptLanguage::frame()
 {
-    runtime_->update();
-    runtime_->gc();
+    environment_->update();
+    environment_->gc();
 }
 
 void GodotJSScriptLanguage::get_reserved_words(List<String>* p_words) const
@@ -125,7 +125,7 @@ Script* GodotJSScriptLanguage::create_script() const
 bool GodotJSScriptLanguage::validate(const String& p_script, const String& p_path, List<String>* r_functions, List<ScriptError>* r_errors, List<Warning>* r_warnings, HashSet<int>* r_safe_lines) const
 {
     jsb::JavaScriptExceptionInfo exception_info;
-    if (context_->validate_script(p_path, &exception_info))
+    if (realm_->validate_script(p_path, &exception_info))
     {
         return true;
     }
@@ -181,5 +181,5 @@ void GodotJSScriptLanguage::get_recognized_extensions(List<String>* p_extensions
 
 Error GodotJSScriptLanguage::eval_source(const String &p_code)
 {
-    return context_->eval_source(p_code.utf8(), "eval");
+    return realm_->eval_source(p_code.utf8(), "eval");
 }

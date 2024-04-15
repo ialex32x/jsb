@@ -18,8 +18,8 @@ namespace jsb
         virtual void on_context_created(const v8::Local<v8::Context>& p_context) = 0;
         virtual void on_context_destroyed(const v8::Local<v8::Context>& p_context) = 0;
 
-        friend class JavaScriptContext;
-        friend class JavaScriptRuntime;
+        friend class Realm;
+        friend class Environment;
     };
 }
 #endif

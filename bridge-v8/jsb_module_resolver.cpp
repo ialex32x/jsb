@@ -1,6 +1,6 @@
 #include "jsb_module_resolver.h"
 
-#include "jsb_context.h"
+#include "jsb_realm.h"
 #include "../internal/jsb_path_util.h"
 #include "../weaver/jsb_weaver_consts.h"
 
@@ -23,18 +23,18 @@ namespace jsb
         return data;
     }
 
-    bool IModuleResolver::load_from_source(JavaScriptContext* p_ccontext, JavaScriptModule& p_module, const String& p_filename_abs, const Vector<uint8_t>& p_source)
+    bool IModuleResolver::load_from_source(Realm* p_realm, JavaScriptModule& p_module, const String& p_filename_abs, const Vector<uint8_t>& p_source)
     {
-        v8::Isolate* isolate = p_ccontext->get_isolate();
+        v8::Isolate* isolate = p_realm->get_isolate();
         v8::Isolate::Scope isolate_scope(isolate);
         v8::HandleScope handle_scope(isolate);
         v8::Local<v8::Context> context = isolate->GetCurrentContext();
         v8::Context::Scope context_scope(context);
 
-        jsb_check(p_ccontext->check(context));
+        jsb_check(p_realm->check(context));
 
         // failed to compile or run, immediately return since an exception should already be thrown
-        v8::MaybeLocal<v8::Value> func_maybe_local = p_ccontext->_compile_run((const char*) p_source.ptr(), p_source.size(), p_filename_abs);
+        v8::MaybeLocal<v8::Value> func_maybe_local = p_realm->_compile_run((const char*) p_source.ptr(), p_source.size(), p_filename_abs);
         if (func_maybe_local.IsEmpty())
         {
             return false;
@@ -54,7 +54,7 @@ namespace jsb
         v8::Local<v8::Object> jmodule = p_module.module.Get(isolate);
         v8::Local<v8::Value> jexports = p_module.exports.Get(isolate);
         v8::Local<v8::String> jfilename = v8::String::NewFromUtf8(isolate, cfilename.ptr(), v8::NewStringType::kNormal, cfilename.length()).ToLocalChecked();
-        v8::Local<v8::Function> jrequire = p_ccontext->_new_require_func(cmodule_id);
+        v8::Local<v8::Function> jrequire = p_realm->_new_require_func(cmodule_id);
         v8::Local<v8::Function> elevator = func_local.As<v8::Function>();
 
         v8::Local<v8::Value> argv[] = { // exports, require, module, __filename, __dirname
@@ -130,18 +130,18 @@ namespace jsb
         return *this;
     }
 
-    bool DefaultModuleResolver::load(JavaScriptContext* p_ccontext, const String& r_asset_path, JavaScriptModule& p_module)
+    bool DefaultModuleResolver::load(Realm* p_realm, const String& r_asset_path, JavaScriptModule& p_module)
     {
         // load source buffer
         FileAccessSourceReader reader(FileAccess::open(r_asset_path, FileAccess::READ));
         if (reader.is_null() || reader.get_length() == 0)
         {
-            p_ccontext->get_isolate()->ThrowError("failed to read module source");
+            p_realm->get_isolate()->ThrowError("failed to read module source");
             return false;
         }
         const String filename_abs = reader.get_path_absolute();
         const Vector<uint8_t> source = read_all_bytes(reader);
-        return load_from_source(p_ccontext, p_module, filename_abs, source);
+        return load_from_source(p_realm, p_module, filename_abs, source);
     }
 
 }

@@ -1,6 +1,6 @@
 #include "jsb_timer_action.h"
 #include "jsb_exception_info.h"
-#include "jsb_context.h"
+#include "jsb_realm.h"
 
 namespace jsb
 {
@@ -8,9 +8,9 @@ namespace jsb
     {
         v8::Local<v8::Function> func = function_.Get(isolate);
         v8::Local<v8::Context> context = func->GetCreationContextChecked();
-        JavaScriptContext* ccontext = JavaScriptContext::wrap(context);
+        Realm* realm = Realm::wrap(context);
 
-        jsb_checkf(ccontext, "timer triggered after JavaScriptContext diposed");
+        jsb_checkf(realm, "timer triggered after Realm diposed");
         v8::Context::Scope context_scope(context);
 
         v8::TryCatch try_catch(isolate);

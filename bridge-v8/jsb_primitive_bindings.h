@@ -6,8 +6,8 @@ namespace jsb
 {
     struct FBindingEnv
     {
-        class JavaScriptRuntime* cruntime;
-        class JavaScriptContext* ccontext;
+        class Environment* environment;
+        class Realm* realm;
 
         v8::Isolate* isolate;
         const v8::Local<v8::Context>& context;
@@ -15,8 +15,8 @@ namespace jsb
         internal::CFunctionPointers& function_pointers;
     };
 
-    typedef v8::Local<v8::Value> (*PrimitiveTypeRegisterFunc)(const FBindingEnv& p_env);
+    typedef NativeClassID (*PrimitiveTypeRegisterFunc)(const FBindingEnv& p_env);
 
-    void register_primitive_bindings(class JavaScriptContext* p_ccontext);
+    void register_primitive_bindings(class Realm* p_realm);
 }
 #endif

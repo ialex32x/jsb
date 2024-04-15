@@ -1,4 +1,4 @@
-#include "jsb_runtime.h"
+#include "jsb_environment.h"
 
 #if JSB_WITH_DEBUGGER
 #include "jsb_debugger.h"
@@ -24,16 +24,16 @@ namespace jsb
         }
     };
 
-    struct JavaScriptRuntimeStore
+    struct EnvironmentStore
     {
-        // return a JavaScriptRuntime shared pointer with a unknown pointer if it's a valid JavaScriptRuntime instance.
-        std::shared_ptr<JavaScriptRuntime> access(void* p_runtime)
+        // return a Environment shared pointer with a unknown pointer if it's a valid Environment instance.
+        std::shared_ptr<Environment> access(void* p_runtime)
         {
-            std::shared_ptr<JavaScriptRuntime> rval;
+            std::shared_ptr<Environment> rval;
             lock_.lock();
             if (all_runtimes_.has(p_runtime))
             {
-                rval = ((JavaScriptRuntime*) p_runtime)->shared_from_this();
+                rval = ((Environment*) p_runtime)->shared_from_this();
             }
             lock_.unlock();
             return rval;
@@ -55,9 +55,9 @@ namespace jsb
             lock_.unlock();
         }
 
-        jsb_force_inline static JavaScriptRuntimeStore& get_shared()
+        jsb_force_inline static EnvironmentStore& get_shared()
         {
-            static JavaScriptRuntimeStore global_store;
+            static EnvironmentStore global_store;
             return global_store;
         }
 
@@ -84,18 +84,18 @@ namespace jsb
 
         static void free_callback(void* p_token, void* p_instance, void* p_binding)
         {
-            if (std::shared_ptr<JavaScriptRuntime> cruntime = JavaScriptRuntimeStore::get_shared().access(p_token))
+            if (std::shared_ptr<Environment> environment = EnvironmentStore::get_shared().access(p_token))
             {
                 jsb_check(p_instance == p_binding);
-                cruntime->unbind_object(p_binding);
+                environment->unbind_object(p_binding);
             }
         }
 
         static GDExtensionBool reference_callback(void* p_token, void* p_binding, GDExtensionBool p_reference)
         {
-            if (std::shared_ptr<JavaScriptRuntime> cruntime = JavaScriptRuntimeStore::get_shared().access(p_token))
+            if (std::shared_ptr<Environment> environment = EnvironmentStore::get_shared().access(p_token))
             {
-                return cruntime->reference_object(p_binding, !!p_reference);
+                return environment->reference_object(p_binding, !!p_reference);
             }
             return true;
         }
@@ -136,21 +136,21 @@ namespace jsb
         }
     }
 
-    void JavaScriptRuntime::on_context_created(const v8::Local<v8::Context>& p_context)
+    void Environment::on_context_created(const v8::Local<v8::Context>& p_context)
     {
 #if JSB_WITH_DEBUGGER
         debugger_->on_context_created(p_context);
 #endif
     }
 
-    void JavaScriptRuntime::on_context_destroyed(const v8::Local<v8::Context>& p_context)
+    void Environment::on_context_destroyed(const v8::Local<v8::Context>& p_context)
     {
 #if JSB_WITH_DEBUGGER
         debugger_->on_context_destroyed(p_context);
 #endif
     }
 
-    JavaScriptRuntime::JavaScriptRuntime()
+    Environment::Environment()
     {
         static GlobalInitialize global_initialize;
         v8::Isolate::CreateParams create_params;
@@ -169,13 +169,13 @@ namespace jsb
             }
         }
         module_loaders_.insert("godot", memnew(GodotModuleLoader));
-        JavaScriptRuntimeStore::get_shared().add(this);
+        EnvironmentStore::get_shared().add(this);
 #if JSB_WITH_DEBUGGER
         debugger_ = JavaScriptDebugger::create(isolate_, GLOBAL_GET("jsb/debugger/port"));
 #endif
     }
 
-    JavaScriptRuntime::~JavaScriptRuntime()
+    Environment::~Environment()
     {
         while (!gdjs_classes_.is_empty())
         {
@@ -193,7 +193,7 @@ namespace jsb
 #if JSB_WITH_DEBUGGER
         debugger_.reset();
 #endif
-        JavaScriptRuntimeStore::get_shared().remove(this);
+        EnvironmentStore::get_shared().remove(this);
 
         timer_manager_.clear_all();
 
@@ -237,7 +237,7 @@ namespace jsb
         isolate_ = nullptr;
     }
 
-    void JavaScriptRuntime::update()
+    void Environment::update()
     {
         const uint64_t base_ticks = Engine::get_singleton()->get_frame_ticks();
         const uint64_t elapsed_milli = (base_ticks - last_ticks_) / 1000; // milliseconds
@@ -256,7 +256,7 @@ namespace jsb
 #endif
     }
 
-    void JavaScriptRuntime::gc()
+    void Environment::gc()
     {
 #if DEV_ENABLED
         isolate_->RequestGarbageCollectionForTesting(v8::Isolate::kFullGarbageCollection);
@@ -265,14 +265,14 @@ namespace jsb
 #endif
     }
 
-    NativeObjectID JavaScriptRuntime::bind_godot_object(NativeClassID p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
+    NativeObjectID Environment::bind_godot_object(NativeClassID p_class_id, Object* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
     {
         const NativeObjectID object_id = bind_object(p_class_id, (void*) p_pointer, p_object, p_persistent);
         p_pointer->set_instance_binding(this, p_pointer, gd_instance_binding_callbacks);
         return object_id;
     }
 
-    NativeObjectID JavaScriptRuntime::bind_object(NativeClassID p_class_id, void* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
+    NativeObjectID Environment::bind_object(NativeClassID p_class_id, void* p_pointer, const v8::Local<v8::Object>& p_object, bool p_persistent)
     {
         jsb_checkf(Thread::get_caller_id() == thread_id_, "multi-threaded call not supported yet");
         jsb_checkf(native_classes_.is_valid_index(p_class_id), "bad class_id");
@@ -299,7 +299,7 @@ namespace jsb
         return object_id;
     }
 
-    void JavaScriptRuntime::unbind_object(void* p_pointer)
+    void Environment::unbind_object(void* p_pointer)
     {
         //TODO thread-safety issues on objects_* access
         jsb_check(Thread::get_caller_id() == thread_id_);
@@ -309,7 +309,7 @@ namespace jsb
         }
     }
 
-    bool JavaScriptRuntime::reference_object(void* p_pointer, bool p_is_inc)
+    bool Environment::reference_object(void* p_pointer, bool p_is_inc)
     {
         //TODO temp code
         //TODO thread-safety issues on objects_* access
@@ -354,7 +354,7 @@ namespace jsb
         return false;
     }
 
-    void JavaScriptRuntime::free_object(void* p_pointer, bool p_free)
+    void Environment::free_object(void* p_pointer, bool p_free)
     {
         jsb_check(Thread::get_caller_id() == thread_id_);
         const HashMap<void*, internal::Index64>::Iterator it = objects_index_.find(p_pointer);
@@ -384,7 +384,7 @@ namespace jsb
         }
     }
 
-    String JavaScriptRuntime::handle_source_map(const String& p_stacktrace)
+    String Environment::handle_source_map(const String& p_stacktrace)
     {
 #if JSB_WITH_SOURCEMAP
         return _source_map_cache.handle_source_map(p_stacktrace);

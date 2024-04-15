@@ -3,7 +3,7 @@
 
 #include "jsb_ref.h"
 #include "jsb_pch.h"
-#include "jsb_runtime.h"
+#include "jsb_environment.h"
 #include "jsb_module.h"
 #include "jsb_primitive_bindings.h"
 #include <unordered_map>
@@ -19,17 +19,17 @@ namespace jsb
      * a sandbox-like execution context for scripting (NOT thread-safe)
      * \note members starting with '_' are assumed the a v8 scope already existed in the caller
      */
-    class JavaScriptContext : public std::enable_shared_from_this<JavaScriptContext>
+    class Realm : public std::enable_shared_from_this<Realm>
     {
     private:
         friend class JavaScriptLanguage;
 
-        static internal::SArray<JavaScriptContext*, ContextID> contexts_;
+        static internal::SArray<Realm*, RealmID> realms_;
 
-        ContextID id_;
+        RealmID id_;
 
-        // hold a reference to JavaScriptRuntime which ensure runtime being destructed after context
-        std::shared_ptr<class JavaScriptRuntime> runtime_;
+        // hold a reference to Environment which ensure runtime being destructed after context
+        std::shared_ptr<class Environment> environment_;
         v8::Global<v8::Context> context_;
 
         internal::CFunctionPointers function_pointers_;
@@ -40,34 +40,41 @@ namespace jsb
         std::unordered_map<TWeakRef<v8::Function>, internal::Index32, TWeakRef<v8::Function>::hasher, TWeakRef<v8::Function>::equaler> function_refs_; // backlink
         internal::SArray<TStrongRef<v8::Function>, internal::Index32> function_bank_;
 
-        //TODO handle the situation that primitive types are not accessed by name (such as used by param/return in native wrapper methods)
-        HashMap<StringName, PrimitiveTypeRegisterFunc> primitive_regs_;
+        struct GodotPrimitiveImport
+        {
+            NativeClassID id = {};
+            PrimitiveTypeRegisterFunc register_func = nullptr;
+        };
+
+        //TODO
+        GodotPrimitiveImport godot_primitive_index_[Variant::VARIANT_MAX] = {};
+        HashMap<StringName, Variant::Type> godot_primitive_map_;
 
     public:
-        JavaScriptContext(const std::shared_ptr<class JavaScriptRuntime>& runtime);
-        ~JavaScriptContext();
+        Realm(const std::shared_ptr<class Environment>& runtime);
+        ~Realm();
 
-        jsb_force_inline ContextID id() const { return id_; }
+        jsb_force_inline RealmID id() const { return id_; }
 
-        const std::shared_ptr<JavaScriptRuntime>& get_runtime() const { return runtime_; }
+        const std::shared_ptr<Environment>& get_environment() const { return environment_; }
 
-        static std::shared_ptr<JavaScriptContext> get_context(ContextID p_context_id)
+        static std::shared_ptr<Realm> get_realm(RealmID p_realm_id)
         {
-            // return contexts_[p_context_id]->shared_from_this();
-            JavaScriptContext* ptr;
-            return contexts_.try_get_value(p_context_id, ptr) ? ptr->shared_from_this() : nullptr;
+            // return contexts_[p_realm_id]->shared_from_this();
+            Realm* ptr;
+            return realms_.try_get_value(p_realm_id, ptr) ? ptr->shared_from_this() : nullptr;
         }
 
-        void register_primitive_binding(const StringName& p_name, PrimitiveTypeRegisterFunc p_func);
+        void register_primitive_binding(const StringName& p_name, Variant::Type p_type, PrimitiveTypeRegisterFunc p_func);
 
-        jsb_force_inline static JavaScriptContext* wrap(const v8::Local<v8::Context>& p_context)
+        jsb_force_inline static Realm* wrap(const v8::Local<v8::Context>& p_context)
         {
-            return (JavaScriptContext*) p_context->GetAlignedPointerFromEmbedderData(kContextEmbedderData);
+            return (Realm*) p_context->GetAlignedPointerFromEmbedderData(kContextEmbedderData);
         }
 
         jsb_force_inline v8::Local<v8::Context> unwrap() const
         {
-            return context_.Get(runtime_->isolate_);
+            return context_.Get(environment_->isolate_);
         }
 
         jsb_force_inline bool check(const v8::Local<v8::Context>& p_context) const
@@ -76,7 +83,7 @@ namespace jsb
         }
 
         //TODO temp
-        jsb_force_inline const GodotJSClassInfo& get_gdjs_class_info(GodotJSClassID p_class_id) const { return runtime_->get_gdjs_class(p_class_id); }
+        jsb_force_inline const GodotJSClassInfo& get_gdjs_class_info(GodotJSClassID p_class_id) const { return environment_->get_gdjs_class(p_class_id); }
 
         //TODO temp, get C++ function pointer (include class methods)
         jsb_force_inline static uint8_t* get_function_pointer(const v8::Local<v8::Context>& p_context, uint32_t p_offset)
@@ -107,7 +114,7 @@ namespace jsb
 
         NativeObjectID crossbind(Object* p_this, GodotJSClassID p_class_id);
 
-        jsb_force_inline v8::Isolate* get_isolate() const { jsb_check(runtime_); return runtime_->isolate_; }
+        jsb_force_inline v8::Isolate* get_isolate() const { jsb_check(environment_); return environment_->isolate_; }
 
         /**
          * \brief run  and return a value from source
@@ -119,10 +126,10 @@ namespace jsb
         v8::MaybeLocal<v8::Value> _compile_run(const char* p_source, int p_source_len, const String& p_filename);
         v8::Local<v8::Function> _new_require_func(const CharString& p_module_id)
         {
-            v8::Isolate* isolate = runtime_->isolate_;
+            v8::Isolate* isolate = environment_->isolate_;
             v8::Local<v8::Context> context = context_.Get(isolate);
             v8::Local<v8::String> jmodule_id = v8::String::NewFromUtf8(isolate, p_module_id.ptr(), v8::NewStringType::kNormal, p_module_id.length()).ToLocalChecked();
-            v8::Local<v8::Function> jrequire = v8::Function::New(context, JavaScriptContext::_require, /* magic: module_id */ jmodule_id).ToLocalChecked();
+            v8::Local<v8::Function> jrequire = v8::Function::New(context, Realm::_require, /* magic: module_id */ jmodule_id).ToLocalChecked();
             v8::Local<v8::Object> jmain_module;
             if (_get_main_module(&jmain_module))
             {
@@ -143,11 +150,19 @@ namespace jsb
         static void _load_godot_mod(const v8::FunctionCallbackInfo<v8::Value>& info);
 
         static void _require(const v8::FunctionCallbackInfo<v8::Value>& info);
+
         NativeClassInfo* _expose_godot_class(const ClassDB::ClassInfo* p_class_info, NativeClassID* r_class_id = nullptr);
         NativeClassInfo* _expose_godot_class(const StringName& p_class_name, NativeClassID* r_class_id = nullptr)
         {
             const HashMap<StringName, ClassDB::ClassInfo>::ConstIterator& it = ClassDB::classes.find(p_class_name);
             return it != ClassDB::classes.end() ? _expose_godot_class(&it->value, r_class_id) : nullptr;
+        }
+
+        NativeClassInfo* _expose_godot_primitive_class(Variant::Type p_type, NativeClassID* r_class_id = nullptr);
+        NativeClassInfo* _expose_godot_primitive_class(const StringName& p_type_name, NativeClassID* r_class_id = nullptr)
+        {
+            const HashMap<StringName, Variant::Type>::ConstIterator& it = godot_primitive_map_.find(p_type_name);
+            return it != godot_primitive_map_.end() ? _expose_godot_primitive_class(it->value, r_class_id) : nullptr;
         }
 
         // return false if something wrong with an exception thrown

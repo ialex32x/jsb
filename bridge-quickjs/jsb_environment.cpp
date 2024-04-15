@@ -1,4 +1,4 @@
-#include "jsb_runtime.h"
+#include "jsb_environment.h"
 #include <iterator>
 
 #include "extra/jsb_extra_funcs.h"
@@ -15,11 +15,11 @@ namespace jsb
 
 // #pragma push_macro("DEF")
 // #undef DEF
-// #define DEF(FieldName) StringName JavaScriptRuntime::_##FieldName;
+// #define DEF(FieldName) StringName Environment::_##FieldName;
 // #include "jsb_preallocated_atoms.h"
 // #pragma pop_macro("DEF")
 
-    JavaScriptRuntime::JavaScriptRuntime()
+    Environment::Environment()
     {
         rt = JS_NewRuntime();
         ctx = JS_NewContext(rt);
@@ -29,7 +29,7 @@ namespace jsb
         JS_SetContextOpaque(ctx, this);
     }
 
-    JavaScriptRuntime::~JavaScriptRuntime()
+    Environment::~Environment()
     {
         shutdown();
 
@@ -37,12 +37,12 @@ namespace jsb
         JS_FreeRuntime(rt);
     }
 
-    JSContext* JavaScriptRuntime::get_context() const
+    JSContext* Environment::get_context() const
     {
         return ctx;
     }
 
-    void JavaScriptRuntime::register_builtins()
+    void Environment::register_builtins()
     {
         bootstrap();
 
@@ -84,7 +84,7 @@ namespace jsb
 
     }
 
-    void JavaScriptRuntime::bootstrap()
+    void Environment::bootstrap()
     {
         if (state != RS_NONE)
         {
@@ -102,8 +102,8 @@ namespace jsb
         JS_NewClassID(&bridge_class_id);
         JS_NewClass(rt, bridge_class_id, &class_def);
 
-        // JavaScriptRuntime::_##FieldName = _scs_create(#FieldName, true);
-        // cached_names.insert(JavaScriptRuntime::_##FieldName, JS_NewAtomLen(ctx, #FieldName, sizeof(#FieldName) - 1));
+        // Environment::_##FieldName = _scs_create(#FieldName, true);
+        // cached_names.insert(Environment::_##FieldName, JS_NewAtomLen(ctx, #FieldName, sizeof(#FieldName) - 1));
 #pragma push_macro("DEF")
 #undef DEF
 #define DEF(FieldName) \
@@ -115,7 +115,7 @@ namespace jsb
         _module_cache = JS_NewObject(ctx);
     }
 
-    void JavaScriptRuntime::shutdown()
+    void Environment::shutdown()
     {
         if (state != RS_INITED)
         {
@@ -135,7 +135,7 @@ namespace jsb
 #pragma pop_macro("DEF")
     }
 
-    void JavaScriptRuntime::_finalizer(JSRuntime* rt, JSValue val)
+    void Environment::_finalizer(JSRuntime* rt, JSValue val)
     {
         GCObject* gco = (GCObject*) JS_GetOpaque(val, bridge_class_id);
         jsb_check(gco);
@@ -144,7 +144,7 @@ namespace jsb
         memdelete(gco);
     }
 
-    JSAtom JavaScriptRuntime::key_for(const String& p_name)
+    JSAtom Environment::key_for(const String& p_name)
     {
         if (const HashMap<String, JSAtom>::Iterator it = cached_names.find(p_name))
         {
@@ -156,7 +156,7 @@ namespace jsb
         return atom;
     }
 
-    Error JavaScriptRuntime::eval(const char* p_source, size_t p_source_len, const char* p_filename)
+    Error Environment::eval(const char* p_source, size_t p_source_len, const char* p_filename)
     {
         constexpr int flags = JS_EVAL_FLAG_STRICT | JS_EVAL_TYPE_GLOBAL;
         const JSValue ret_val = JS_Eval(ctx, p_source, p_source_len, p_filename, flags);
@@ -165,7 +165,7 @@ namespace jsb
         return OK;
     }
 
-    void JavaScriptRuntime::update()
+    void Environment::update()
     {
         JSContext *pctx;
         while (true)
@@ -185,13 +185,13 @@ namespace jsb
         }
     }
 
-    bool JavaScriptRuntime::is_reloading(const String& p_module_id)
+    bool Environment::is_reloading(const String& p_module_id)
     {
         //TODO
         return false;
     }
 
-    JSValue JavaScriptRuntime::create_module_object(const String& p_module_id, const String& p_filename)
+    JSValue Environment::create_module_object(const String& p_module_id, const String& p_filename)
     {
         jsb_check(!p_module_id.is_empty());
         jsb_check(!module_index.has(p_module_id));
@@ -214,7 +214,7 @@ namespace jsb
         return module_object;
     }
 
-    bool JavaScriptRuntime::try_get_module_object(const String& p_module_id, JSValue& o_module_object)
+    bool Environment::try_get_module_object(const String& p_module_id, JSValue& o_module_object)
     {
         const JSValue module_object = JS_GetProperty(ctx, _module_cache, key_for(p_module_id));
         if (JS_IsObject(module_object))
@@ -226,7 +226,7 @@ namespace jsb
         return false;
     }
 
-    JSValue JavaScriptRuntime::create_require_func(const String& p_module_id)
+    JSValue Environment::create_require_func(const String& p_module_id)
     {
         const int index = module_index.find(p_module_id);
         jsb_check(index >= 0);
@@ -237,13 +237,13 @@ namespace jsb
         return require_func;
     }
 
-    void JavaScriptRuntime::load(const String& p_name)
+    void Environment::load(const String& p_name)
     {
         JSValue mod = resolve_module(p_name, -1);
         JS_FreeValue(ctx, mod);
     }
 
-    JSValue JavaScriptRuntime::resolve_module(const String& p_name, int p_parent_module_index)
+    JSValue Environment::resolve_module(const String& p_name, int p_parent_module_index)
     {
         const String parent_id = p_parent_module_index >= 0 ? module_index[p_parent_module_index] : String();
         {
@@ -274,7 +274,7 @@ namespace jsb
         return JS_ThrowInternalError(ctx, "no such module %s", c_module_id.get_data());
     }
 
-    bool JavaScriptRuntime::resolve_file(const String& p_filename, String& o_entry)
+    bool Environment::resolve_file(const String& p_filename, String& o_entry)
     {
         if (p_filename[0] != '/')
         {
@@ -297,7 +297,7 @@ namespace jsb
         return false;
     }
 
-    void JavaScriptRuntime::dump_exception(const JSValue &p_exception)
+    void Environment::dump_exception(const JSValue &p_exception)
     {
         JSValue err_file = JS_GetProperty(ctx, p_exception, JS_ATOM_fileName);
         JSValue err_line = JS_GetProperty(ctx, p_exception, JS_ATOM_lineNumber);
@@ -318,7 +318,7 @@ namespace jsb
     }
 
 
-    bool JavaScriptRuntime::_resolve(const String& p_parent_id, const String& p_name, SourceReference& o_source_reference)
+    bool Environment::_resolve(const String& p_parent_id, const String& p_name, SourceReference& o_source_reference)
     {
         // join with parent id if name is relative
         const String raw_path = p_name.begins_with("./") || p_name.begins_with("../")
@@ -347,7 +347,7 @@ namespace jsb
         return false;
     }
 
-    bool JavaScriptRuntime::_load(JSValue p_module_object, const String& p_parent_id, const SourceReference& p_source_reference)
+    bool Environment::_load(JSValue p_module_object, const String& p_parent_id, const SourceReference& p_source_reference)
     {
         const String dirname = PathUtil::dirname(p_source_reference.path);
         JSValue argv[] = {
@@ -395,7 +395,7 @@ namespace jsb
         return succeeded;
     }
 
-    bool JavaScriptRuntime::_reload(JSValue p_module_object, const SourceReference& p_source_reference)
+    bool Environment::_reload(JSValue p_module_object, const SourceReference& p_source_reference)
     {
         //TODO
         return false;

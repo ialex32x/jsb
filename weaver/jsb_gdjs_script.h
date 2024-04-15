@@ -21,7 +21,7 @@ private:
 
     SelfList<GodotJSScript> script_list_;
 	RBSet<Object *> instances_;
-    std::shared_ptr<jsb::JavaScriptContext> context_;
+    std::shared_ptr<jsb::Realm> realm_;
 
     String source_;
     String path_;
@@ -33,7 +33,7 @@ public:
     GodotJSScript();
     virtual ~GodotJSScript() override;
 
-    void attach_source(const std::shared_ptr<jsb::JavaScriptContext>& p_context, const String& p_path, const String& p_source, jsb::GodotJSClassID p_class_id);
+    void attach_source(const std::shared_ptr<jsb::Realm>& p_context, const String& p_path, const String& p_source, jsb::GodotJSClassID p_class_id);
     Variant call_js(jsb::NativeObjectID p_object_id, const StringName& p_method, const Variant** p_argv, int p_argc, Callable::CallError& r_error);
 
     const jsb::GodotJSClassInfo& get_js_class_info() const;

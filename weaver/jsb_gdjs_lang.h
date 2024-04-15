@@ -17,14 +17,14 @@ private:
     SelfList<class GodotJSScript>::List script_list_;
 
     bool once_inited_ = false;
-    std::shared_ptr<jsb::JavaScriptRuntime> runtime_;
-    std::shared_ptr<jsb::JavaScriptContext> context_;
+    std::shared_ptr<jsb::Environment> environment_;
+    std::shared_ptr<jsb::Realm> realm_;
 
 public:
     jsb_force_inline static GodotJSScriptLanguage* get_singleton() { return singleton_; }
 
     // main context
-    jsb_force_inline std::shared_ptr<jsb::JavaScriptContext> get_context() const { return context_; }
+    jsb_force_inline std::shared_ptr<jsb::Realm> get_context() const { return realm_; }
 
     Error eval_source(const String& p_code);
 
