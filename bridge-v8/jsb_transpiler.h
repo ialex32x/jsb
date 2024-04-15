@@ -650,14 +650,8 @@ namespace jsb
             Environment* environment = Environment::wrap(isolate);
             const NativeClassInfo& jclass_info = environment->get_native_class(class_id);
             jsb_check(jclass_info.type == NativeClassInfo::GodotObject);
-
             v8::Local<v8::Function> constructor = jclass_info.template_.Get(isolate)->GetFunction(context).ToLocalChecked();
 
-            JSB_LOG(Verbose, "constructor === info.NewTarget() %d", constructor->StrictEquals(info.NewTarget()) ? 1 : 0);
-            JSB_LOG(Verbose, "info.This() === info.NewTarget() %d", info.This()->StrictEquals(info.NewTarget()) ? 1 : 0);
-            JSB_LOG(Verbose, "info.NewTarget()->IsFunction() %d", info.NewTarget()->IsFunction() ? 1 : 0);
-            JSB_LOG(Verbose, "constructor->GetIdentityHash() %d", constructor->GetIdentityHash());
-            JSB_LOG(Verbose, "info.NewTarget().As<v8::Object>()->GetIdentityHash() %d", info.NewTarget().As<v8::Object>()->GetIdentityHash());
             if (constructor == info.NewTarget())
             {
                 const HashMap<StringName, ClassDB::ClassInfo>::Iterator it = ClassDB::classes.find(jclass_info.name);
