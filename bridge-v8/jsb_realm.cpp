@@ -806,7 +806,6 @@ namespace jsb
             jsb_check(context == context_.Get(isolate));
             v8::Local<v8::FunctionTemplate> function_template = ClassTemplate<Object>::create(isolate, class_id, jclass_info);
             v8::Local<v8::ObjectTemplate> object_template = function_template->PrototypeTemplate();
-            jsb_check(function_template == jclass_info.template_);
             JSB_LOG(Verbose, "expose godot type %s(%d)", p_class_info->name, (uint32_t) class_id);
 
             // expose class methods
@@ -894,6 +893,7 @@ namespace jsb
                 function_template->Inherit(base_template);
                 JSB_LOG(Debug, "%s (%d) extends %s (%d)", p_class_info->name, (uint32_t) class_id, p_class_info->inherits_ptr->name, (uint32_t) super_id);
             }
+            jsb_check(function_template == jclass_info.template_);
         }
 
         if (r_class_id)
@@ -1298,10 +1298,12 @@ namespace jsb
         if (const auto it = realm->godot_primitive_map_.find(type_name); it != realm->godot_primitive_map_.end())
         {
             JSB_LOG(Verbose, "import primitive type %s", (String) type_name);
-            const NativeClassInfo* class_info = realm->_expose_godot_primitive_class(it->value);
+            NativeClassInfo* class_info = realm->_expose_godot_primitive_class(it->value);
             jsb_check(class_info);
             jsb_check(!class_info->template_.IsEmpty());
-            info.GetReturnValue().Set(class_info->template_.Get(isolate)->GetFunction(context).ToLocalChecked());
+            v8::Local<v8::Function> instantiated = class_info->template_.Get(isolate)->GetFunction(context).ToLocalChecked();
+            class_info->function_.Reset(isolate, instantiated);
+            info.GetReturnValue().Set(instantiated);
             return;
         }
 
@@ -1353,7 +1355,10 @@ namespace jsb
         {
             if (NativeClassInfo* godot_class = realm->_expose_godot_class(&it->value))
             {
-                info.GetReturnValue().Set(godot_class->template_.Get(isolate)->GetFunction(context).ToLocalChecked());
+                v8::Local<v8::Function> instantiated = godot_class->template_.Get(isolate)->GetFunction(context).ToLocalChecked();
+                godot_class->function_.Reset(isolate, instantiated);
+                JSB_LOG(Verbose, "instantiated template %s %d", type_name, instantiated->GetIdentityHash());
+                info.GetReturnValue().Set(instantiated);
                 return;
             }
         }

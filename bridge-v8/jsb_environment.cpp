@@ -226,13 +226,7 @@ namespace jsb
         }
 
         // cleanup all class templates
-        while (!native_classes_.is_empty())
-        {
-            const NativeClassID first_index = native_classes_.get_first_index();
-            NativeClassInfo& class_info = native_classes_.get_value(first_index);
-            class_info.template_.Reset();
-            native_classes_.remove_at(first_index);
-        }
+        native_classes_.clear();
 
         isolate_->Dispose();
         isolate_ = nullptr;

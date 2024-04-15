@@ -33,6 +33,10 @@ namespace jsb
         //NOTE template_.GetFunction() returns the `constructor`,
         //NOTE `constructor == info.NewTarget()` only if directly creating a class instance
         v8::Global<v8::FunctionTemplate> template_;
+
+        //TODO not really necessary
+        //TODO why jclass_info.template_.Get.GetFunction instantiate a new function diff with jclass_info.function_.Get when reading in ClassTemplate<Object>.constructor??
+        v8::Global<v8::Function> function_;
     };
 
     struct GodotJSMethodInfo

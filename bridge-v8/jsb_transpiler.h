@@ -642,7 +642,6 @@ namespace jsb
             v8::Isolate* isolate = info.GetIsolate();
             v8::HandleScope handle_scope(isolate);
             v8::Isolate::Scope isolate_scope(isolate);
-            v8::Local<v8::Object> self = info.This();
             v8::Local<v8::Context> context = isolate->GetCurrentContext();
             const internal::Index32 class_id(v8::Local<v8::Uint32>::Cast(info.Data())->Value());
 
@@ -650,10 +649,12 @@ namespace jsb
             Environment* environment = Environment::wrap(isolate);
             const NativeClassInfo& jclass_info = environment->get_native_class(class_id);
             jsb_check(jclass_info.type == NativeClassInfo::GodotObject);
-            v8::Local<v8::Function> constructor = jclass_info.template_.Get(isolate)->GetFunction(context).ToLocalChecked();
+            v8::Local<v8::Value> new_target = info.NewTarget();
+            v8::Local<v8::Function> constructor = jclass_info.function_.Get(isolate);
 
-            if (constructor == info.NewTarget())
+            if (constructor == new_target)
             {
+                v8::Local<v8::Object> self = info.This();
                 const HashMap<StringName, ClassDB::ClassInfo>::Iterator it = ClassDB::classes.find(jclass_info.name);
                 jsb_check(it != ClassDB::classes.end());
                 const ClassDB::ClassInfo& gd_class_info = it->value;
@@ -665,7 +666,7 @@ namespace jsb
             }
             else
             {
-                JSB_LOG(Verbose, "[experimental] constructing %s from subclass", jclass_info.name);
+                JSB_LOG(Verbose, "[experimental] constructing %s(%d) from subclass", jclass_info.name, (uint32_t) class_id);
             }
         }
 
