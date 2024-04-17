@@ -289,7 +289,7 @@ namespace jsb
         {
             handle.ref_count_ = 1;
         }
-        JSB_LOG(Verbose, "bind object %s class_id %d", uitos((uint64_t) object_id), (uint32_t) p_class_id);
+        JSB_LOG(Verbose, "bind object %s(%d) addr:%s (id: %s)", (String) native_classes_.get_value(p_class_id).name, (uint32_t) p_class_id, uitos((uintptr_t) p_pointer), uitos((uint64_t) object_id));
         return object_id;
     }
 
@@ -385,9 +385,13 @@ namespace jsb
         {
             const NativeClassInfo& class_info = native_classes_.get_value(class_id);
 
-            JSB_LOG(Verbose, "deleting %s(%d) %s", (String) class_info.name, (uint32_t) class_id, uitos((uintptr_t) p_pointer));
+            JSB_LOG(Verbose, "deleting %s(%d) addr:%s", (String) class_info.name, (uint32_t) class_id, uitos((uintptr_t) p_pointer));
             //NOTE Godot will call Object::_predelete to post a notification NOTIFICATION_PREDELETE which finally call `ScriptInstance::callp`
             class_info.finalizer(this, p_pointer, is_persistent);
+        }
+        else
+        {
+            JSB_LOG(Verbose, "unbinding %s(%d) addr:%s", (String) native_classes_.get_value(class_id).name, (uint32_t) class_id, uitos((uintptr_t) p_pointer));
         }
     }
 
