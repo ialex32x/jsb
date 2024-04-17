@@ -198,6 +198,19 @@ declare namespace jsb {
             return_: PropertyInfo | undefined;
         }
 
+        interface MethodBind {
+            id: number;
+            name: string;
+            hint_flags: MethodFlags;
+            is_static: boolean;
+            is_const: boolean;
+            is_vararg: boolean;
+            argument_count: number; /** int32_t */
+
+            args_: Array<PropertyInfo>;
+            return_: PropertyInfo | undefined;
+        }
+
         interface PropertyInfo {
             name: string;
             type: Type;
@@ -222,7 +235,8 @@ declare namespace jsb {
 
             // fields: Array<FieldInfo>;
             // properties: Array<PropertyInfo>;
-            methods: Array<MethodInfo>;
+            methods: Array<MethodBind>;
+            virtual_methods: Array<MethodInfo>;
             constants: Array<ConstantInfo>;
             enums: Array<EnumInfo>;
             signals: Array<SignalInfo>;
@@ -248,6 +262,8 @@ declare namespace jsb {
         function get_singletons(): Array<SingletonInfo>;
 
         function get_global_constants(): Array<GlobalConstantInfo>;
+        
+        function get_utility_functions(): Array<MethodInfo>;
 
         function delete_file(filepath: string): void;
     }

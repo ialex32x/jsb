@@ -309,7 +309,23 @@ class ClassWriter extends IndentWriter {
         }
         return "void";
     }
+    //TODO temporarily reuse MethodBind routine 
+    virtual_method_(method_info) {
+        const special_mark = "/*virtual*/ ";
+        if (method_info.name.indexOf('/') >= 0 || method_info.name.indexOf('.') >= 0) {
+            const args = this.make_args(method_info);
+            const rval = this.make_return(method_info);
+            const prefix = this.make_method_prefix(method_info);
+            this.line(`${special_mark}${prefix}["${method_info.name}"]: (${args}) => ${rval}`);
+            return;
+        }
+        const args = this.make_args(method_info);
+        const rval = this.make_return(method_info);
+        const prefix = this.make_method_prefix(method_info);
+        this.line(`${special_mark}${prefix}${method_info.name}(${args}): ${rval}`);
+    }
     method_(method_info) {
+        // some godot methods declared with special characters
         if (method_info.name.indexOf('/') >= 0 || method_info.name.indexOf('.') >= 0) {
             const args = this.make_args(method_info);
             const rval = this.make_return(method_info);
@@ -550,6 +566,9 @@ class TSDCodeGen {
         }
         for (let method_info of cls.methods) {
             class_cg.method_(method_info);
+        }
+        for (let method_info of cls.virtual_methods) {
+            class_cg.virtual_method_(method_info);
         }
         for (let signal_info of cls.signals) {
             class_cg.signal_(signal_info);

@@ -291,7 +291,7 @@ class ClassWriter extends IndentWriter {
         }
         return `class ${this._name} extends ${this._super}`
     }
-    protected make_method_prefix(method_info: jsb.editor.MethodInfo): string {
+    protected make_method_prefix(method_info: jsb.editor.MethodBind): string {
         return this._singleton_mode || method_info.is_static ? "static " : "";
     }
     finish() {
@@ -346,21 +346,37 @@ class ClassWriter extends IndentWriter {
     private make_arg(info: jsb.editor.PropertyInfo): string {
         return `${replace(info.name)}: ${this.make_typename(info)}`
     }
-    private make_args(method_info: jsb.editor.MethodInfo): string {
+    private make_args(method_info: jsb.editor.MethodBind): string {
         //TODO
         if (method_info.args_.length == 0) {
             return ""
         }
         return method_info.args_.map(it => this.make_arg(it)).join(", ");
     }
-    private make_return(method_info: jsb.editor.MethodInfo): string {
+    private make_return(method_info: jsb.editor.MethodBind): string {
         //TODO
         if (typeof method_info.return_ != "undefined") {
             return this.make_typename(method_info.return_)
         }
         return "void"
     }
-    method_(method_info: jsb.editor.MethodInfo) {
+    //TODO temporarily reuse MethodBind routine 
+    virtual_method_(method_info: jsb.editor.MethodInfo) {
+        const special_mark = "/*virtual*/ ";
+        if (method_info.name.indexOf('/') >= 0 || method_info.name.indexOf('.') >= 0) {
+            const args = this.make_args(method_info)
+            const rval = this.make_return(method_info)
+            const prefix = this.make_method_prefix(method_info);
+            this.line(`${special_mark}${prefix}["${method_info.name}"]: (${args}) => ${rval}`);
+            return;
+        }
+        const args = this.make_args(method_info)
+        const rval = this.make_return(method_info)
+        const prefix = this.make_method_prefix(method_info);
+        this.line(`${special_mark}${prefix}${method_info.name}(${args}): ${rval}`);
+    }
+    method_(method_info: jsb.editor.MethodBind) {
+        // some godot methods declared with special characters
         if (method_info.name.indexOf('/') >= 0 || method_info.name.indexOf('.') >= 0) {
             const args = this.make_args(method_info)
             const rval = this.make_return(method_info)
@@ -637,6 +653,9 @@ export default class TSDCodeGen {
         }
         for (let method_info of cls.methods) {
             class_cg.method_(method_info);
+        }
+        for (let method_info of cls.virtual_methods) {
+            class_cg.virtual_method_(method_info);
         }
         for (let signal_info of cls.signals) {
             class_cg.signal_(signal_info);

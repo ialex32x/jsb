@@ -566,6 +566,7 @@ namespace jsb
                 editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "get_classes"), v8::Function::New(context, JavaScriptEditorUtility::_get_classes).ToLocalChecked()).Check();
                 editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "get_global_constants"), v8::Function::New(context, JavaScriptEditorUtility::_get_global_constants).ToLocalChecked()).Check();
                 editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "get_singletons"), v8::Function::New(context, JavaScriptEditorUtility::_get_singletons).ToLocalChecked()).Check();
+                editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "get_utility_functions"), v8::Function::New(context, JavaScriptEditorUtility::_get_utility_functions).ToLocalChecked()).Check();
                 editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "delete_file"), v8::Function::New(context, JavaScriptEditorUtility::_delete_file).ToLocalChecked()).Check();
 
             }
@@ -607,6 +608,11 @@ namespace jsb
             self->Set(context, v8::String::NewFromUtf8Literal(isolate, "setTimeout"), v8::Function::New(context, _set_timer, v8::Int32::New(isolate, InternalTimerType::Timeout)).ToLocalChecked()).Check();
             self->Set(context, v8::String::NewFromUtf8Literal(isolate, "setImmediate"), v8::Function::New(context, _set_timer, v8::Int32::New(isolate, InternalTimerType::Immediate)).ToLocalChecked()).Check();
             self->Set(context, v8::String::NewFromUtf8Literal(isolate, "clearInterval"), v8::Function::New(context, _clear_timer).ToLocalChecked()).Check();
+        }
+
+        //TODO expose variant_utility.cpp (variant_utility.cpp get_utility_function_list/call_utility_function)
+        {
+
         }
     }
 
@@ -829,6 +835,19 @@ namespace jsb
                 {
                     object_template->Set(propkey_name, propval_func);
                 }
+            }
+
+            for (const KeyValue<StringName, MethodInfo>& pair : p_class_info->virtual_methods_map)
+            {
+                const StringName& method_name = pair.key;
+                const MethodInfo& method_info = pair.value;
+                const CharString cmethod_name = ((String) method_name).ascii();
+                v8::Local<v8::String> propkey_name = v8::String::NewFromUtf8(isolate, cmethod_name.ptr(), v8::NewStringType::kNormal, cmethod_name.length()).ToLocalChecked();
+                const StringNameID string_name_id = environment_->add_string_name(method_name);
+                v8::Local<v8::FunctionTemplate> propval_func = v8::FunctionTemplate::New(isolate, _godot_object_virtual_method, v8::Uint32::NewFromUnsigned(isolate, (uint32_t) string_name_id));
+
+                jsb_check(!(method_info.flags & METHOD_FLAG_STATIC));
+                object_template->Set(propkey_name, propval_func);
             }
 
             // expose signals
@@ -1207,15 +1226,93 @@ namespace jsb
         info.GetReturnValue().Set(rval);
     }
 
-    void Realm::_godot_object_method(const v8::FunctionCallbackInfo<v8::Value>& info)
+    const MethodInfo& get_method_info_recursively(const ClassDB::ClassInfo& p_class_info, const StringName& method_name)
     {
+        const HashMap<StringName, MethodInfo>::ConstIterator method_it = p_class_info.virtual_methods_map.find(method_name);
+        if (method_it != p_class_info.virtual_methods_map.end()) return method_it->value;
+        jsb_check(p_class_info.inherits_ptr);
+        return get_method_info_recursively(*p_class_info.inherits_ptr, method_name);
+    }
+
+    void Realm::_godot_object_virtual_method(const v8::FunctionCallbackInfo<v8::Value>& info)
+    {
+        jsb_check(info.Data()->IsUint32());
         v8::Isolate* isolate = info.GetIsolate();
-        if (!info.Data()->IsExternal())
+        v8::Local<v8::Context> context = isolate->GetCurrentContext();
+        Realm* realm = wrap(context);
+        Environment* environment = realm->environment_.get();
+        StringName method_name = environment->get_string_name((StringNameID) info.Data().As<v8::Uint32>()->Value());
+        const int argc = info.Length();
+
+        v8::Local<v8::Object> self = info.This();
+
+        // avoid unexpected `this` in a relatively cheap way
+        if (!self->IsObject() || self->InternalFieldCount() != kObjectFieldCount)
         {
-            isolate->ThrowError("bad call");
+            isolate->ThrowError("bad this");
             return;
         }
 
+        // `this` must be a gd object which already bound to javascript
+        void* pointer = self->GetAlignedPointerFromInternalField(kObjectFieldPointer);
+        jsb_check(Environment::wrap(isolate)->check_object(pointer));
+        Object* gd_object = (Object*) pointer;
+
+        // inefficient approach to get MethodInfo
+        StringName class_name = gd_object->get_class_name();
+        const HashMap<StringName, ClassDB::ClassInfo>::Iterator class_it = ClassDB::classes.find(class_name);
+        jsb_check(class_it != ClassDB::classes.end());
+        const ClassDB::ClassInfo& class_info = class_it->value;
+        const MethodInfo& method_info = get_method_info_recursively(class_info, method_name);
+
+        // prepare argv
+        jsb_check(argc <= method_info.arguments.size());
+        const Variant** argv = jsb_stackalloc(const Variant*, argc);
+        Variant* args = jsb_stackalloc(Variant, argc);
+        for (int index = 0; index < argc; ++index)
+        {
+            memnew_placement(&args[index], Variant);
+            argv[index] = &args[index];
+            Variant::Type type = method_info.arguments[index].type;
+            if (!js_to_gd_var(isolate, context, info[index], type, args[index]))
+            {
+                // revert all constructors
+                const CharString raw_string = vformat("bad argument: %d", index).ascii();
+                while (index >= 0) { args[index--].~Variant(); }
+                v8::Local<v8::String> error_message = v8::String::NewFromOneByte(isolate, (const uint8_t*) raw_string.ptr(), v8::NewStringType::kNormal, raw_string.length()).ToLocalChecked();
+                isolate->ThrowError(error_message);
+                return;
+            }
+        }
+
+        // call godot method
+        Callable::CallError error;
+        Variant crval = gd_object->callp(method_name, argv, argc, error);
+
+        // don't forget to destruct all stack allocated variants
+        for (int index = 0; index < argc; ++index)
+        {
+            args[index].~Variant();
+        }
+
+        if (error.error != Callable::CallError::CALL_OK)
+        {
+            isolate->ThrowError("failed to call");
+            return;
+        }
+        v8::Local<v8::Value> jrval;
+        if (gd_var_to_js(isolate, context, crval, jrval))
+        {
+            info.GetReturnValue().Set(jrval);
+            return;
+        }
+        isolate->ThrowError("failed to translate godot variant to v8 value");
+    }
+
+    void Realm::_godot_object_method(const v8::FunctionCallbackInfo<v8::Value>& info)
+    {
+        jsb_check(info.Data()->IsExternal());
+        v8::Isolate* isolate = info.GetIsolate();
         v8::Local<v8::Context> context = isolate->GetCurrentContext();
         v8::Local<v8::External> data = info.Data().As<v8::External>();
         MethodBind* method_bind = (MethodBind*) data->Value();

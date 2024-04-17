@@ -158,6 +158,37 @@ namespace jsb
             set_field(isolate, context, object, "args_", args_obj);
         }
 
+        void build_method_info(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const MethodInfo& method_info, const v8::Local<v8::Object>& object)
+        {
+            set_field(isolate, context, object, "id", method_info.id);
+            set_field(isolate, context, object, "name", method_info.name);
+            set_field(isolate, context, object, "hint_flags", method_info.flags);
+            set_field(isolate, context, object, "is_static", method_info.flags & METHOD_FLAG_STATIC);
+            set_field(isolate, context, object, "is_const", method_info.flags & METHOD_FLAG_CONST);
+            set_field(isolate, context, object, "is_vararg", method_info.flags & METHOD_FLAG_VARARG);
+            // set_field(isolate, context, object, "has_return", method_bind->has_return());
+            set_field(isolate, context, object, "argument_count", method_info.arguments.size());
+
+            if (method_info.return_val.type != Variant::NIL)
+            {
+                const PropertyInfo& return_info = method_info.return_val;
+                v8::Local<v8::Object> property_info_obj = v8::Object::New(isolate);
+                build_property_info(isolate, context, return_info, property_info_obj);
+                set_field(isolate, context, object, "return_", property_info_obj);
+            }
+
+            const int argc = method_info.arguments.size();
+            v8::Local<v8::Array> args_obj = v8::Array::New(isolate, argc);
+            for (int index = 0; index < argc; ++index)
+            {
+                const PropertyInfo& arg_info = method_info.arguments[index];
+                v8::Local<v8::Object> property_info_obj = v8::Object::New(isolate);
+                build_property_info(isolate, context, arg_info, property_info_obj);
+                args_obj->Set(context, index, property_info_obj);
+            }
+            set_field(isolate, context, object, "args_", args_obj);
+        }
+
         void build_enum_info(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const ClassDB::ClassInfo::EnumInfo& enum_info, const v8::Local<v8::Object>& object)
         {
             const int num = enum_info.constants.size();
@@ -226,6 +257,18 @@ namespace jsb
                     MethodBind const * const method_bind = pair.value;
                     v8::Local<v8::Object> method_info_obj = v8::Object::New(isolate);
                     build_method_info(isolate, context, method_bind, method_info_obj);
+                    methods_obj->Set(context, index++, method_info_obj);
+                }
+            }
+
+            {
+                v8::Local<v8::Array> methods_obj = v8::Array::New(isolate, (int) class_info.virtual_methods_map.size());
+                set_field(isolate, context, class_info_obj, "virtual_methods", methods_obj);
+                int index = 0;
+                for (const KeyValue<StringName, MethodInfo>& pair : class_info.virtual_methods_map)
+                {
+                    v8::Local<v8::Object> method_info_obj = v8::Object::New(isolate);
+                    build_method_info(isolate, context, pair.value, method_info_obj);
                     methods_obj->Set(context, index++, method_info_obj);
                 }
             }
@@ -322,6 +365,25 @@ namespace jsb
                     build_int64(isolate, kv.key, kv.value));
             }
             array->Set(context, array_index++, enum_obj);
+        }
+        info.GetReturnValue().Set(array);
+    }
+
+    void JavaScriptEditorUtility::_get_utility_functions(const v8::FunctionCallbackInfo<v8::Value>& info)
+    {
+        v8::Isolate* isolate = info.GetIsolate();
+        v8::HandleScope handle_scope(isolate);
+        v8::Local<v8::Context> context = isolate->GetCurrentContext();
+
+        List<StringName> utility_function_list;
+        Variant::get_utility_function_list(&utility_function_list);
+        v8::Local<v8::Array> array = v8::Array::New(isolate, utility_function_list.size());
+        for (int index = 0, num = utility_function_list.size(); index < num; ++index)
+        {
+            const MethodInfo method_info = Variant::get_utility_function_info(utility_function_list[index]);
+            v8::Local<v8::Object> method_info_obj = v8::Object::New(isolate);
+            build_method_info(isolate, context, method_info, method_info_obj);
+            array->Set(context, index, method_info_obj);
         }
         info.GetReturnValue().Set(array);
     }

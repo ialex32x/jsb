@@ -181,6 +181,7 @@ namespace jsb
         static void _set_timer(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void _clear_timer(const v8::FunctionCallbackInfo<v8::Value>& info);
 
+        static void _godot_object_virtual_method(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void _godot_object_method(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void _godot_signal(const v8::FunctionCallbackInfo<v8::Value>& info);
 
