@@ -128,7 +128,7 @@ namespace jsb
             }
             return stringnames_.add(p_string_name);
         }
-        jsb_force_inline StringName get_string_name(const StringNameID& p_string_name_id) const { return stringnames_[p_string_name_id]; }
+        jsb_force_inline const StringName& get_string_name(const StringNameID& p_string_name_id) const { return stringnames_[p_string_name_id]; }
 
         /**
          * \brief bind a C++ `p_pointer` with a JS `p_object`

@@ -1,5 +1,5 @@
 #include "jsb_primitive_bindings.h"
-
+#if JSB_WITH_STATIC_PRIMITIVE_TYPE_BINDINGS
 #include "jsb_class_info.h"
 #include "jsb_transpiler.h"
 
@@ -194,3 +194,4 @@ namespace jsb
         p_realm->register_primitive_binding(jsb_typename(Callable), Variant::CALLABLE, bind_Callable);
     }
 }
+#endif

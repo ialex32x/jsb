@@ -43,6 +43,7 @@ namespace jsb
         struct GodotPrimitiveImport
         {
             NativeClassID id = {};
+            StringName type_name;
             PrimitiveTypeRegisterFunc register_func = nullptr;
         };
 
@@ -65,7 +66,12 @@ namespace jsb
             return realms_.try_get_value(p_realm_id, ptr) ? ptr->shared_from_this() : nullptr;
         }
 
-        void register_primitive_binding(const StringName& p_name, Variant::Type p_type, PrimitiveTypeRegisterFunc p_func);
+        void register_primitive_binding(Variant::Type p_type, PrimitiveTypeRegisterFunc p_func)
+        {
+            const StringName type_name = Variant::get_type_name(p_type);
+            godot_primitive_map_.insert(type_name, p_type);
+            godot_primitive_index_[p_type] = { {}, type_name, p_func };
+        }
 
         jsb_force_inline static Realm* wrap(const v8::Local<v8::Context>& p_context)
         {

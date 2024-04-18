@@ -13,23 +13,6 @@
 
 namespace jsb
 {
-    template<typename T>
-    jsb_force_inline int32_t jsb_downscale(int64_t p_val, const T& p_msg)
-    {
-#if DEV_ENABLED
-        if (p_val != (int64_t) (int32_t) p_val) JSB_LOG(Warning, "inconsistent int64_t conversion: %s", p_msg);
-#endif
-        return (int32_t) p_val;
-    }
-
-    jsb_force_inline int32_t jsb_downscale(int64_t p_val)
-    {
-#if DEV_ENABLED
-        if (p_val != (int64_t) (int32_t) p_val) JSB_LOG(Warning, "inconsistent int64_t conversion");
-#endif
-        return (int32_t) p_val;
-    }
-
     namespace InternalTimerType { enum Type : uint8_t { Interval, Timeout, Immediate, }; }
 
     static void _generate_stacktrace(v8::Isolate* isolate, StringBuilder& sb)
@@ -756,12 +739,6 @@ namespace jsb
         ERR_FAIL_V_MSG(ERR_COMPILATION_FAILED, "something wrong");
     }
 
-    void Realm::register_primitive_binding(const StringName& p_name, Variant::Type p_type, PrimitiveTypeRegisterFunc p_func)
-    {
-        godot_primitive_map_.insert(p_name, p_type);
-        godot_primitive_index_[p_type] = { {}, p_func };
-    }
-
     NativeClassInfo* Realm::_expose_godot_primitive_class(Variant::Type p_type, NativeClassID* r_class_id)
     {
         GodotPrimitiveImport& importer = godot_primitive_index_[p_type];
@@ -770,6 +747,7 @@ namespace jsb
             importer.id = importer.register_func(FBindingEnv {
                 environment_.get(),
                 this,
+                importer.type_name,
                 environment_->isolate_,
                 this->context_.Get(environment_->isolate_),
                 this->function_pointers_
@@ -897,7 +875,7 @@ namespace jsb
                 const CharString const_name = const_name_str.utf8(); // utf-8 for better compatibilities
                 v8::Local<v8::String> prop_key = v8::String::NewFromUtf8(isolate, const_name.ptr(), v8::NewStringType::kNormal, const_name.length()).ToLocalChecked();
 
-                function_template->Set(prop_key, v8::Int32::New(isolate, jsb_downscale(const_value, pair.key)));
+                function_template->Set(prop_key, v8::Int32::New(isolate, V8Helper::jsb_downscale(const_value, pair.key)));
             }
 
             //TODO expose all available fields/properties etc.
@@ -1112,7 +1090,7 @@ namespace jsb
         case Variant::INT:
             {
                 const int64_t raw_val = p_cvar;
-                r_jval = v8::Int32::New(isolate, jsb_downscale(raw_val));
+                r_jval = v8::Int32::New(isolate, V8Helper::jsb_downscale(raw_val));
                 return true;
             }
         case Variant::FLOAT:
@@ -1393,7 +1371,7 @@ namespace jsb
         }
 
         // v8::String::Utf8Value str_utf8(isolate, arg0);
-        StringName type_name(V8Helper::to_string(v8::String::Value(isolate, arg0)));
+        const StringName type_name(V8Helper::to_string(v8::String::Value(isolate, arg0)));
         v8::Local<v8::Context> context = isolate->GetCurrentContext();
         Realm* realm = Realm::wrap(context);
 
