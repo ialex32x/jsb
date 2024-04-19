@@ -44,12 +44,26 @@ namespace jsb
         Variant::Type return_type;
     };
 
+    struct FGetSetInfo
+    {
+        Variant::ValidatedSetter setter_func;
+        Variant::ValidatedGetter getter_func;
+        Variant::Type type;
+    };
+
     template<typename T>
     struct VariantBind
     {
         constexpr static Variant::Type TYPE = GetTypeInfo<T>::VARIANT_TYPE;
 
         static Vector<FMethodInfo> builtin_method_collection_;
+        static Vector<FGetSetInfo> builtin_getset_collection_;
+
+        jsb_force_inline static const FGetSetInfo& get_setter(int p_index)
+        {
+            jsb_check(p_index >= 0 && p_index < builtin_getset_collection_.size());
+            return builtin_getset_collection_[p_index];
+        }
 
         jsb_force_inline static const FMethodInfo& get_method(int p_index)
         {
@@ -57,7 +71,17 @@ namespace jsb
             return builtin_method_collection_[p_index];
         }
 
-        jsb_force_inline static int register_type_method(const StringName& p_name)
+        jsb_force_inline static int register_getset_method(const StringName& p_name)
+        {
+            const int collection_index = builtin_getset_collection_.size();
+            builtin_getset_collection_.append({
+                Variant::get_member_validated_setter(TYPE, p_name),
+                Variant::get_member_validated_getter(TYPE, p_name),
+                Variant::get_member_type(TYPE, p_name)});
+            return collection_index;
+        }
+
+        jsb_force_inline static int register_builtin_method(const StringName& p_name)
         {
             const int collection_index = builtin_method_collection_.size();
             builtin_method_collection_.append({});
@@ -85,7 +109,7 @@ namespace jsb
             v8::Local<v8::Value> rval;
             if (!Realm::gd_var_to_js(isolate, context, constant_value, rval))
             {
-                isolate->ThrowError("bad translate");
+                jsb_throw(isolate, "bad translate");
                 return;
             }
             info.GetReturnValue().Set(rval);
@@ -153,7 +177,7 @@ namespace jsb
                 if (err.error != Callable::CallError::CALL_OK)
                 {
                     memdelete(instance);
-                    isolate->ThrowError("bad call");
+                    jsb_throw(isolate, "bad call");
                     return;
                 }
 
@@ -161,7 +185,7 @@ namespace jsb
                 return;
             }
 
-            isolate->ThrowError("bad params");
+            jsb_throw(isolate, "bad params");
         }
 
         static void finalizer(Environment* runtime, void* pointer, bool p_persistent)
@@ -181,14 +205,17 @@ namespace jsb
             v8::Isolate::Scope isolate_scope(isolate);
             v8::Local<v8::Context> context = isolate->GetCurrentContext();
             const Variant* p_self = (Variant*) info.This().As<v8::Object>()->GetAlignedPointerFromInternalField(kObjectFieldPointer);
-            const Variant::ValidatedGetter getter = (Variant::ValidatedGetter) info.Data().As<v8::External>()->Value();
+            const FGetSetInfo& getset = get_setter(info.Data().As<v8::Int32>()->Value());
 
             Variant value;
-            getter(p_self, &value);
+            construct_variant(value, getset.type);
+
+            //NOTE the getter function will not touch the type of `Variant`, so we must set it properly before use in the above code
+            getset.getter_func(p_self, &value);
             v8::Local<v8::Value> rval;
             if (!Realm::gd_var_to_js(isolate, context, value, rval))
             {
-                isolate->ThrowError("bad translate");
+                jsb_throw(isolate, "bad translate");
                 return;
             }
             info.GetReturnValue().Set(rval);
@@ -201,15 +228,15 @@ namespace jsb
             v8::Isolate::Scope isolate_scope(isolate);
             v8::Local<v8::Context> context = isolate->GetCurrentContext();
             Variant* p_self = (Variant*) info.This().As<v8::Object>()->GetAlignedPointerFromInternalField(kObjectFieldPointer);
-            const Variant::ValidatedSetter setter = (Variant::ValidatedSetter) info.Data().As<v8::External>()->Value();
+            const FGetSetInfo& getset = get_setter(info.Data().As<v8::Int32>()->Value());
 
             Variant value;
-            if (!Realm::js_to_gd_var(isolate, context, info[0], value))
+            if (!Realm::js_to_gd_var(isolate, context, info[0], getset.type, value))
             {
-                isolate->ThrowError("bad translate");
+                jsb_throw(isolate, "bad translate");
                 return;
             }
-            setter(p_self, &value);
+            getset.setter_func(p_self, &value);
         }
 
         static void _instance_method(const v8::FunctionCallbackInfo<v8::Value>& info)
@@ -230,8 +257,7 @@ namespace jsb
             {
                 memnew_placement(&args[index], Variant);
                 argv[index] = &args[index];
-                Variant::Type type = method_info.argument_types[index];
-                if (!Realm::js_to_gd_var(isolate, context, info[index], type, args[index]))
+                if (!Realm::js_to_gd_var(isolate, context, info[index], method_info.argument_types[index], args[index]))
                 {
                     // revert all constructors
                     const CharString raw_string = vformat("bad argument: %d", index).ascii();
@@ -255,7 +281,7 @@ namespace jsb
 
             if (error.error != Callable::CallError::CALL_OK)
             {
-                isolate->ThrowError("failed to call");
+                jsb_throw(isolate, "failed to call");
                 return;
             }
             v8::Local<v8::Value> jrval;
@@ -264,7 +290,7 @@ namespace jsb
                 info.GetReturnValue().Set(jrval);
                 return;
             }
-            isolate->ThrowError("failed to translate godot variant to v8 value");
+            jsb_throw(isolate, "failed to translate godot variant to v8 value");
         }
 
         static void _static_method(const v8::FunctionCallbackInfo<v8::Value>& info)
@@ -309,7 +335,7 @@ namespace jsb
 
             if (error.error != Callable::CallError::CALL_OK)
             {
-                isolate->ThrowError("failed to call");
+                jsb_throw(isolate, "failed to call");
                 return;
             }
             v8::Local<v8::Value> jrval;
@@ -318,7 +344,7 @@ namespace jsb
                 info.GetReturnValue().Set(jrval);
                 return;
             }
-            isolate->ThrowError("failed to translate godot variant to v8 value");
+            jsb_throw(isolate, "failed to translate godot variant to v8 value");
         }
 
         static NativeClassID reflect_bind(const FBindingEnv& p_env)
@@ -334,15 +360,16 @@ namespace jsb
             function_template->SetClassName(V8Helper::to_string(p_env.isolate, class_info.name));
             v8::Local<v8::ObjectTemplate> prototype_template = function_template->PrototypeTemplate();
 
-            // setgets
+            // getsets
             {
                 List<StringName> members;
                 Variant::get_member_list(TYPE, &members);
                 for (const StringName& name : members)
                 {
+                    v8::Local<v8::Integer> index = v8::Int32::New(p_env.isolate, register_getset_method(name));
                     prototype_template->SetAccessorProperty(V8Helper::to_string(p_env.isolate, name),
-                        v8::FunctionTemplate::New(p_env.isolate, _getter, v8::External::New(p_env.isolate, (void*) Variant::get_member_validated_getter(TYPE, name))),
-                        v8::FunctionTemplate::New(p_env.isolate, _setter, v8::External::New(p_env.isolate, (void*) Variant::get_member_validated_setter(TYPE, name))));
+                        v8::FunctionTemplate::New(p_env.isolate, _getter, index),
+                        v8::FunctionTemplate::New(p_env.isolate, _setter, index));
                 }
             }
 
@@ -352,7 +379,7 @@ namespace jsb
                 Variant::get_builtin_method_list(TYPE, &methods);
                 for (const StringName& name : methods)
                 {
-                    const int index = register_type_method(name);
+                    const int index = register_builtin_method(name);
                     if (Variant::is_builtin_method_static(TYPE, name))
                     {
                         function_template->Set(V8Helper::to_string(p_env.isolate, name), v8::FunctionTemplate::New(p_env.isolate, _static_method, v8::Int32::New(p_env.isolate, index)));
@@ -446,7 +473,7 @@ namespace jsb
         p_realm->RegisterPrimitiveType(PackedColorArray);
     }
 
-    template<typename T>
-    Vector<FMethodInfo> VariantBind<T>::builtin_method_collection_;
+    template<typename T> Vector<FMethodInfo> VariantBind<T>::builtin_method_collection_;
+    template<typename T> Vector<FGetSetInfo> VariantBind<T>::builtin_getset_collection_;
 }
 #endif

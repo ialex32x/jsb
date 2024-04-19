@@ -56,6 +56,9 @@
 
 #define jsb_stackalloc(type, size) (type*) alloca(sizeof(type) * (size))
 
+// help to trace the location of the throwing error in C++ code.
+#define jsb_throw(isolate, literal) { ERR_PRINT((literal)); isolate->ThrowError((literal)); } (void) 0
+
 namespace jsb::internal
 {
     namespace ELogSeverity
