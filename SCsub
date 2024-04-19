@@ -26,7 +26,7 @@ javascript_shared_defines = [
     # translate the js source stacktrace with source map (currectly, the `.map` file must locate at the same filename & directory of the js source)
     "JSB_WITH_SOURCEMAP=1",
 
-    # enable this to let all methods in `console` print with js stacktrace 
+    # enable this to let all methods in `console` print with js stacktrace
     "JSB_WITH_STACKTRACE_ALWAYS=0",
 
     # NOTE
@@ -36,7 +36,7 @@ javascript_shared_defines = [
     # and the connection will break immediately by `devtools` if `selected_protocol` is assigned manually in `WSLPeer`
     "JSB_WITH_LWS=1",
 
-    # lower log levels are completely skipped (at compile-time)  
+    # lower log levels are completely skipped (at compile-time)
     "JSB_MIN_LOG_LEVEL=Verbose",
 ]
 
@@ -90,7 +90,7 @@ def generate_method_code(output, methodname, indent, filenames):
     output.write(indent+"r_len = 0;\n")
     output.write(indent+"return nullptr;\n")
     output.write("}\n")
-    
+
 def generate_code(filenames):
     indent = "    "
     output = io.StringIO()
@@ -166,25 +166,23 @@ if env.editor_build:
         "scripts/out/jsb.editor.codegen.js": "",
         "scripts/out/jsb.editor.codegen.js.map": "",
         "scripts/src/jsb.editor.main.ts": "",
-        
+
         "scripts/out/jsb.editor.main.js": "",
         "scripts/out/jsb.editor.main.js.map": "",
         "scripts/src/jsb.editor.codegen.ts": "",
 
-
         "scripts/godot-typings/godot.minimal.d.ts": "",
-        "scripts/godot-typings/godot.primitive.d.ts": "",
 
         "scripts/presets/package.json.txt": "package.json",
         "scripts/presets/tsconfig.json.txt": "tsconfig.json",
-        "scripts/presets/gdignore.txt": ".gdignore", 
+        "scripts/presets/gdignore.txt": ".gdignore",
         # icon (from https://icons.getbootstrap.com/icons/filetype-js/)
-        "scripts/presets/filetype-js.svg": "", 
+        "scripts/presets/filetype-js.svg": "",
 
         # runtime presets
-        "scripts/out/jsb.core.js": "", 
-        "scripts/out/jsb.core.js.map": "", 
-        "scripts/src/jsb.core.ts": "", 
+        "scripts/out/jsb.core.js": "",
+        "scripts/out/jsb.core.js.map": "",
+        "scripts/src/jsb.core.ts": "",
     })
     env_jsb.add_source_files(module_obj, "weaver-editor/*.cpp")
 

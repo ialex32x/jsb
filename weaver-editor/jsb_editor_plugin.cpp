@@ -80,7 +80,6 @@ void GodotJSEditorPlugin::install_ts_project()
 
     // type declaration files
     ERR_FAIL_COND(write_file("res://typescripts/typings", "godot.minimal.d.ts") != OK);
-    ERR_FAIL_COND(write_file("res://typescripts/typings", "godot.primitive.d.ts") != OK);
 
     // ts source files
     ERR_FAIL_COND(write_file("res://typescripts/src/jsb", "jsb.core.ts") != OK);

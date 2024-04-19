@@ -32,7 +32,7 @@ console.assert(typeof Node === "function");
 // console.log("start tick", timer_id);
 
 // setImmediate(function(){
-//     console.log("immediate"); 
+//     console.log("immediate");
 // });
 
 // let infinite_loops = 0;

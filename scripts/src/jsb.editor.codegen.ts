@@ -26,44 +26,6 @@ interface ScopeWriter extends CodeWriter {
 //TODO remove all these lines after all primitive types implemented
 const MockLines = [
     "class GodotError {}",
-    "class Dictionary {}",
-    "class Array {}",
-    "class Rect2 {}",
-    "class Rect2i {}",
-    "class Vector2 {}",
-    "class Vector2i {}",
-    "class Vector3 {}",
-    "class Vector3i {}",
-    "class Vector4 {}",
-    "class Vector4i {}",
-    "class AABB {}",
-    "class Plane {}",
-    "class Basis {}",
-    "class Color {}",
-    "class NodePath {}",
-    "class StringName {}",
-    "class RID {}",
-    "class Transform2D {}",
-    "class Transform3D {}",
-    "class Projection {}",
-    "class Quaternion {}",
-    "class PackedByteArray {}",
-    "class PackedInt32Array {}",
-    "class PackedInt64Array {}",
-    "class PackedFloat32Array {}",
-    "class PackedFloat64Array {}",
-    "class PackedStringArray {}",
-    "class PackedVector2Array {}",
-    "class PackedVector3Array {}",
-    "class PackedColorArray {}",
-    "namespace Vector2 { enum Axis { AXIS_X, AXIS_Y, AXIS_Z } }",
-    "namespace Vector2i { enum Axis { AXIS_X, AXIS_Y, AXIS_Z } }",
-    "namespace Vector3 { enum Axis { AXIS_X, AXIS_Y, AXIS_Z } }",
-    "namespace Vector3i { enum Axis { AXIS_X, AXIS_Y, AXIS_Z } }",
-    "namespace Vector4 { enum Axis { AXIS_X, AXIS_Y, AXIS_Z, AXIS_W } }",
-    "namespace Vector4i { enum Axis { AXIS_X, AXIS_Y, AXIS_Z, AXIS_W } }",
-    "type Callable = jsb.Callable", 
-    "type Signal = jsb.Signal",
 ]
 const KeywordReplacement: { [name: string]: string } = {
     ["default"]: "default_",
@@ -84,51 +46,52 @@ const KeywordReplacement: { [name: string]: string } = {
     ["typeof"]: "typeof_",
 }
 
-const PrimitiveTypes = {
-    [jsb.VariantType.NIL]: "any",
-    [jsb.VariantType.BOOL]: "boolean",
-    [jsb.VariantType.INT]: "number /*i64*/",
-    [jsb.VariantType.FLOAT]: "number /*f64*/",
-    [jsb.VariantType.STRING]: "string",
+const PrimitiveTypeNames : { [type: number]: string } = {
+    [jsb.VariantType.TYPE_NIL]: "any",
+    [jsb.VariantType.TYPE_BOOL]: "boolean",
+    [jsb.VariantType.TYPE_INT]: "number /*i64*/",
+    [jsb.VariantType.TYPE_FLOAT]: "number /*f64*/",
+    [jsb.VariantType.TYPE_STRING]: "string",
 
+    //TODO the following mappings could be replaced with Variant::get_type_name()
     // math types
-    [jsb.VariantType.VECTOR2]: "Vector2",
-    [jsb.VariantType.VECTOR2I]: "Vector2i",
-    [jsb.VariantType.RECT2]: "Rect2",
-    [jsb.VariantType.RECT2I]: "Rect2i",
-    [jsb.VariantType.VECTOR3]: "Vector3",
-    [jsb.VariantType.VECTOR3I]: "Vector3i",
-    [jsb.VariantType.TRANSFORM2D]: "Transform2D",
-    [jsb.VariantType.VECTOR4]: "Vector4",
-    [jsb.VariantType.VECTOR4I]: "Vector4i",
-    [jsb.VariantType.PLANE]: "Plane",
-    [jsb.VariantType.QUATERNION]: "Quaternion",
-    [jsb.VariantType.AABB]: "AABB",
-    [jsb.VariantType.BASIS]: "Basis",
-    [jsb.VariantType.TRANSFORM3D]: "Transform3D",
-    [jsb.VariantType.PROJECTION]: "Projection",
+    [jsb.VariantType.TYPE_VECTOR2]: "Vector2",
+    [jsb.VariantType.TYPE_VECTOR2I]: "Vector2i",
+    [jsb.VariantType.TYPE_RECT2]: "Rect2",
+    [jsb.VariantType.TYPE_RECT2I]: "Rect2i",
+    [jsb.VariantType.TYPE_VECTOR3]: "Vector3",
+    [jsb.VariantType.TYPE_VECTOR3I]: "Vector3i",
+    [jsb.VariantType.TYPE_TRANSFORM2D]: "Transform2D",
+    [jsb.VariantType.TYPE_VECTOR4]: "Vector4",
+    [jsb.VariantType.TYPE_VECTOR4I]: "Vector4i",
+    [jsb.VariantType.TYPE_PLANE]: "Plane",
+    [jsb.VariantType.TYPE_QUATERNION]: "Quaternion",
+    [jsb.VariantType.TYPE_AABB]: "AABB",
+    [jsb.VariantType.TYPE_BASIS]: "Basis",
+    [jsb.VariantType.TYPE_TRANSFORM3D]: "Transform3D",
+    [jsb.VariantType.TYPE_PROJECTION]: "Projection",
 
     // misc types
-    [jsb.VariantType.COLOR]: "Color",
-    [jsb.VariantType.STRING_NAME]: "StringName",
-    [jsb.VariantType.NODE_PATH]: "NodePath",
-    [jsb.VariantType.RID]: "RID",
-    [jsb.VariantType.OBJECT]: "Object",
-    [jsb.VariantType.CALLABLE]: "Callable",
-    [jsb.VariantType.SIGNAL]: "Signal",
-    [jsb.VariantType.DICTIONARY]: "Dictionary",
-    [jsb.VariantType.ARRAY]: "Array",
+    [jsb.VariantType.TYPE_COLOR]: "Color",
+    [jsb.VariantType.TYPE_STRING_NAME]: "StringName",
+    [jsb.VariantType.TYPE_NODE_PATH]: "NodePath",
+    [jsb.VariantType.TYPE_RID]: "RID",
+    [jsb.VariantType.TYPE_OBJECT]: "Object",
+    [jsb.VariantType.TYPE_CALLABLE]: "Callable",
+    [jsb.VariantType.TYPE_SIGNAL]: "Signal",
+    [jsb.VariantType.TYPE_DICTIONARY]: "Dictionary",
+    [jsb.VariantType.TYPE_ARRAY]: "Array",
 
     // typed arrays
-    [jsb.VariantType.PACKED_BYTE_ARRAY]: "PackedByteArray",
-    [jsb.VariantType.PACKED_INT32_ARRAY]: "PackedInt32Array",
-    [jsb.VariantType.PACKED_INT64_ARRAY]: "PackedInt64Array",
-    [jsb.VariantType.PACKED_FLOAT32_ARRAY]: "PackedFloat32Array",
-    [jsb.VariantType.PACKED_FLOAT64_ARRAY]: "PackedFloat64Array",
-    [jsb.VariantType.PACKED_STRING_ARRAY]: "PackedStringArray",
-    [jsb.VariantType.PACKED_VECTOR2_ARRAY]: "PackedVector2Array",
-    [jsb.VariantType.PACKED_VECTOR3_ARRAY]: "PackedVector3Array",
-    [jsb.VariantType.PACKED_COLOR_ARRAY]: "PackedColorArray",
+    [jsb.VariantType.TYPE_PACKED_BYTE_ARRAY]: "PackedByteArray",
+    [jsb.VariantType.TYPE_PACKED_INT32_ARRAY]: "PackedInt32Array",
+    [jsb.VariantType.TYPE_PACKED_INT64_ARRAY]: "PackedInt64Array",
+    [jsb.VariantType.TYPE_PACKED_FLOAT32_ARRAY]: "PackedFloat32Array",
+    [jsb.VariantType.TYPE_PACKED_FLOAT64_ARRAY]: "PackedFloat64Array",
+    [jsb.VariantType.TYPE_PACKED_STRING_ARRAY]: "PackedStringArray",
+    [jsb.VariantType.TYPE_PACKED_VECTOR2_ARRAY]: "PackedVector2Array",
+    [jsb.VariantType.TYPE_PACKED_VECTOR3_ARRAY]: "PackedVector3Array",
+    [jsb.VariantType.TYPE_PACKED_COLOR_ARRAY]: "PackedColorArray",
 }
 const RemapTypes: { [name: string]: string } = {
     ["Error"]: "GodotError",
@@ -299,12 +262,20 @@ class ClassWriter extends IndentWriter {
         super.finish()
         this._base.line('}')
     }
+    primitive_constant_(constant: jsb.editor.PrimitiveConstantInfo) {
+        if (typeof constant.value !== "undefined") {
+            this.line(`static readonly ${constant.name} = ${constant.value}`);
+        } else {
+            const type_name = PrimitiveTypeNames[constant.type];
+            this.line(`static readonly ${constant.name}: ${type_name}`);
+        }
+    }
     constant_(constant: jsb.editor.ConstantInfo) {
         this.line(`static readonly ${constant.name} = ${constant.value}`);
     }
     private make_typename(info: jsb.editor.PropertyInfo): string {
         if (info.class_name.length == 0) {
-            const primitive_name = PrimitiveTypes[info.type];
+            const primitive_name = PrimitiveTypeNames[info.type];
             if (typeof primitive_name !== "undefined") {
                 return primitive_name;
             }
@@ -325,7 +296,7 @@ class ClassWriter extends IndentWriter {
                         return info.class_name;
                     }
                     const cls = this.types.classes[layers[0]];
-                    if (typeof cls !== "undefined" && cls.enums.findIndex(v => v.name == layers[1]) >= 0) {
+                    if (typeof cls !== "undefined" && cls.enums!.findIndex(v => v.name == layers[1]) >= 0) {
                         return info.class_name;
                     }
                 }
@@ -360,7 +331,7 @@ class ClassWriter extends IndentWriter {
         }
         return "void"
     }
-    //TODO temporarily reuse MethodBind routine 
+    //TODO temporarily reuse MethodBind routine
     virtual_method_(method_info: jsb.editor.MethodInfo) {
         const special_mark = "/*virtual*/ ";
         if (method_info.name.indexOf('/') >= 0 || method_info.name.indexOf('.') >= 0) {
@@ -374,6 +345,14 @@ class ClassWriter extends IndentWriter {
         const rval = this.make_return(method_info)
         const prefix = this.make_method_prefix(method_info);
         this.line(`${special_mark}${prefix}${method_info.name}(${args}): ${rval}`);
+    }
+    property_(property_info: jsb.editor.PropertySetGetInfo) {
+        const type_name = PrimitiveTypeNames[property_info.type];
+        this.line_comment_(`// godot.getset: ${property_info.name}: ${type_name}`);
+    }
+    primitive_property_(property_info: jsb.editor.PrimitiveGetSetInfo) {
+        const type_name = PrimitiveTypeNames[property_info.type];
+        this.line(`${property_info.name}: ${type_name}`);
     }
     method_(method_info: jsb.editor.MethodBind) {
         // some godot methods declared with special characters
@@ -497,7 +476,12 @@ class FileSplitter {
 class TypeDB {
     singletons: { [name: string]: jsb.editor.SingletonInfo } = {};
     classes: { [name: string]: jsb.editor.ClassInfo } = {};
+    primitive_types: { [name: string]: jsb.editor.PrimitiveClassInfo } = {};
     globals: { [name: string]: jsb.editor.GlobalConstantInfo } = {};
+
+    is_primitive_type(name: string): boolean {
+        return typeof this.primitive_types[name] !== "undefined";
+    }
 }
 
 // d.ts generator
@@ -512,10 +496,14 @@ export default class TSDCodeGen {
         this._outDir = outDir;
 
         const classes = jsb.editor.get_classes();
+        const primitive_types = jsb.editor.get_primitive_types();
         const singletons = jsb.editor.get_singletons();
         const globals = jsb.editor.get_global_constants();
         for (let cls of classes) {
             this._types.classes[cls.name] = cls;
+        }
+        for (let cls of primitive_types) {
+            this._types.primitive_types[cls.name] = cls;
         }
         for (let singleton of singletons) {
             this._types.singletons[singleton.name] = singleton;
@@ -570,8 +558,8 @@ export default class TSDCodeGen {
         }
     }
 
-    has_class(name: string): boolean {
-        return typeof this._types.classes[name] !== "undefined"
+    has_class(name?: string): boolean {
+        return typeof name === "string" && typeof this._types.classes[name] !== "undefined"
     }
 
     emit() {
@@ -629,36 +617,83 @@ export default class TSDCodeGen {
             }
             this.emit_godot_class(this.split(), cls, false);
         }
+
+        for (let class_name in this._types.primitive_types) {
+            const cls = this._types.primitive_types[class_name];
+            this.emit_godot_primitive(this.split(), cls);
+        }
     }
 
-    private emit_godot_class(cg: CodeWriter, cls: jsb.editor.ClassInfo, singleton_mode: boolean) {
+    private emit_godot_primitive(cg: CodeWriter, cls: jsb.editor.PrimitiveClassInfo) {
         const ignored_consts: Set<string> = new Set();
         const class_ns_cg = cg.namespace_(cls.name);
-        for (let enum_info of cls.enums) {
-            const enum_cg = class_ns_cg.enum_(enum_info.name);
-            for (let name of enum_info.literals) {
-                const value = cls.constants.find(v => v.name == name)!.value;
-                enum_cg.element_(name, value)
-                ignored_consts.add(name);
+        if (cls.enums) {
+            for (let enum_info of cls.enums) {
+                const enum_cg = class_ns_cg.enum_(enum_info.name);
+                for (let name of enum_info.literals) {
+                    const value = cls.constants!.find(v => v.name == name)!.value;
+                    enum_cg.element_(name, value)
+                    ignored_consts.add(name);
+                }
+                enum_cg.finish();
             }
-            enum_cg.finish();
         }
         class_ns_cg.finish();
 
-        const class_cg = cg.class_(cls.name, this.has_class(cls.super) ? cls.super : "", singleton_mode);
-        for (let constant of cls.constants) {
-            if (!ignored_consts.has(constant.name)) {
-                class_cg.constant_(constant);
+        const class_cg = cg.class_(cls.name, "", false);
+        if (cls.constants) {
+            for (let constant of cls.constants) {
+                if (!ignored_consts.has(constant.name)) {
+                    class_cg.primitive_constant_(constant);
+                }
             }
         }
         for (let method_info of cls.methods) {
             class_cg.method_(method_info);
         }
-        for (let method_info of cls.virtual_methods) {
-            class_cg.virtual_method_(method_info);
+        for (let property_info of cls.properties) {
+            class_cg.primitive_property_(property_info);
         }
-        for (let signal_info of cls.signals) {
-            class_cg.signal_(signal_info);
+        class_cg.finish();
+    }
+
+    private emit_godot_class(cg: CodeWriter, cls: jsb.editor.ClassInfo, singleton_mode: boolean) {
+        const ignored_consts: Set<string> = new Set();
+        const class_ns_cg = cg.namespace_(cls.name);
+        if (cls.enums) {
+            for (let enum_info of cls.enums) {
+                const enum_cg = class_ns_cg.enum_(enum_info.name);
+                for (let name of enum_info.literals) {
+                    const value = cls.constants!.find(v => v.name == name)!.value;
+                    enum_cg.element_(name, value)
+                    ignored_consts.add(name);
+                }
+                enum_cg.finish();
+            }
+        }
+        class_ns_cg.finish();
+
+        const class_cg = cg.class_(cls.name, this.has_class(cls.super) ? cls.super! : "", singleton_mode);
+        if (cls.constants) {
+            for (let constant of cls.constants) {
+                if (!ignored_consts.has(constant.name)) {
+                    class_cg.constant_(constant);
+                }
+            }
+        }
+        for (let method_info of cls.methods) {
+            class_cg.method_(method_info);
+        }
+        for (let property_info of cls.properties) {
+            class_cg.property_(property_info);
+        }
+        // for (let method_info of cls.virtual_methods) {
+        //     class_cg.virtual_method_(method_info);
+        // }
+        if (cls.signals) {
+            for (let signal_info of cls.signals) {
+                class_cg.signal_(signal_info);
+            }
         }
         class_cg.finish();
     }

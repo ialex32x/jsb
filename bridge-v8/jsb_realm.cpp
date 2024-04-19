@@ -533,9 +533,9 @@ namespace jsb
             {
                 v8::Local<v8::Object> ptypes = v8::Object::New(isolate);
 #pragma push_macro("DEF")
-#undef DEF
-#define DEF(FieldName) ptypes->Set(context, v8::String::NewFromUtf8Literal(isolate, #FieldName), v8::Int32::New(isolate, Variant::FieldName)).Check();
-#include "jsb_variant_types.h"
+#   undef DEF
+#   define DEF(FieldName) ptypes->Set(context, v8::String::NewFromUtf8Literal(isolate, "TYPE_" #FieldName), v8::Int32::New(isolate, Variant::FieldName)).Check();
+#   include "jsb_variant_types.h"
 #pragma pop_macro("DEF")
                 jenv->Set(context, v8::String::NewFromUtf8Literal(isolate, "VariantType"), ptypes).Check();
             }
@@ -550,6 +550,7 @@ namespace jsb
                 editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "get_global_constants"), v8::Function::New(context, JavaScriptEditorUtility::_get_global_constants).ToLocalChecked()).Check();
                 editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "get_singletons"), v8::Function::New(context, JavaScriptEditorUtility::_get_singletons).ToLocalChecked()).Check();
                 editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "get_utility_functions"), v8::Function::New(context, JavaScriptEditorUtility::_get_utility_functions).ToLocalChecked()).Check();
+                editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "get_primitive_types"), v8::Function::New(context, JavaScriptEditorUtility::_get_primitive_types).ToLocalChecked()).Check();
                 editor->Set(context, v8::String::NewFromUtf8Literal(isolate, "delete_file"), v8::Function::New(context, JavaScriptEditorUtility::_delete_file).ToLocalChecked()).Check();
 
             }
