@@ -12,25 +12,30 @@
 #include "core/os/os.h"
 
 #ifndef JSB_MIN_LOG_LEVEL
-#   define JSB_MIN_LOG_LEVEL Verbose
+#   if DEV_ENABLED
+#       define JSB_MIN_LOG_LEVEL Verbose
+#   else
+#       define JSB_MIN_LOG_LEVEL Warning
+#   endif
 #endif
 
-#define JSB_LOG_FORMAT(Severity, Format, ...) vformat("[jsb][" #Severity "] " Format, ##__VA_ARGS__)
-
-#if DEV_ENABLED
-#   define JSB_LOG(Severity, Format, ...) \
+#define JSB_LOG_FORMAT(CategoryName, Severity, Format, ...) vformat("[" #CategoryName "][" #Severity "] " Format, ##__VA_ARGS__)
+#define JSB_LOG_IMPL(CategoryName, Severity, Format, ...) \
     if constexpr (jsb::internal::ELogSeverity::Severity >= jsb::internal::ELogSeverity::JSB_MIN_LOG_LEVEL) \
     {\
-        if constexpr (jsb::internal::ELogSeverity::Severity >= jsb::internal::ELogSeverity::Error) { _err_print_error(FUNCTION_STR, __FILE__, __LINE__, "Method/function failed.", JSB_LOG_FORMAT(Severity, Format, ##__VA_ARGS__)); } \
-        else if constexpr (jsb::internal::ELogSeverity::Severity >= jsb::internal::ELogSeverity::Warning) { _err_print_error(FUNCTION_STR, __FILE__, __LINE__, JSB_LOG_FORMAT(Severity, Format, ##__VA_ARGS__), false, ERR_HANDLER_WARNING); }\
-        else if constexpr (jsb::internal::ELogSeverity::Severity > jsb::internal::ELogSeverity::Verbose) { print_line(JSB_LOG_FORMAT(Severity, Format, ##__VA_ARGS__)); } \
-        else if (OS::get_singleton()->is_stdout_verbose()) { print_line(JSB_LOG_FORMAT(Severity, Format, ##__VA_ARGS__)); } \
+        if constexpr (jsb::internal::ELogSeverity::Severity >= jsb::internal::ELogSeverity::Error) { _err_print_error(FUNCTION_STR, __FILE__, __LINE__, "Method/function failed.", JSB_LOG_FORMAT(CategoryName, Severity, Format, ##__VA_ARGS__)); } \
+        else if constexpr (jsb::internal::ELogSeverity::Severity >= jsb::internal::ELogSeverity::Warning) { _err_print_error(FUNCTION_STR, __FILE__, __LINE__, JSB_LOG_FORMAT(CategoryName, Severity, Format, ##__VA_ARGS__), false, ERR_HANDLER_WARNING); }\
+        else if constexpr (jsb::internal::ELogSeverity::Severity > jsb::internal::ELogSeverity::Verbose) { print_line(JSB_LOG_FORMAT(CategoryName, Severity, Format, ##__VA_ARGS__)); } \
+        else if (OS::get_singleton()->is_stdout_verbose()) { print_line(JSB_LOG_FORMAT(CategoryName, Severity, Format, ##__VA_ARGS__)); } \
     } (void) 0
+
+#define JSB_LOG(Severity, Format, ...) JSB_LOG_IMPL(jsb, Severity, Format, ##__VA_ARGS__)
+
+#if DEV_ENABLED
 #   define jsb_check(Condition) CRASH_COND(!(Condition))
 #   define jsb_checkf(Condition, Format, ...) CRASH_COND_MSG(!(Condition), vformat(Format, ##__VA_ARGS__))
 #   define jsb_ensure(Condition) CRASH_COND(!(Condition))
 #else
-#   define JSB_LOG(Severity, Format, ...) (void) 0
 #   define jsb_check(Condition) (void) 0
 #   define jsb_checkf(Condition, Format, ...) (void) 0
 #   define jsb_ensure(Condition) CRASH_COND(!(Condition))
@@ -57,7 +62,7 @@
 #define jsb_stackalloc(type, size) (type*) alloca(sizeof(type) * (size))
 
 // help to trace the location of the throwing error in C++ code.
-#define jsb_throw(isolate, literal) { ERR_PRINT((literal)); isolate->ThrowError((literal)); } (void) 0
+#define jsb_throw(isolate, literal) { ERR_PRINT((literal)); (isolate)->ThrowError((literal)); } (void) 0
 
 namespace jsb::internal
 {
