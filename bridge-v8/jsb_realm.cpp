@@ -815,18 +815,18 @@ namespace jsb
                 }
             }
 
-            for (const KeyValue<StringName, MethodInfo>& pair : p_class_info->virtual_methods_map)
-            {
-                const StringName& method_name = pair.key;
-                const MethodInfo& method_info = pair.value;
-                const CharString cmethod_name = ((String) method_name).ascii();
-                v8::Local<v8::String> propkey_name = v8::String::NewFromUtf8(isolate, cmethod_name.ptr(), v8::NewStringType::kNormal, cmethod_name.length()).ToLocalChecked();
-                const StringNameID string_name_id = environment_->add_string_name(method_name);
-                v8::Local<v8::FunctionTemplate> propval_func = v8::FunctionTemplate::New(isolate, _godot_object_virtual_method, v8::Uint32::NewFromUnsigned(isolate, (uint32_t) string_name_id));
-
-                jsb_check(!(method_info.flags & METHOD_FLAG_STATIC));
-                object_template->Set(propkey_name, propval_func);
-            }
+            // for (const KeyValue<StringName, MethodInfo>& pair : p_class_info->virtual_methods_map)
+            // {
+            //     const StringName& method_name = pair.key;
+            //     const MethodInfo& method_info = pair.value;
+            //     const CharString cmethod_name = ((String) method_name).ascii();
+            //     v8::Local<v8::String> propkey_name = v8::String::NewFromUtf8(isolate, cmethod_name.ptr(), v8::NewStringType::kNormal, cmethod_name.length()).ToLocalChecked();
+            //     const StringNameID string_name_id = environment_->add_string_name(method_name);
+            //     v8::Local<v8::FunctionTemplate> propval_func = v8::FunctionTemplate::New(isolate, _godot_object_virtual_method, v8::Uint32::NewFromUnsigned(isolate, (uint32_t) string_name_id));
+            //
+            //     jsb_check(!(method_info.flags & METHOD_FLAG_STATIC));
+            //     object_template->Set(propkey_name, propval_func);
+            // }
 
             // expose signals
             for (const KeyValue<StringName, MethodInfo>& pair : p_class_info->signal_map)
@@ -942,7 +942,11 @@ namespace jsb
             if (p_jval->IsNumber()) { r_cvar = (int64_t) p_jval->NumberValue(context).ToChecked(); return true; }
             return false;
         case Variant::FLOAT:
-            if (p_jval->IsNumber()) { r_cvar = p_jval->NumberValue(context).ToChecked(); return true; }
+            if (p_jval->IsNumber())
+            {
+                r_cvar = p_jval->NumberValue(context).ToChecked();
+                return true;
+            }
             return false;
         case Variant::STRING:
             if (p_jval->IsString())
