@@ -9,7 +9,8 @@
 #if JSB_WITH_LWS
 #include "libwebsockets.h"
 #include "../internal/jsb_version.h"
-#define JSB_DEBUGGER_LOG(Severity, Format, ...) print_line(vformat("[JSDebugger][%s] " Format, ((void) sizeof(jsb::internal::ELogSeverity::Severity), #Severity), ##__VA_ARGS__))
+
+#define JSB_DEBUGGER_LOG(Severity, Format, ...) JSB_LOG_IMPL(JSDebugger, Severity, Format, ##__VA_ARGS__)
 
 namespace jsb
 {
@@ -116,8 +117,8 @@ namespace jsb
 	        if (lws_is_final_fragment(wsi_))
 	        {
 	            const bool is_binary = lws_frame_is_binary(wsi_) == 1;
-	            if (is_binary) JSB_DEBUGGER_LOG(Debug, "receive binary message: %d", recv_buffer_->get_position());
-	            else JSB_DEBUGGER_LOG(Debug, "receive text message: %s", String::utf8((const char*) recv_buffer_->get_data_array().ptr(), recv_buffer_->get_position()));
+	            if (is_binary) { JSB_DEBUGGER_LOG(Debug, "receive binary message: %d", recv_buffer_->get_position()); }
+	            else { JSB_DEBUGGER_LOG(Debug, "receive text message: %s", String::utf8((const char*) recv_buffer_->get_data_array().ptr(), recv_buffer_->get_position())); }
 
 	            v8::Isolate* isolate = isolate_;
 	            v8::Isolate::Scope isolateScope(isolate);

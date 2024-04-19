@@ -104,6 +104,12 @@ namespace jsb
         }
 
         template<int N>
+        void set_field(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& obj, const char (&field_name)[N], double field_value)
+        {
+            set_field(isolate, context, obj, field_name, v8::Number::New(isolate, field_value));
+        }
+
+        template<int N>
         void set_field(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& obj, const char (&field_name)[N], int64_t field_value)
         {
             set_field(isolate, context, obj, field_name, build_int64(isolate, field_name, field_value));
@@ -117,6 +123,18 @@ namespace jsb
             set_field(isolate, context, object, "hint", property_info.hint);
             set_field(isolate, context, object, "hint_string", property_info.hint_string);
             set_field(isolate, context, object, "usage", property_info.usage);
+        }
+
+        struct FPrimitiveGetSetInfo
+        {
+            StringName name;
+            Variant::Type type;
+        };
+
+        void build_property_info(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const StringName& property_name, const FPrimitiveGetSetInfo& property_info, const v8::Local<v8::Object>& object)
+        {
+            set_field(isolate, context, object, "name", property_name);
+            set_field(isolate, context, object, "type", property_info.type);
         }
 
         void build_property_info(v8::Isolate* isolate, const v8::Local<v8::Context>& context, const StringName& property_name, const ClassDB::PropertySetGet& property_info, const v8::Local<v8::Object>& object)
@@ -222,6 +240,7 @@ namespace jsb
             set_field(isolate, context, class_info_obj, "name", class_name);
             set_field(isolate, context, class_info_obj, "super", class_info.inherits);
 
+            // fields?
             {
                 v8::Local<v8::Array> properties_obj = v8::Array::New(isolate, class_info.property_list.size());
                 set_field(isolate, context, class_info_obj, "fields", properties_obj);
@@ -234,6 +253,7 @@ namespace jsb
                 }
             }
 
+            // properties?
             {
                 v8::Local<v8::Array> properties_obj = v8::Array::New(isolate, (int) class_info.property_setget.size());
                 set_field(isolate, context, class_info_obj, "properties", properties_obj);
@@ -248,6 +268,7 @@ namespace jsb
                 }
             }
 
+            // methods
             {
                 v8::Local<v8::Array> methods_obj = v8::Array::New(isolate, (int) class_info.method_map.size());
                 set_field(isolate, context, class_info_obj, "methods", methods_obj);
@@ -261,6 +282,7 @@ namespace jsb
                 }
             }
 
+            // vmethods (DO NOT USE)
             {
                 v8::Local<v8::Array> methods_obj = v8::Array::New(isolate, (int) class_info.virtual_methods_map.size());
                 set_field(isolate, context, class_info_obj, "virtual_methods", methods_obj);
@@ -273,6 +295,7 @@ namespace jsb
                 }
             }
 
+            // enums
             {
                 v8::Local<v8::Array> enums_obj = v8::Array::New(isolate, (int) class_info.enum_map.size());
                 set_field(isolate, context, class_info_obj, "enums", enums_obj);
@@ -287,6 +310,7 @@ namespace jsb
                 }
             }
 
+            // constants (int only)
             {
                 v8::Local<v8::Array> constants_obj = v8::Array::New(isolate, (int) class_info.constant_map.size());
                 set_field(isolate, context, class_info_obj, "constants", constants_obj);
@@ -300,6 +324,7 @@ namespace jsb
                 }
             }
 
+            // signals
             {
                 v8::Local<v8::Array> signals_obj = v8::Array::New(isolate, (int) class_info.signal_map.size());
                 set_field(isolate, context, class_info_obj, "signals", signals_obj);
@@ -366,6 +391,163 @@ namespace jsb
             }
             array->Set(context, array_index++, enum_obj);
         }
+        info.GetReturnValue().Set(array);
+    }
+
+    template<typename T>
+    static v8::Local<v8::Value> generate_primitive_type(v8::Isolate* isolate, const v8::Local<v8::Context>& context)
+    {
+        constexpr static Variant::Type TYPE = GetTypeInfo<T>::VARIANT_TYPE;
+        v8::Local<v8::Object> class_info_obj = v8::Object::New(isolate);
+        set_field(isolate, context, class_info_obj, "name", Variant::get_type_name(TYPE));
+
+        // properties (getset)
+        {
+            List<StringName> members;
+            Variant::get_member_list(TYPE, &members);
+            v8::Local<v8::Array> members_obj = v8::Array::New(isolate, members.size());
+            set_field(isolate, context, class_info_obj, "properties", members_obj);
+            int index = 0;
+            for (const StringName& property_name : members)
+            {
+                // in order to reuse `build_property_info`, wrap it as a `PropertySetGet`
+                FPrimitiveGetSetInfo property_info;
+                property_info.name = property_name;
+                property_info.type = Variant::get_member_type(TYPE, property_name);
+                v8::Local<v8::Object> property_info_obj = v8::Object::New(isolate);
+                build_property_info(isolate, context, property_name, property_info, property_info_obj);
+                members_obj->Set(context, index++, property_info_obj);
+            }
+        }
+
+        // methods
+        {
+            List<StringName> methods;
+            Variant::get_builtin_method_list(TYPE, &methods);
+            v8::Local<v8::Array> methods_obj = v8::Array::New(isolate, (int) methods.size());
+            set_field(isolate, context, class_info_obj, "methods", methods_obj);
+            int index = 0;
+            for (const StringName& name : methods)
+            {
+                MethodInfo method_info;
+                method_info.name = name;
+                method_info.flags = 0;
+                method_info.return_val.type = Variant::get_builtin_method_return_type(TYPE, name);
+                for (int i = 0, n = Variant::get_builtin_method_argument_count(TYPE, name); i < n; ++i)
+                {
+                    PropertyInfo prop_info;
+                    prop_info.name = Variant::get_builtin_method_argument_name(TYPE, name, i);
+                    prop_info.type = Variant::get_builtin_method_argument_type(TYPE, name, i);
+                    method_info.arguments.push_back(prop_info);
+                }
+                if (Variant::is_builtin_method_const(TYPE, name)) method_info.flags |= METHOD_FLAG_CONST;
+                if (Variant::is_builtin_method_static(TYPE, name)) method_info.flags |= METHOD_FLAG_STATIC;
+                if (Variant::is_builtin_method_vararg(TYPE, name)) method_info.flags |= METHOD_FLAG_VARARG;
+                v8::Local<v8::Object> method_info_obj = v8::Object::New(isolate);
+                build_method_info(isolate, context, method_info, method_info_obj);
+                methods_obj->Set(context, index++, method_info_obj);
+            }
+        }
+
+        // operators
+        {
+            //TODO
+        }
+
+        // enums
+        {
+            List<StringName> enums;
+            Variant::get_enums_for_type(TYPE, &enums);
+            v8::Local<v8::Array> enums_obj = v8::Array::New(isolate, (int) enums.size());
+            set_field(isolate, context, class_info_obj, "enums", enums_obj);
+            int index = 0;
+            for (const StringName& enum_name : enums)
+            {
+                List<StringName> enumerations;
+                Variant::get_enumerations_for_enum(TYPE, enum_name, &enumerations);
+                ClassDB::ClassInfo::EnumInfo enum_info;
+                for (const StringName& enumeration : enumerations)
+                {
+                    enum_info.constants.push_back(enumeration);
+                }
+                v8::Local<v8::Object> enum_info_obj = v8::Object::New(isolate);
+                set_field(isolate, context, enum_info_obj, "name", enum_name);
+                build_enum_info(isolate, context, enum_info, enum_info_obj);
+                enums_obj->Set(context, index++, enum_info_obj);
+            }
+        }
+
+        // constants
+        {
+            List<StringName> constants;
+            Variant::get_constants_for_type(TYPE, &constants);
+            v8::Local<v8::Array> constants_obj = v8::Array::New(isolate, (int) constants.size());
+            set_field(isolate, context, class_info_obj, "constants", constants_obj);
+            int index = 0;
+            for (const StringName& constant : constants)
+            {
+                v8::Local<v8::Object> constant_info_obj = v8::Object::New(isolate);
+                const Variant constant_value = Variant::get_constant_value(TYPE, constant);
+
+                set_field(isolate, context, constant_info_obj, "name", constant);
+                set_field(isolate, context, constant_info_obj, "type", constant_value.get_type());
+                switch (constant_value.get_type())
+                {
+                case Variant::BOOL: set_field(isolate, context, constant_info_obj, "value", (bool) constant_value); break;
+                case Variant::INT: set_field(isolate, context, constant_info_obj, "value", (int64_t) constant_value); break;
+                case Variant::FLOAT: set_field(isolate, context, constant_info_obj, "value", (double) constant_value); break;
+                default: break;
+                }
+                constants_obj->Set(context, index++, constant_info_obj);
+            }
+        }
+        return class_info_obj;
+    }
+
+    #define GeneratePrimitiveType(Type) array->Set(context, index++, generate_primitive_type<Type>(isolate, context))
+    void JavaScriptEditorUtility::_get_primitive_types(const v8::FunctionCallbackInfo<v8::Value>& info)
+    {
+        v8::Isolate* isolate = info.GetIsolate();
+        v8::HandleScope handle_scope(isolate);
+        v8::Local<v8::Context> context = isolate->GetCurrentContext();
+
+        int index = 0;
+        v8::Local<v8::Array> array = v8::Array::New(isolate);
+
+        GeneratePrimitiveType(Vector2);
+        GeneratePrimitiveType(Vector2i);
+        GeneratePrimitiveType(Rect2);
+        GeneratePrimitiveType(Rect2i);
+        GeneratePrimitiveType(Vector3);
+        GeneratePrimitiveType(Vector3i);
+        GeneratePrimitiveType(Transform2D);
+        GeneratePrimitiveType(Vector4);
+        GeneratePrimitiveType(Vector4i);
+        GeneratePrimitiveType(Plane);
+        GeneratePrimitiveType(Quaternion);
+        GeneratePrimitiveType(AABB);
+        GeneratePrimitiveType(Basis);
+        GeneratePrimitiveType(Transform3D);
+        GeneratePrimitiveType(Projection);
+        GeneratePrimitiveType(Color);
+        // - StringName
+        // - NodePath
+        GeneratePrimitiveType(RID);
+        // - Object
+        GeneratePrimitiveType(Callable);
+        GeneratePrimitiveType(Signal);
+        GeneratePrimitiveType(Dictionary);
+        GeneratePrimitiveType(Array);
+        GeneratePrimitiveType(PackedByteArray);
+        GeneratePrimitiveType(PackedInt32Array);
+        GeneratePrimitiveType(PackedInt64Array);
+        GeneratePrimitiveType(PackedFloat32Array);
+        GeneratePrimitiveType(PackedFloat64Array);
+        GeneratePrimitiveType(PackedStringArray);
+        GeneratePrimitiveType(PackedVector2Array);
+        GeneratePrimitiveType(PackedVector3Array);
+        GeneratePrimitiveType(PackedColorArray);
+
         info.GetReturnValue().Set(array);
     }
 

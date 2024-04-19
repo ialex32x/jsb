@@ -25,7 +25,7 @@ console.assert(typeof godot_1.Node === "function");
 // }, 1000);
 // console.log("start tick", timer_id);
 // setImmediate(function(){
-//     console.log("immediate"); 
+//     console.log("immediate");
 // });
 // let infinite_loops = 0;
 // setInterval(function () {
