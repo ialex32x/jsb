@@ -7,6 +7,7 @@
 #include <v8-inspector.h>
 #include <v8-version-string.h>
 
+#include <memory>
 #include <cstdint>
 
 #include "core/core_constants.h"

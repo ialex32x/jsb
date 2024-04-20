@@ -9,34 +9,6 @@
 
 namespace jsb
 {
-    static const char* _op_names[] = {
-		"op_EQUAL",            // Equality operator ([code]==[/code]).
-		"op_NOT_EQUAL",            // Inequality operator ([code]!=[/code]).
-		"op_LESS",             // Less than operator ([code]&lt;[/code]).
-		"op_LESS_EQUAL",           // Less than or equal operator ([code]&lt;=[/code]).
-		"op_GREATER",          // Greater than operator ([code]&gt;[/code]).
-		"op_GREATER_EQUAL",            // Greater than or equal operator ([code]&gt;=[/code]).
-		"op_ADD",          // Addition operator ([code]+[/code]).
-		"op_SUBTRACT",             // Subtraction operator ([code]-[/code]).
-		"op_MULTIPLY",             // Multiplication operator ([code]*[/code]).
-		"op_DIVIDE",           // Division operator ([code]/[/code]).
-		"op_NEGATE",           // Unary negation operator ([code]-[/code]).
-		"op_POSITIVE",             // Unary plus operator ([code]+[/code]).
-		"op_MODULE",           // Remainder/modulo operator ([code]%[/code]).
-		"op_POWER",            // Power operator ([code]**[/code]).
-		"op_SHIFT_LEFT",           // Left shift operator ([code]&lt;&lt;[/code]).
-		"op_SHIFT_RIGHT",          // Right shift operator ([code]&gt;&gt;[/code]).
-		"op_BIT_AND",          // Bitwise AND operator ([code]&amp;[/code]).
-		"op_BIT_OR",           // Bitwise OR operator ([code]|[/code]).
-		"op_BIT_XOR",          // Bitwise XOR operator ([code]^[/code]).
-		"op_BIT_NEGATE",           // Bitwise NOT operator ([code]~[/code]).
-		"op_AND",          // Logical AND operator ([code]and[/code] or [code]&amp;&amp;[/code]).
-		"op_OR",           // Logical OR operator ([code]or[/code] or [code]||[/code]).
-		"op_XOR",          // Logical XOR operator (not implemented in GDScript).
-		"op_NOT",          // Logical NOT operator ([code]not[/code] or [code]![/code]).
-		"op_IN",           // Logical IN operator ([code]in[/code]).
-    };
-
     struct FMethodInfo
     {
         StringName name;
@@ -50,6 +22,81 @@ namespace jsb
         Variant::ValidatedGetter getter_func;
         Variant::Type type;
     };
+
+    struct OperatorEvaluator2
+    {
+        static void invoke(const v8::FunctionCallbackInfo<v8::Value>& info)
+        {
+            v8::Isolate* isolate = info.GetIsolate();
+            v8::HandleScope handle_scope(isolate);
+            v8::Isolate::Scope isolate_scope(isolate);
+            v8::Local<v8::Context> context = isolate->GetCurrentContext();
+            const Variant::Operator op = (Variant::Operator) info.Data().As<v8::Int32>()->Value();
+            if (info.Length() != 2)
+            {
+                jsb_throw(isolate, "bad param");
+                return;
+            }
+            Variant left, right;
+            if (!Realm::js_to_gd_var(isolate, context, info[0], left) || !Realm::js_to_gd_var(isolate, context, info[1], right))
+            {
+                jsb_throw(isolate, "bad translation");
+                return;
+            }
+            const Variant::Type left_type = left.get_type();
+            const Variant::Type right_type = right.get_type();
+            const Variant::ValidatedOperatorEvaluator func = Variant::get_validated_operator_evaluator(op, left_type, right_type);
+            if (!func)
+            {
+                jsb_throw(isolate, "bad type (no operator)");
+                return;
+            }
+            Variant ret;
+            func(&left, &right, &ret);
+            if (ret.get_type() != Variant::get_operator_return_type(op, left_type, right_type))
+            {
+                jsb_throw(isolate, "bad return");
+                return;
+            }
+            v8::Local<v8::Value> rval;
+            if (!Realm::gd_var_to_js(isolate, context, ret, rval))
+            {
+                jsb_throw(isolate, "bad translation");
+                return;
+            }
+            info.GetReturnValue().Set(rval);
+        }
+    };
+
+#define JSB_DEFINE_OPERATOR2(op_code) function_template->\
+    Set(V8Helper::to_string(p_env.isolate, "op_" #op_code), v8::FunctionTemplate::New(p_env.isolate, OperatorEvaluator2::invoke, v8::Int32::New(p_env.isolate, Variant::OP_##op_code)));\
+    JSB_LOG(Verbose, "generate %d: %s", Variant::OP_##op_code, "op_" #op_code)
+
+    template<typename T>
+    struct OperatorRegister
+    {
+        static void generate(const FBindingEnv& p_env, const v8::Local<v8::FunctionTemplate>& function_template) {}
+    };
+
+    // Godot do not make operator list public, so we can only do it manually
+    template<>
+    struct OperatorRegister<Vector2>
+    {
+        static void generate(const FBindingEnv& p_env, const v8::Local<v8::FunctionTemplate>& function_template)
+        {
+            JSB_DEFINE_OPERATOR2(ADD);
+            JSB_DEFINE_OPERATOR2(SUBTRACT);
+            JSB_DEFINE_OPERATOR2(MULTIPLY);
+            JSB_DEFINE_OPERATOR2(DIVIDE);
+        }
+    };
+
+    template<> struct OperatorRegister<Vector2i> : OperatorRegister<Vector2> {};
+    template<> struct OperatorRegister<Vector3> : OperatorRegister<Vector2> {};
+    template<> struct OperatorRegister<Vector3i> : OperatorRegister<Vector2> {};
+    template<> struct OperatorRegister<Vector4> : OperatorRegister<Vector2> {};
+    template<> struct OperatorRegister<Vector4i> : OperatorRegister<Vector2> {};
+    template<> struct OperatorRegister<Quaternion> : OperatorRegister<Vector2> {};
 
     template<typename T>
     struct VariantBind
@@ -393,9 +440,7 @@ namespace jsb
 
             // operators
             {
-                //TODO expose operators
-                //TODO Godot do not make operator list public, so we can only do it manually
-                // Variant::get_operator_return_type(Variant::OP_ADD, left, right);
+                OperatorRegister<T>::generate(p_env, function_template);
             }
 
             // enums

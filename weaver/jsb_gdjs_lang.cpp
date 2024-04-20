@@ -179,7 +179,7 @@ void GodotJSScriptLanguage::get_recognized_extensions(List<String>* p_extensions
     p_extensions->push_back(JSB_RES_EXT);
 }
 
-Error GodotJSScriptLanguage::eval_source(const String &p_code)
+jsb::JSValueMove GodotJSScriptLanguage::eval_source(const String &p_code, Error& r_err)
 {
-    return realm_->eval_source(p_code.utf8(), "eval");
+    return realm_->eval_source(p_code.utf8(), "eval", r_err);
 }

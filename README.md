@@ -6,6 +6,7 @@ JavaScript for Godot with V8
 ## Features
 * [x] Support on-demand binding
 * [x] Essential NodeJS compatibilities (`console` , `timers` and `CommonJS` modules)
+* [ ] Support REPL in Godot Editor
 * [ ] Asynchronous module loading support (`import` function)
 * [x] Godot Object types binding
 * [ ] Godot Primitive types binding

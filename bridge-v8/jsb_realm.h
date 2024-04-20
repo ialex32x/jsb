@@ -8,6 +8,8 @@
 #include "jsb_primitive_bindings.h"
 #include <unordered_map>
 
+#include "jsb_value_move.h"
+
 namespace jsb
 {
     enum : uint32_t
@@ -106,7 +108,7 @@ namespace jsb
 
         //NOTE AVOID USING THIS CALL, CONSIDERING REMOVING IT.
         //     eval from source
-        Error eval_source(const CharString& p_source, const String& p_filename);
+        JSValueMove eval_source(const CharString& p_source, const String& p_filename, Error& r_err);
 
         /**
          * \brief load a module script
