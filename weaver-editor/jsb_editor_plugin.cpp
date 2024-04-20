@@ -1,6 +1,7 @@
 #include "jsb_editor_plugin.h"
 
 #include "jsb_project_preset.h"
+#include "jsb_repl.h"
 #include "../internal/jsb_path_util.h"
 #include "../weaver/jsb_gdjs_lang.h"
 
@@ -46,6 +47,8 @@ GodotJSEditorPlugin::GodotJSEditorPlugin()
     menu->add_item(TTR("Install TS Project"), MENU_ID_INSTALL_TS_PROJECT);
     menu->add_item(TTR("Generate Godot d.ts"), MENU_ID_GENERATE_GODOT_DTS);
     menu->connect("id_pressed", callable_mp(this, &GodotJSEditorPlugin::_on_menu_pressed));
+
+    add_control_to_bottom_panel(memnew(GodotJSREPL), TTR("GodotJS"));
 }
 
 GodotJSEditorPlugin::~GodotJSEditorPlugin()
