@@ -1,11 +1,14 @@
 ﻿#include "jsb_repl.h"
 
+#include "../weaver/jsb_gdjs_lang.h"
 #include "scene/gui/button.h"
 #include "scene/gui/line_edit.h"
 #include "scene/gui/rich_text_label.h"
 
 GodotJSREPL::GodotJSREPL()
 {
+    //TODO list all created realm instances in REPL, interact with the current selected one.
+
     HBoxContainer* hbox = memnew(HBoxContainer);
     add_child(hbox);
     {
@@ -72,6 +75,11 @@ void GodotJSREPL::_input_submitted(const String &p_text)
 {
     _add_line(p_text);
     input_box_->clear();
+    GodotJSScriptLanguage* lang = GodotJSScriptLanguage::get_singleton();
+    jsb_check(lang);
+    Error err;
+    const jsb::JSValueMove value = lang->eval_source(p_text, err);
+    _add_string(value.to_string());
 }
 
 void GodotJSREPL::_add_line(const String &p_line)

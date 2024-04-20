@@ -26,7 +26,7 @@ public:
     // main context
     jsb_force_inline std::shared_ptr<jsb::Realm> get_context() const { return realm_; }
 
-    Error eval_source(const String& p_code);
+    jsb::JSValueMove eval_source(const String& p_code, Error& r_err);
 
     GodotJSScriptLanguage();
     virtual ~GodotJSScriptLanguage() override;

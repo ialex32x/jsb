@@ -1450,7 +1450,7 @@ namespace jsb
         isolate->ThrowError(v8::String::NewFromUtf8(isolate, message.ptr(), v8::NewStringType::kNormal, message.length()).ToLocalChecked());
     }
 
-    Error Realm::eval_source(const CharString& p_source, const String& p_filename)
+    JSValueMove Realm::eval_source(const CharString& p_source, const String& p_filename, Error& r_err)
     {
         v8::Isolate* isolate = get_isolate();
         v8::Isolate::Scope isolate_scope(isolate);
@@ -1459,7 +1459,7 @@ namespace jsb
         v8::Context::Scope context_scope(context);
 
         v8::TryCatch try_catch_run(isolate);
-        /* return value discarded */ _compile_run(p_source, p_source.length(), p_filename);
+        v8::MaybeLocal<v8::Value> maybe = _compile_run(p_source, p_source.length(), p_filename);
         if (try_catch_run.HasCaught())
         {
             v8::Local<v8::Message> message = try_catch_run.Message();
@@ -1469,15 +1469,25 @@ namespace jsb
                 v8::String::Utf8Value stack_trace_utf8(isolate, stack_trace);
                 if (stack_trace_utf8.length() != 0)
                 {
-                    ERR_FAIL_V_MSG(ERR_COMPILATION_FAILED, String(*stack_trace_utf8, stack_trace_utf8.length()));
+                    r_err = ERR_COMPILATION_FAILED;
+                    JSB_LOG(Error, "%s", String(*stack_trace_utf8, stack_trace_utf8.length()));
+                    return JSValueMove();
                 }
             }
 
             // fallback to plain message
             const v8::String::Utf8Value message_utf8(isolate, message->Get());
-            ERR_FAIL_V_MSG(ERR_COMPILATION_FAILED, String::utf8(*message_utf8, message_utf8.length()));
+            r_err = ERR_COMPILATION_FAILED;
+            JSB_LOG(Error, "%s", String(*message_utf8, message_utf8.length()));
+            return JSValueMove();
         }
-        return OK;
+
+        v8::Local<v8::Value> rval;
+        if (!maybe.ToLocal(&rval))
+        {
+            return JSValueMove();
+        }
+        return JSValueMove(shared_from_this(), rval);
     }
 
     bool Realm::_get_main_module(v8::Local<v8::Object>* r_main_module) const
