@@ -401,6 +401,11 @@ namespace jsb
         v8::Local<v8::Object> class_info_obj = v8::Object::New(isolate);
         set_field(isolate, context, class_info_obj, "name", Variant::get_type_name(TYPE));
 
+        // constructors
+        {
+            //TODO list all constructor overloads
+        }
+
         // properties (getset)
         {
             List<StringName> members;
